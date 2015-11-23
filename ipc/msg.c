@@ -413,7 +413,7 @@ static int msgctl_down(struct ipc_namespace *ns, int msqid, int cmd,
 		       struct msqid_ds __user *buf, int version)
 {
 	struct kern_ipc_perm *ipcp;
-	struct msqid64_ds msqid64;
+	struct msqid64_ds msqid64 = {{0}};
 	struct msg_queue *msq;
 	int err;
 

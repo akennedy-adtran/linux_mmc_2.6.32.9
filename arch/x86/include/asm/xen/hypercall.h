@@ -45,6 +45,7 @@
 #include <xen/interface/xen.h>
 #include <xen/interface/sched.h>
 #include <xen/interface/physdev.h>
+#include <xen/interface/platform.h>
 
 /*
  * The hypercall asms have to meet several constraints:
@@ -200,6 +201,23 @@ extern struct { char _entry[32]; } hypercall_page[];
 	(type)__res;							\
 })
 
+static inline long
+privcmd_call(unsigned call,
+	     unsigned long a1, unsigned long a2,
+	     unsigned long a3, unsigned long a4,
+	     unsigned long a5)
+{
+	__HYPERCALL_DECLS;
+	__HYPERCALL_5ARG(a1, a2, a3, a4, a5);
+
+	asm volatile("call *%[call]"
+		     : __HYPERCALL_5PARAM
+		     : [call] "a" (&hypercall_page[call])
+		     : __HYPERCALL_CLOBBER5);
+
+	return (long)__res;
+}
+
 static inline int
 HYPERVISOR_set_trap_table(struct trap_info *table)
 {
@@ -279,6 +297,13 @@ HYPERVISOR_set_timer_op(u64 timeout)
 	unsigned long timeout_hi = (unsigned long)(timeout>>32);
 	unsigned long timeout_lo = (unsigned long)timeout;
 	return _hypercall2(long, set_timer_op, timeout_lo, timeout_hi);
+}
+
+static inline int
+HYPERVISOR_dom0_op(struct xen_platform_op *platform_op)
+{
+	platform_op->interface_version = XENPF_INTERFACE_VERSION;
+	return _hypercall1(int, dom0_op, platform_op);
 }
 
 static inline int

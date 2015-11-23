@@ -125,6 +125,7 @@ void __cpuinit calibrate_delay(void)
 	int lps_precision = LPS_PREC;
 	static bool printed;
 
+	printk("Delay calibration in progress:\n");
 	if (preset_lpj) {
 		loops_per_jiffy = preset_lpj;
 		if (!printed)

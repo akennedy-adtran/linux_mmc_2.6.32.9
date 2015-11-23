@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2005-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * hvc_console.h
  * Copyright (C) 2005 IBM Corporation
@@ -26,6 +34,9 @@
 
 #ifndef HVC_CONSOLE_H
 #define HVC_CONSOLE_H
+
+#include <linux/types.h>
+
 #include <linux/kref.h>
 #include <linux/tty.h>
 #include <linux/spinlock.h>

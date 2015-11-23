@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -63,7 +71,12 @@ extern int add_temporary_entry(unsigned long entrylo0, unsigned long entrylo1,
 #define USER_PTRS_PER_PGD	(0x80000000UL/PGDIR_SIZE)
 #define FIRST_USER_ADDRESS	0
 
+#ifdef CONFIG_MAPPED_KERNEL
+extern unsigned long __vmalloc_start;
+#define VMALLOC_START     __vmalloc_start
+#else
 #define VMALLOC_START     MAP_BASE
+#endif
 
 #define PKMAP_BASE		(0xfe000000UL)
 
@@ -127,8 +140,12 @@ pfn_pte(unsigned long pfn, pgprot_t prot)
 #define pte_pfn(x)		((unsigned long)((x).pte >> (PAGE_SHIFT + 2)))
 #define pfn_pte(pfn, prot)	__pte(((pfn) << (PAGE_SHIFT + 2)) | pgprot_val(prot))
 #else
-#define pte_pfn(x)		((unsigned long)((x).pte >> PAGE_SHIFT))
-#define pfn_pte(pfn, prot)	__pte(((unsigned long long)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
+#ifdef CONFIG_NLM_XLP
+#define pte_pfn(x)     ((unsigned long)((x).pte >> PAGE_SHIFT))
+#else
+#define pte_pfn(x)     ((unsigned long)((x).pte >> _PFN_SHIFT))
+#endif
+#define pfn_pte(pfn, prot) __pte(((unsigned long long)(pfn) << _PFN_SHIFT) | pgprot_val(prot))
 #endif
 #endif /* defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_CPU_MIPS32) */
 

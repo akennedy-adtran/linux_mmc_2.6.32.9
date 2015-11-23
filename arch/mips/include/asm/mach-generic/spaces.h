@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -21,7 +29,11 @@
 
 #ifdef CONFIG_32BIT
 
+#if defined(CONFIG_MAPPED_KERNEL) && defined(CONFIG_KSEG2_LOWMEM)
+#define CAC_BASE                _AC(0xc0000000, UL)
+#else
 #define CAC_BASE		_AC(0x80000000, UL)
+#endif
 #define IO_BASE			_AC(0xa0000000, UL)
 #define UNCAC_BASE		_AC(0xa0000000, UL)
 
@@ -41,11 +53,25 @@
 #ifdef CONFIG_64BIT
 
 #ifndef CAC_BASE
+
 #ifdef CONFIG_DMA_NONCOHERENT
-#define CAC_BASE		_AC(0x9800000000000000, UL)
+#define CAC_BASE                _AC(0x9800000000000000, UL)
+#else /* !CONFIG_DMA_NONCOHERENT */
+
+#if defined(CONFIG_MAPPED_KERNEL) && defined(CONFIG_KSEG2_LOWMEM)
+#define CAC_BASE                XKSEG
+#else /* !CONFIG_MAPPED_KERNEL */
+#define CAC_BASE                _AC(0xa800000000000000, UL)
+#endif /* CONFIG_MAPPED_KERNEL */
+
+#endif /* CONFIG_DMA_NONCOHERENT */
+
+#endif /* CAC_BASE */
+
+#if defined(CONFIG_MAPPED_KERNEL)  && defined(CONFIG_KSEG2_LOWMEM)
+#define PAGE_OFFSET	XKSEG
 #else
-#define CAC_BASE		_AC(0xa800000000000000, UL)
-#endif
+#define PAGE_OFFSET	_AC(0xa800000000000000, UL)
 #endif
 
 #ifndef IO_BASE

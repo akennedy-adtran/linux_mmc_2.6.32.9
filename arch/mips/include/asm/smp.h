@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file "COPYING" in the main directory of this
@@ -13,7 +22,9 @@
 
 #include <linux/bitops.h>
 #include <linux/linkage.h>
+#ifndef CONFIG_NLM_COMMON
 #include <linux/smp.h>
+#endif
 #include <linux/threads.h>
 #include <linux/cpumask.h>
 
@@ -25,8 +36,10 @@ extern cpumask_t cpu_sibling_map[];
 
 #define raw_smp_processor_id() (current_thread_info()->cpu)
 
-/* Map from cpu id to sequential logical cpu number.  This will only
-   not be idempotent when cpus failed to come on-line.  */
+/* Map from cpu id to sequential logical cpu number.  This will
+   not be idempotent when cpus failed to come on-line as well as
+   when you have holes in the online cpu mask
+   if you use FDT, `onlinemask' */
 extern int __cpu_number_map[NR_CPUS];
 #define cpu_number_map(cpu)  __cpu_number_map[cpu]
 
@@ -44,6 +57,7 @@ extern int __cpu_logical_map[NR_CPUS];
 extern volatile cpumask_t cpu_callin_map;
 
 extern void asmlinkage smp_bootstrap(void);
+extern void core_send_ipi(int cpu, unsigned int action);
 
 /*
  * this function sends a 'reschedule' IPI to another CPU.

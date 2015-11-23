@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2006-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * Processor capabilities determination functions.
  *
@@ -24,6 +32,14 @@
 #include <asm/system.h>
 #include <asm/watch.h>
 #include <asm/spram.h>
+#if defined(CONFIG_NLM_XLR)
+#include <asm/netlogic/sim.h>
+#endif
+#if defined(CONFIG_NLM_XLP)
+#include <asm/netlogic/xlp.h>
+#endif
+
+
 /*
  * Not all of the MIPS CPUs have the "wait" instruction available. Moreover,
  * the implementation of the "wait" feature differs between CPU families. This
@@ -160,6 +176,8 @@ void __init check_wait(void)
 	case CPU_BCM6348:
 	case CPU_BCM6358:
 	case CPU_CAVIUM_OCTEON:
+	case CPU_XLR:
+	case CPU_XLP:
 		cpu_wait = r4k_wait;
 		break;
 
@@ -183,7 +201,7 @@ void __init check_wait(void)
 
 	case CPU_TX49XX:
 		cpu_wait = r4k_wait_irqoff;
-		break;
+        break;
 	case CPU_ALCHEMY:
 		cpu_wait = au1k_wait;
 		break;
@@ -280,6 +298,15 @@ static inline unsigned long cpu_get_fpu_id(void)
 static inline int __cpu_has_fpu(void)
 {
 	return ((cpu_get_fpu_id() & 0xff00) != FPIR_IMP_NONE);
+}
+
+static inline void cpu_probe_vmbits(struct cpuinfo_mips *c)
+{
+#ifdef __NEED_VMBITS_PROBE
+	write_c0_entryhi(0x3fffffffffffe000ULL);
+	back_to_back_c0_hazard();
+	c->vmbits = fls64(read_c0_entryhi() & 0x3fffffffffffe000ULL);
+#endif
 }
 
 #define R4K_OPTS (MIPS_CPU_TLB | MIPS_CPU_4KEX | MIPS_CPU_4K_CACHE \
@@ -904,6 +931,51 @@ static inline void cpu_probe_cavium(struct cpuinfo_mips *c, unsigned int cpu)
 
 const char *__cpu_name[NR_CPUS];
 
+static __inline__ void cpu_probe_netlogic(struct cpuinfo_mips *c, int cpu)
+{
+	decode_configs(c);
+
+	c->options = (MIPS_CPU_TLB     |
+		      MIPS_CPU_4KEX    |
+		      MIPS_CPU_COUNTER |
+		      MIPS_CPU_DIVEC   |
+		      MIPS_CPU_WATCH   |
+		      MIPS_CPU_EJTAG   |
+		      MIPS_CPU_NLM_CACHE |
+		      MIPS_CPU_LLSC);
+
+#if defined(CONFIG_NLM_XLP)
+	{
+		/* XLP */
+
+		c->cputype = CPU_XLP;
+
+		c->isa_level = MIPS_CPU_ISA_M64R2;
+		c->options |= (MIPS_CPU_FPU | MIPS_CPU_ULRI | MIPS_CPU_MCHECK);
+
+		c->tlbsize = ((read_c0_config6() >> 16 ) & 0xffff) + 1;
+		__cpu_name[cpu] = (const char *)get_cpu_info();
+
+		printk("Enabling XLP CPU (%s): pr id 0x%x  smp id %d\n",
+		       cpu_name_string(), c->processor_id, cpu);
+	}
+#else
+	{
+	
+		/* XLR/XLS */
+
+		c->cputype = CPU_XLR;
+		c->isa_level = MIPS_CPU_ISA_M64R1;
+		c->tlbsize = ((read_c0_config1() >> 25) & 0x3f) + 1;
+
+		__cpu_name[cpu] = (const char *)get_cpu_info();
+
+		printk("Enabling XLR/XLS CPU (%s)\n", cpu_name_string());
+	}
+#endif
+
+}
+
 __cpuinit void cpu_probe(void)
 {
 	struct cpuinfo_mips *c = &current_cpu_data;
@@ -939,6 +1011,9 @@ __cpuinit void cpu_probe(void)
 	case PRID_COMP_CAVIUM:
 		cpu_probe_cavium(c, cpu);
 		break;
+	case PRID_COMP_NLM:
+		cpu_probe_netlogic(c, cpu);
+		break;
 	}
 
 	BUG_ON(!__cpu_name[cpu]);
@@ -967,6 +1042,8 @@ __cpuinit void cpu_probe(void)
 		c->srsets = ((read_c0_srsctl() >> 26) & 0x0f) + 1;
 	else
 		c->srsets = 1;
+
+	cpu_probe_vmbits(c);
 }
 
 __cpuinit void cpu_report(void)

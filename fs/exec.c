@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *  linux/fs/exec.c
  *
@@ -230,7 +238,11 @@ static int __bprm_mm_init(struct linux_binprm *bprm)
 	struct vm_area_struct *vma = NULL;
 	struct mm_struct *mm = bprm->mm;
 
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+	bprm->vma = vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL | GFP_DMA);
+#else
 	bprm->vma = vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL);
+#endif
 	if (!vma)
 		return -ENOMEM;
 
@@ -361,7 +373,7 @@ err:
 /*
  * count() counts the number of strings in array ARGV.
  */
-static int count(char __user * __user * argv, int max)
+int count(char __user * __user * argv, int max)
 {
 	int i = 0;
 
@@ -387,7 +399,7 @@ static int count(char __user * __user * argv, int max)
  * processes's memory to the new process's stack.  The call to get_user_pages()
  * ensures the destination page is created and not swapped out.
  */
-static int copy_strings(int argc, char __user * __user * argv,
+int copy_strings(int argc, char __user * __user * argv,
 			struct linux_binprm *bprm)
 {
 	struct page *kmapped_page = NULL;

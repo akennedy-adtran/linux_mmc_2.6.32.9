@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2006-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /******************************************************************************
  * grant_table.c
  *
@@ -38,9 +46,11 @@
 #include <linux/uaccess.h>
 
 #include <xen/interface/xen.h>
+#include <xen/interface/domctl.h>
 #include <xen/page.h>
 #include <xen/grant_table.h>
 #include <asm/xen/hypercall.h>
+#include <xen/interface/memory.h>
 
 #include <asm/pgtable.h>
 #include <asm/sync_bitops.h>
@@ -158,16 +168,34 @@ static void update_grant_entry(grant_ref_t ref, domid_t domid,
 /*
  * Public grant-issuing interface functions
  */
+void gnttab_update_service(uint32_t service_for_dom_id, uint32_t start_ref_id, 
+						   uint32_t nr_pages, uint64_t pfn, uint32_t service_id)
+{
+	int rc;
+	struct gnttab_update_service service;
+
+	service.dom_id = DOMID_SELF;
+	service.shared_page_for_dom_id = service_for_dom_id;
+	service.start_ref_id = start_ref_id;
+	service.nr_pages = nr_pages;
+	service.service_id = service_id;
+	service.pfn = pfn;
+
+	rc = HYPERVISOR_grant_table_op2 (GNTTABOP_update_service, &service, 1);
+}
+
 void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
-				     unsigned long frame, int readonly)
+									 unsigned long frame, int readonly)
 {
 	update_grant_entry(ref, domid, frame,
-			   GTF_permit_access | (readonly ? GTF_readonly : 0));
+					   GTF_permit_access | 
+					   (readonly ? GTF_readonly : (GTF_reading | GTF_writing)));
 }
+
 EXPORT_SYMBOL_GPL(gnttab_grant_foreign_access_ref);
 
 int gnttab_grant_foreign_access(domid_t domid, unsigned long frame,
-				int readonly)
+								int readonly)
 {
 	int ref;
 
@@ -209,7 +237,7 @@ int gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly)
 EXPORT_SYMBOL_GPL(gnttab_end_foreign_access_ref);
 
 void gnttab_end_foreign_access(grant_ref_t ref, int readonly,
-			       unsigned long page)
+							   unsigned long page)
 {
 	if (gnttab_end_foreign_access_ref(ref, readonly)) {
 		put_free_entry(ref);
@@ -238,7 +266,7 @@ int gnttab_grant_foreign_transfer(domid_t domid, unsigned long pfn)
 EXPORT_SYMBOL_GPL(gnttab_grant_foreign_transfer);
 
 void gnttab_grant_foreign_transfer_ref(grant_ref_t ref, domid_t domid,
-				       unsigned long pfn)
+									   unsigned long pfn)
 {
 	update_grant_entry(ref, domid, pfn, GTF_accept_transfer);
 }
@@ -338,7 +366,7 @@ int gnttab_claim_grant_reference(grant_ref_t *private_head)
 EXPORT_SYMBOL_GPL(gnttab_claim_grant_reference);
 
 void gnttab_release_grant_reference(grant_ref_t *private_head,
-				    grant_ref_t release)
+									grant_ref_t release)
 {
 	gnttab_entry(release) = *private_head;
 	*private_head = release;
@@ -346,7 +374,7 @@ void gnttab_release_grant_reference(grant_ref_t *private_head,
 EXPORT_SYMBOL_GPL(gnttab_release_grant_reference);
 
 void gnttab_request_free_callback(struct gnttab_free_callback *callback,
-				  void (*fn)(void *), void *arg, u16 count)
+								  void (*fn)(void *), void *arg, u16 count)
 {
 	unsigned long flags;
 	spin_lock_irqsave(&gnttab_list_lock, flags);
@@ -462,9 +490,9 @@ static int gnttab_map(unsigned int start_idx, unsigned int end_idx)
 	}
 
 	BUG_ON(rc || setup.status);
-
-	rc = arch_gnttab_map_shared(frames, nr_gframes, max_nr_grant_frames(),
-				    &shared);
+  
+	rc = arch_gnttab_map_shared(frames, nr_gframes, max_nr_grant_frames(), 
+								&shared);
 	BUG_ON(rc);
 
 	kfree(frames);
@@ -492,7 +520,7 @@ static int gnttab_expand(unsigned int req_entries)
 
 	cur = nr_grant_frames;
 	extra = ((req_entries + (GREFS_PER_GRANT_FRAME-1)) /
-		 GREFS_PER_GRANT_FRAME);
+			 GREFS_PER_GRANT_FRAME);
 	if (cur + extra > max_nr_grant_frames())
 		return -ENOSPC;
 
@@ -501,6 +529,102 @@ static int gnttab_expand(unsigned int req_entries)
 		rc = grow_gnttab_list(extra);
 
 	return rc;
+}
+
+#define MAX_EXTENTS                (1)
+#define MAX_EXTENT_ORDER           (12)
+#define MAX_PAGE_REQUEST           (1 << (MAX_EXTENT_ORDER + 1))
+xen_pfn_t p2m_host[MAX_EXTENTS], p2m_host_extent[MAX_PAGE_REQUEST];
+unsigned long vaddr_buffer [MAX_PAGE_REQUEST];
+
+int xen_get_current_reservation (uint32_t dom_id)
+{
+	int tot_pages;
+	tot_pages = HYPERVISOR_memory_op (XENMEM_current_reservation, &dom_id);
+	return tot_pages;
+}
+
+int xen_get_maximum_reservation (uint32_t dom_id)
+{
+	int max_pages = 0;
+	max_pages = HYPERVISOR_memory_op (XENMEM_maximum_reservation, &dom_id);
+	return max_pages;
+}
+
+int xen_increase_max_mem (uint32_t dom_id, uint64_t max_mem)
+{
+	struct xen_domctl domctl;
+	int ret;
+
+	memset((char *)&domctl, 0, sizeof(domctl));
+	domctl.cmd = XEN_DOMCTL_max_mem;
+	domctl.domain = (domid_t)dom_id;
+	domctl.u.max_mem.max_memkb = max_mem;
+	domctl.interface_version = XEN_DOMCTL_INTERFACE_VERSION;
+	ret = privcmd_call(__HYPERVISOR_domctl, (unsigned long)&domctl, 0, 0, 0, 0);
+	return ret;
+}
+
+/* Below function makes a request to XEN for N pfn's */
+int xen_increase_reservation (int dom_id, int n_extents, int n_extent_order)
+{
+    xen_pfn_t pfn;
+    int rc = 0;
+    unsigned long vaddr;
+    struct xen_memory_reservation reservation;
+
+    vaddr = 0;
+
+    /* setup initial p2m */
+    if (n_extents > MAX_PAGE_REQUEST) {
+        printk ("%s, Error: Request %d exceeded max=%d\n", __func__, n_extents, MAX_PAGE_REQUEST);
+        return 0;
+    }
+    for ( pfn = 0; pfn < n_extents; pfn++ )
+        p2m_host[pfn] = vaddr + pfn;
+
+    reservation.nr_extents   = n_extents;
+    reservation.extent_order = n_extent_order;
+    reservation.domid        = dom_id;
+    reservation.address_bits = 0;
+    set_xen_guest_handle(reservation.extent_start, p2m_host);
+
+    /* allocate guest memory */
+    rc = HYPERVISOR_memory_op (XENMEM_increase_reservation, &reservation);
+    if (rc != n_extents)
+        printk ("%s: Error in XENMEM_increase_reservation: rc = %d\n", __func__, rc);
+
+    return rc;
+}
+
+/* Below function makes a request to XEN for reducing N GPFN's */
+int xen_decrease_reservation (int n_extents, int n_extent_order, unsigned long vaddr_start)
+{
+    xen_pfn_t pfn;
+    int rc = 0;
+    struct xen_memory_reservation reservation;
+
+    /* setup initial p2m */
+    if (n_extents > MAX_PAGE_REQUEST) {
+        printk ("%s, Error: Request %d exceeded max=%d\n", __func__, n_extents, MAX_PAGE_REQUEST);
+        return 0;
+    }
+
+    for ( pfn = 0; pfn < n_extents; pfn++ )
+        p2m_host[pfn] = (vaddr_start +  pfn * XEN_PAGE_SIZE) >> XEN_PAGE_SHIFT;
+
+    reservation.nr_extents   = n_extents;
+    reservation.extent_order = n_extent_order;
+    reservation.domid        = DOMID_SELF;
+    reservation.address_bits = 0;
+    set_xen_guest_handle(reservation.extent_start, p2m_host);
+
+    /* allocate guest memory */
+    rc = HYPERVISOR_memory_op (XENMEM_decrease_reservation, &reservation);
+    if (rc != n_extents)
+        printk ("%s: Error in XENMEM_decrease_reservation rc = %d\n", __func__, rc);
+
+    return rc;
 }
 
 static int __devinit gnttab_init(void)
@@ -515,14 +639,15 @@ static int __devinit gnttab_init(void)
 	nr_grant_frames = 1;
 	boot_max_nr_grant_frames = __max_nr_grant_frames();
 
-	/* Determine the maximum number of frames required for the
+	/* 
+	 * Determine the maximum number of frames required for the
 	 * grant reference free list on the current hypervisor.
 	 */
-	max_nr_glist_frames = (boot_max_nr_grant_frames *
-			       GREFS_PER_GRANT_FRAME / RPP);
+	max_nr_glist_frames = (boot_max_nr_grant_frames * 
+						   GREFS_PER_GRANT_FRAME / RPP);
 
-	gnttab_list = kmalloc(max_nr_glist_frames * sizeof(grant_ref_t *),
-			      GFP_KERNEL);
+	gnttab_list = kmalloc(max_nr_glist_frames * sizeof(grant_ref_t *), 
+						  GFP_KERNEL);
 	if (gnttab_list == NULL)
 		return -ENOMEM;
 
@@ -545,10 +670,9 @@ static int __devinit gnttab_init(void)
 	gnttab_free_count = nr_init_grefs - NR_RESERVED_ENTRIES;
 	gnttab_free_head  = NR_RESERVED_ENTRIES;
 
-	printk("Grant table initialized\n");
 	return 0;
 
- ini_nomem:
+ini_nomem:
 	for (i--; i >= 0; i--)
 		free_page((unsigned long)gnttab_list[i]);
 	kfree(gnttab_list);

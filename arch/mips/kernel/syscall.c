@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2005-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -112,6 +120,7 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		    (!vmm || addr + len <= vmm->vm_start))
 			return addr;
 	}
+
 	addr = TASK_UNMAPPED_BASE;
 	if (do_color_align)
 		addr = COLOUR_ALIGN(addr, pgoff);
@@ -129,6 +138,24 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 			addr = COLOUR_ALIGN(addr, pgoff);
 	}
 }
+
+#if defined(CONFIG_NLM_COMMON) && defined(CONFIG_64BIT)
+int mips_mmap_check(unsigned long addr, unsigned long len,
+		    unsigned long flags)
+{
+	int app_is_32bit = test_thread_flag(TIF_32BIT_ADDR);
+
+	if(app_is_32bit){
+		if(len >= TASK_SIZE32){
+			return -EINVAL;
+		}
+		if ((flags & MAP_FIXED) && addr > (TASK_SIZE32 - len)){
+			return -EINVAL;
+		}
+	}
+	return 0;
+}
+#endif
 
 SYSCALL_DEFINE6(mips_mmap, unsigned long, addr, unsigned long, len,
 	unsigned long, prot, unsigned long, flags, unsigned long,
@@ -257,13 +284,20 @@ SYSCALL_DEFINE1(olduname, struct oldold_utsname __user *, name)
 	return error;
 }
 
+void sys_nlm_nlm_common_dummy(void)
+{	
+	printk("Unexpected Dummy System Call!\n");
+	BUG();
+}
+
 SYSCALL_DEFINE1(set_thread_area, unsigned long, addr)
 {
 	struct thread_info *ti = task_thread_info(current);
 
 	ti->tp_value = addr;
-	if (cpu_has_userlocal)
+	if (cpu_has_userlocal) {
 		write_c0_userlocal(addr);
+	}
 
 	return 0;
 }

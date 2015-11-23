@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -31,12 +39,21 @@
  * We know that all SMP capable CPUs have cycle counters.
  */
 
+#if defined CONFIG_NLM_XLP
+typedef unsigned long cycles_t;
+#else
 typedef unsigned int cycles_t;
+#endif
 
 static inline cycles_t get_cycles(void)
 {
 	return 0;
 }
+
+#ifdef CONFIG_NLM_COMMON
+#define ARCH_HAS_READ_CURRENT_TIMER	1
+extern int read_current_timer(unsigned long *timer_val);
+#endif /* CONFIG_NLM_COMMON */
 
 #endif /* __KERNEL__ */
 

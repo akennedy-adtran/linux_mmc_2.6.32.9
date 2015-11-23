@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2006-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * Atomic operations that C can't guarantee us.  Useful for
  * resource counting etc..
@@ -20,6 +28,10 @@
 #include <asm/cpu-features.h>
 #include <asm/war.h>
 #include <asm/system.h>
+
+#ifdef CONFIG_NLM_COMMON
+#include <asm/netlogic/mips-exts.h>
+#endif
 
 #define ATOMIC_INIT(i)    { (i) }
 
@@ -49,6 +61,9 @@
  */
 static __inline__ void atomic_add(int i, atomic_t * v)
 {
+#ifdef CONFIG_NLM_ATOMICS
+	ldadd_w_no_read(i, &v->counter);
+#else
 	if (kernel_uses_llsc && R10000_LLSC_WAR) {
 		int temp;
 
@@ -83,6 +98,7 @@ static __inline__ void atomic_add(int i, atomic_t * v)
 		v->counter += i;
 		raw_local_irq_restore(flags);
 	}
+#endif
 }
 
 /*
@@ -94,6 +110,9 @@ static __inline__ void atomic_add(int i, atomic_t * v)
  */
 static __inline__ void atomic_sub(int i, atomic_t * v)
 {
+#ifdef CONFIG_NLM_ATOMICS
+	ldadd_w_no_read(-i,&v->counter);
+#else
 	if (kernel_uses_llsc && R10000_LLSC_WAR) {
 		int temp;
 
@@ -128,6 +147,7 @@ static __inline__ void atomic_sub(int i, atomic_t * v)
 		v->counter -= i;
 		raw_local_irq_restore(flags);
 	}
+#endif
 }
 
 /*
@@ -139,6 +159,10 @@ static __inline__ int atomic_add_return(int i, atomic_t * v)
 
 	smp_llsc_mb();
 
+#ifdef CONFIG_NLM_ATOMICS
+	result = ldadd_w(i, &v->counter);
+	result += i;
+#else
 	if (kernel_uses_llsc && R10000_LLSC_WAR) {
 		int temp;
 
@@ -179,6 +203,7 @@ static __inline__ int atomic_add_return(int i, atomic_t * v)
 		v->counter = result;
 		raw_local_irq_restore(flags);
 	}
+#endif
 
 	smp_llsc_mb();
 
@@ -191,6 +216,10 @@ static __inline__ int atomic_sub_return(int i, atomic_t * v)
 
 	smp_llsc_mb();
 
+#ifdef CONFIG_NLM_ATOMICS
+	result = ldadd_w(-i, &v->counter);
+	result -= i;
+#else
 	if (kernel_uses_llsc && R10000_LLSC_WAR) {
 		int temp;
 
@@ -231,6 +260,7 @@ static __inline__ int atomic_sub_return(int i, atomic_t * v)
 		v->counter = result;
 		raw_local_irq_restore(flags);
 	}
+#endif
 
 	smp_llsc_mb();
 
@@ -434,7 +464,7 @@ static __inline__ void atomic64_add(long i, atomic64_t * v)
 		__asm__ __volatile__(
 		"	.set	mips3					\n"
 		"1:	lld	%0, %1		# atomic64_add		\n"
-		"	addu	%0, %2					\n"
+		"	daddu	%0, %2					\n"
 		"	scd	%0, %1					\n"
 		"	beqzl	%0, 1b					\n"
 		"	.set	mips0					\n"
@@ -446,7 +476,7 @@ static __inline__ void atomic64_add(long i, atomic64_t * v)
 		__asm__ __volatile__(
 		"	.set	mips3					\n"
 		"1:	lld	%0, %1		# atomic64_add		\n"
-		"	addu	%0, %2					\n"
+		"	daddu	%0, %2					\n"
 		"	scd	%0, %1					\n"
 		"	beqz	%0, 2f					\n"
 		"	.subsection 2					\n"
@@ -479,7 +509,7 @@ static __inline__ void atomic64_sub(long i, atomic64_t * v)
 		__asm__ __volatile__(
 		"	.set	mips3					\n"
 		"1:	lld	%0, %1		# atomic64_sub		\n"
-		"	subu	%0, %2					\n"
+		"	dsubu	%0, %2					\n"
 		"	scd	%0, %1					\n"
 		"	beqzl	%0, 1b					\n"
 		"	.set	mips0					\n"
@@ -491,7 +521,7 @@ static __inline__ void atomic64_sub(long i, atomic64_t * v)
 		__asm__ __volatile__(
 		"	.set	mips3					\n"
 		"1:	lld	%0, %1		# atomic64_sub		\n"
-		"	subu	%0, %2					\n"
+		"	dsubu	%0, %2					\n"
 		"	scd	%0, %1					\n"
 		"	beqz	%0, 2f					\n"
 		"	.subsection 2					\n"
@@ -524,10 +554,10 @@ static __inline__ long atomic64_add_return(long i, atomic64_t * v)
 		__asm__ __volatile__(
 		"	.set	mips3					\n"
 		"1:	lld	%1, %2		# atomic64_add_return	\n"
-		"	addu	%0, %1, %3				\n"
+		"	daddu	%0, %1, %3				\n"
 		"	scd	%0, %2					\n"
 		"	beqzl	%0, 1b					\n"
-		"	addu	%0, %1, %3				\n"
+		"	daddu	%0, %1, %3				\n"
 		"	.set	mips0					\n"
 		: "=&r" (result), "=&r" (temp), "=m" (v->counter)
 		: "Ir" (i), "m" (v->counter)
@@ -538,10 +568,10 @@ static __inline__ long atomic64_add_return(long i, atomic64_t * v)
 		__asm__ __volatile__(
 		"	.set	mips3					\n"
 		"1:	lld	%1, %2		# atomic64_add_return	\n"
-		"	addu	%0, %1, %3				\n"
+		"	daddu	%0, %1, %3				\n"
 		"	scd	%0, %2					\n"
 		"	beqz	%0, 2f					\n"
-		"	addu	%0, %1, %3				\n"
+		"	daddu	%0, %1, %3				\n"
 		"	.subsection 2					\n"
 		"2:	b	1b					\n"
 		"	.previous					\n"
@@ -576,10 +606,10 @@ static __inline__ long atomic64_sub_return(long i, atomic64_t * v)
 		__asm__ __volatile__(
 		"	.set	mips3					\n"
 		"1:	lld	%1, %2		# atomic64_sub_return	\n"
-		"	subu	%0, %1, %3				\n"
+		"	dsubu	%0, %1, %3				\n"
 		"	scd	%0, %2					\n"
 		"	beqzl	%0, 1b					\n"
-		"	subu	%0, %1, %3				\n"
+		"	dsubu	%0, %1, %3				\n"
 		"	.set	mips0					\n"
 		: "=&r" (result), "=&r" (temp), "=m" (v->counter)
 		: "Ir" (i), "m" (v->counter)
@@ -590,10 +620,10 @@ static __inline__ long atomic64_sub_return(long i, atomic64_t * v)
 		__asm__ __volatile__(
 		"	.set	mips3					\n"
 		"1:	lld	%1, %2		# atomic64_sub_return	\n"
-		"	subu	%0, %1, %3				\n"
+		"	dsubu	%0, %1, %3				\n"
 		"	scd	%0, %2					\n"
 		"	beqz	%0, 2f					\n"
-		"	subu	%0, %1, %3				\n"
+		"	dsubu	%0, %1, %3				\n"
 		"	.subsection 2					\n"
 		"2:	b	1b					\n"
 		"	.previous					\n"

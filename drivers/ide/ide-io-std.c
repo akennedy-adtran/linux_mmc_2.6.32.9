@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 
 #include <linux/kernel.h>
 #include <linux/ide.h>
@@ -13,14 +21,31 @@
  *	Conventional PIO operations for ATA devices
  */
 
+#ifdef CONFIG_NLM_COMMON
+extern u8 nlm_ide_mm_inb (unsigned long port);              /* readb  */
+extern void nlm_ide_mm_outb (u8 value, unsigned long port); /* writeb */
+extern void nlm_ide_mm_insl(unsigned long port, void *addr, unsigned int count);
+extern void nlm_ide_mm_outsl(unsigned long port, void *addr,unsigned int count);
+extern void nlm_ide_mm_insw(unsigned long port, void *addr, u32 count);
+extern void nlm_ide_mm_outsw(unsigned long port, void *addr,unsigned int count);
+#endif
+
 static u8 ide_inb(unsigned long port)
 {
+#ifdef CONFIG_NLM_COMMON
+	return (u8) nlm_ide_mm_inb(port);
+#else
 	return (u8) inb(port);
+#endif
 }
 
 static void ide_outb(u8 val, unsigned long port)
 {
+#ifdef CONFIG_NLM_COMMON
+	nlm_ide_mm_outb(val, port);
+#else
 	outb(val, port);
+#endif
 }
 
 /*
@@ -42,7 +67,11 @@ void ide_exec_command(ide_hwif_t *hwif, u8 cmd)
 	if (hwif->host_flags & IDE_HFLAG_MMIO)
 		writeb(cmd, (void __iomem *)hwif->io_ports.command_addr);
 	else
+#ifdef CONFIG_NLM_COMMON
+		nlm_ide_mm_outb(cmd, hwif->io_ports.command_addr);
+#else
 		outb(cmd, hwif->io_ports.command_addr);
+#endif
 }
 EXPORT_SYMBOL_GPL(ide_exec_command);
 
@@ -51,7 +80,11 @@ u8 ide_read_status(ide_hwif_t *hwif)
 	if (hwif->host_flags & IDE_HFLAG_MMIO)
 		return readb((void __iomem *)hwif->io_ports.status_addr);
 	else
+#ifdef CONFIG_NLM_COMMON
+		return (u8) nlm_ide_mm_inb(hwif->io_ports.status_addr);
+#else
 		return inb(hwif->io_ports.status_addr);
+#endif
 }
 EXPORT_SYMBOL_GPL(ide_read_status);
 
@@ -60,7 +93,11 @@ u8 ide_read_altstatus(ide_hwif_t *hwif)
 	if (hwif->host_flags & IDE_HFLAG_MMIO)
 		return readb((void __iomem *)hwif->io_ports.ctl_addr);
 	else
+#ifdef CONFIG_NLM_COMMON
+		return (u8) nlm_ide_mm_inb(hwif->io_ports.ctl_addr);
+#else
 		return inb(hwif->io_ports.ctl_addr);
+#endif
 }
 EXPORT_SYMBOL_GPL(ide_read_altstatus);
 
@@ -69,7 +106,11 @@ void ide_write_devctl(ide_hwif_t *hwif, u8 ctl)
 	if (hwif->host_flags & IDE_HFLAG_MMIO)
 		writeb(ctl, (void __iomem *)hwif->io_ports.ctl_addr);
 	else
+#ifdef CONFIG_NLM_COMMON
+		nlm_ide_mm_outb(ctl, hwif->io_ports.ctl_addr);
+#else
 		outb(ctl, hwif->io_ports.ctl_addr);
+#endif
 }
 EXPORT_SYMBOL_GPL(ide_write_devctl);
 
@@ -81,7 +122,11 @@ void ide_dev_select(ide_drive_t *drive)
 	if (hwif->host_flags & IDE_HFLAG_MMIO)
 		writeb(select, (void __iomem *)hwif->io_ports.device_addr);
 	else
+#ifdef CONFIG_NLM_COMMON
+		nlm_ide_mm_outb(select, hwif->io_ports.device_addr);
+#else
 		outb(select, hwif->io_ports.device_addr);
+#endif
 }
 EXPORT_SYMBOL_GPL(ide_dev_select);
 
@@ -182,7 +227,11 @@ void ide_input_data(ide_drive_t *drive, struct ide_cmd *cmd, void *buf,
 		if (mmio)
 			__ide_mm_insl((void __iomem *)data_addr, buf, words);
 		else
+#ifdef CONFIG_NLM_COMMON
+			nlm_ide_mm_insl(data_addr, buf, words);
+#else
 			insl(data_addr, buf, words);
+#endif
 
 		if ((io_32bit & 2) && !mmio)
 			local_irq_restore(flags);
@@ -197,7 +246,11 @@ void ide_input_data(ide_drive_t *drive, struct ide_cmd *cmd, void *buf,
 	if (mmio)
 		__ide_mm_insw((void __iomem *)data_addr, buf, words);
 	else
+#ifdef CONFIG_NLM_COMMON
+		nlm_ide_mm_insw(data_addr, buf, words);
+#else
 		insw(data_addr, buf, words);
+#endif
 }
 EXPORT_SYMBOL_GPL(ide_input_data);
 
@@ -226,7 +279,11 @@ void ide_output_data(ide_drive_t *drive, struct ide_cmd *cmd, void *buf,
 		if (mmio)
 			__ide_mm_outsl((void __iomem *)data_addr, buf, words);
 		else
+#ifdef CONFIG_NLM_COMMON
+			nlm_ide_mm_outsl(data_addr, buf, words);
+#else
 			outsl(data_addr, buf, words);
+#endif
 
 		if ((io_32bit & 2) && !mmio)
 			local_irq_restore(flags);
@@ -241,7 +298,11 @@ void ide_output_data(ide_drive_t *drive, struct ide_cmd *cmd, void *buf,
 	if (mmio)
 		__ide_mm_outsw((void __iomem *)data_addr, buf, words);
 	else
+#ifdef CONFIG_NLM_COMMON
+		nlm_ide_mm_outsw(data_addr, buf, words);
+#else
 		outsw(data_addr, buf, words);
+#endif
 }
 EXPORT_SYMBOL_GPL(ide_output_data);
 

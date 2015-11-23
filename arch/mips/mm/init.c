@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -89,7 +97,11 @@ unsigned long setup_zero_pages(void)
 	else
 		order = 0;
 
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+	empty_zero_page = __get_free_pages(GFP_DMA | GFP_KERNEL | __GFP_ZERO, order);
+#else
 	empty_zero_page = __get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+#endif
 	if (!empty_zero_page)
 		panic("Oh boy, that early out of memory?");
 
@@ -143,7 +155,7 @@ void *kmap_coherent(struct page *page, unsigned long addr)
 #if defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_CPU_MIPS32)
 	entrylo = pte.pte_high;
 #else
-	entrylo = pte_val(pte) >> 6;
+	entrylo = pte_to_entrylo(pte_val(pte));
 #endif
 
 	ENTER_CRITICAL(flags);
@@ -323,9 +335,14 @@ static int __init page_is_ram(unsigned long pagenr)
 void __init paging_init(void)
 {
 	unsigned long max_zone_pfns[MAX_NR_ZONES];
-	unsigned long lastpfn;
+	unsigned long lastpfn __attribute__((unused));
 
 	pagetable_init();
+
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+	setup_mapped_kernel_tlbs(FALSE, TRUE);
+	setup_mapped_kernel_pgtable();
+#endif
 
 #ifdef CONFIG_HIGHMEM
 	kmap_init();

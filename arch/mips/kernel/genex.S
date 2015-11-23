@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2007-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -403,6 +411,12 @@ NESTED(nmi_handler, PT_SIZE, sp)
 	KMODE
 	.endm
 
+	.macro	__build_clear_rixi
+	MFC0	t0, CP0_BADVADDR
+	PTR_S	t0, PT_BVADDR(sp)
+	STI
+	.endm
+		
 	.macro	__BUILD_silent exception
 	.endm
 
@@ -446,16 +460,30 @@ NESTED(nmi_handler, PT_SIZE, sp)
 	__BUILD_HANDLER	\exception \handler \clear \verbose _int
 	.endm
 
+#if defined(CONFIG_NLM_XLP) && !defined(CONFIG_HUGETLB_PAGE)
+	.macro	BUILD_HANDLER_mcheck exception handler clear verbose
+	.align	5
+	NESTED(handle_\exception, PT_SIZE, sp)
+	eret
+	END(handle_\exception)
+	.endm
+#endif
+
 	BUILD_HANDLER adel ade ade silent		/* #4  */
 	BUILD_HANDLER ades ade ade silent		/* #5  */
 	BUILD_HANDLER ibe be cli silent			/* #6  */
 	BUILD_HANDLER dbe be cli silent			/* #7  */
+#if defined(CONFIG_NLM_COMMON) && defined (CONFIG_KGDB)
+	BUILD_HANDLER bp bp cli silent			/* #9  */
+#else
 	BUILD_HANDLER bp bp sti silent			/* #9  */
+#endif
 	BUILD_HANDLER ri ri sti silent			/* #10 */
 	BUILD_HANDLER cpu cpu sti silent		/* #11 */
 	BUILD_HANDLER ov ov sti silent			/* #12 */
 	BUILD_HANDLER tr tr sti silent			/* #13 */
 	BUILD_HANDLER fpe fpe fpe silent		/* #15 */
+	BUILD_HANDLER rixi rixi rixi silent		/* #16 */
 	BUILD_HANDLER mdmx mdmx sti silent		/* #22 */
 #ifdef 	CONFIG_HARDWARE_WATCHPOINTS
 	/*
@@ -466,7 +494,13 @@ NESTED(nmi_handler, PT_SIZE, sp)
 #else
 	BUILD_HANDLER watch watch sti verbose		/* #23 */
 #endif
+
+#if defined(CONFIG_NLM_XLP) && !defined(CONFIG_HUGETLB_PAGE)
+	BUILD_HANDLER_mcheck mcheck mcheck cli silent	/* #24 */
+#else
 	BUILD_HANDLER mcheck mcheck cli verbose		/* #24 */
+#endif
+
 	BUILD_HANDLER mt mt sti silent			/* #25 */
 	BUILD_HANDLER dsp dsp sti silent		/* #26 */
 	BUILD_HANDLER reserved reserved sti verbose	/* others */

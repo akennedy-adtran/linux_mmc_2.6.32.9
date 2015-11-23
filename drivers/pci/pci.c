@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2014 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *	PCI Bus Services, see include/linux/pci.h for further explanation.
  *
@@ -23,6 +31,7 @@
 #include <linux/device.h>
 #include <asm/setup.h>
 #include "pci.h"
+#include <asm/netlogic/sim.h>
 
 const char *pci_power_names[] = {
 	"error", "D0", "D1", "D2", "D3hot", "D3cold", "unknown",
@@ -114,7 +123,7 @@ pci_max_busnr(void)
 static int __pci_find_next_cap_ttl(struct pci_bus *bus, unsigned int devfn,
 				   u8 pos, int cap, int *ttl)
 {
-	u8 id;
+	u8 id=0;
 
 	while ((*ttl)--) {
 		pci_bus_read_config_byte(bus, devfn, pos, &pos);
@@ -1912,6 +1921,11 @@ pci_set_cacheline_size(struct pci_dev *dev)
 	/* Validate current setting: the PCI_CACHE_LINE_SIZE must be
 	   equal to or multiple of the right value. */
 	pci_read_config_byte(dev, PCI_CACHE_LINE_SIZE, &cacheline_size);
+#ifdef CONFIG_NLM_XLP
+	/* Some on-chip device PCI-e config spaces have 0 for cache line size */
+	if(!cacheline_size)
+		cacheline_size = 16;	/* # of 32 bit words */
+#endif
 	if (cacheline_size >= pci_cache_line_size &&
 	    (cacheline_size % pci_cache_line_size) == 0)
 		return 0;
@@ -2061,18 +2075,22 @@ pci_set_dma_mask(struct pci_dev *dev, u64 mask)
 	if (!pci_dma_supported(dev, mask))
 		return -EIO;
 
-	dev->dma_mask = mask;
+ 	dev->dma_mask = mask;
+
+	dev_dbg(&dev->dev, "using %dbit DMA mask\n", fls64(mask));
 
 	return 0;
 }
-    
+
 int
 pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask)
 {
 	if (!pci_dma_supported(dev, mask))
 		return -EIO;
 
-	dev->dev.coherent_dma_mask = mask;
+ 	dev->dev.coherent_dma_mask = mask;
+
+	dev_dbg(&dev->dev, "using %dbit consistent DMA mask\n", fls64(mask));
 
 	return 0;
 }

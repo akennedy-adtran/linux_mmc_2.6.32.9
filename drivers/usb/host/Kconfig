@@ -19,7 +19,7 @@ config USB_C67X00_HCD
 
 config USB_XHCI_HCD
 	tristate "xHCI HCD (USB 3.0) support (EXPERIMENTAL)"
-	depends on USB && PCI && EXPERIMENTAL
+	depends on USB && USB_ARCH_HAS_XHCI && EXPERIMENTAL
 	---help---
 	  The eXtensible Host Controller Interface (xHCI) is standard for USB 3.0
 	  "SuperSpeed" host controller hardware.
@@ -27,15 +27,21 @@ config USB_XHCI_HCD
 	  To compile this driver as a module, choose M here: the
 	  module will be called xhci-hcd.
 
+if USB_XHCI_HCD
+
+config USB_XHCI_PLATFORM
+	tristate
+
 config USB_XHCI_HCD_DEBUGGING
 	bool "Debugging for the xHCI host controller"
-	depends on USB_XHCI_HCD
 	---help---
 	  Say 'Y' to turn on debugging for the xHCI host controller driver.
 	  This will spew debugging output, even in interrupt context.
 	  This should only be used for debugging xHCI driver bugs.
 
 	  If unsure, say N.
+
+endif # USB_XHCI_HCD
 
 config USB_EHCI_HCD
 	tristate "EHCI HCD (USB 2.0) support"
@@ -90,13 +96,15 @@ config USB_EHCI_TT_NEWSCHED
 
 config USB_EHCI_BIG_ENDIAN_MMIO
 	bool
-	depends on USB_EHCI_HCD && (PPC_CELLEB || PPC_PS3 || 440EPX || ARCH_IXP4XX)
-	default y
+	depends on USB_EHCI_HCD && (PPC_CELLEB || PPC_PS3 || 440EPX || ARCH_IXP4XX || (NLM_XLP && CPU_BIG_ENDIAN))
+	default y if NLM_XLP && CPU_BIG_ENDIAN
+	default n
 
 config USB_EHCI_BIG_ENDIAN_DESC
 	bool
-	depends on USB_EHCI_HCD && (440EPX || ARCH_IXP4XX)
-	default y
+	depends on USB_EHCI_HCD && (440EPX || ARCH_IXP4XX || (NLM_XLP && CPU_BIG_ENDIAN))
+	default y if NLM_XLP && CPU_BIG_ENDIAN
+	default n
 
 config USB_EHCI_FSL
 	bool "Support for Freescale on-chip EHCI USB controller"
@@ -251,12 +259,13 @@ config USB_OHCI_BIG_ENDIAN_DESC
 config USB_OHCI_BIG_ENDIAN_MMIO
 	bool
 	depends on USB_OHCI_HCD
+	default y if NLM_XLP
 	default n
 
 config USB_OHCI_LITTLE_ENDIAN
 	bool
 	depends on USB_OHCI_HCD
-	default n if STB03xxx || PPC_MPC52xx
+	default n if STB03xxx || PPC_MPC52xx || NLM_XLP
 	default y
 
 config USB_UHCI_HCD

@@ -114,6 +114,28 @@ config MTD_SST25L
 	  Set up your spi devices with the right board-specific platform data,
 	  if you want to specify device partitioning.
 
+config MTD_SPINAND
+	tristate "SPINAND Device Support"
+	depends on MTD 
+	help
+	  This enables support for accessing Micron SPI NAND flash
+	  devices.
+
+if MTD_SPINAND
+
+config MTD_SPINAND_ONDIEECC
+	bool "Use SPINAND internal ECC"
+	help
+	  Internel ECC
+
+config MTD_SPINAND_SWECC
+	bool "Use software ECC"
+	depends on MTD_NAND
+	help
+	  software ECC
+
+endif
+
 config MTD_SLRAM
 	tristate "Uncached system RAM"
 	help

@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2007-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -643,6 +651,14 @@ static inline unsigned long __ffs(unsigned long word)
 static inline int fls(int x)
 {
 	int r;
+#if defined(CONFIG_CPU_XLR) || defined(CONFIG_CPU_XLP)
+	__asm__("       .set push                       \n"
+		"       .set mips32                     \n"
+		"       clz %0, %1                      \n"
+		"       .set pop                        \n"
+		: "=r" (x) : "r" (x));
+	return 32 - x;
+#endif
 
 	if (__builtin_constant_p(cpu_has_clo_clz) && cpu_has_clo_clz) {
 		__asm__("clz %0, %1" : "=r" (x) : "r" (x));
@@ -676,7 +692,19 @@ static inline int fls(int x)
 	return r;
 }
 
+#if defined(CONFIG_64BIT) && (defined(CONFIG_CPU_XLR) || defined(CONFIG_CPU_XLP))
+static __always_inline int fls64(__u64 word)
+{
+	__asm__("       .set push               \n"
+		"       .set mips64             \n"
+		"       dclz %0, %1             \n"
+		"       .set pop                \n"
+		: "=r" (word) : "r" (word));
+	return 64 - word;
+}
+#else
 #include <asm-generic/bitops/fls64.h>
+#endif
 
 /*
  * ffs - find first bit set.

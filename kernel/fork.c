@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *  linux/kernel/fork.c
  *
@@ -98,7 +106,11 @@ int nr_processes(void)
 }
 
 #ifndef __HAVE_ARCH_TASK_STRUCT_ALLOCATOR
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+# define alloc_task_struct()	kmem_cache_alloc(task_struct_cachep, GFP_KERNEL | GFP_DMA)
+#else
 # define alloc_task_struct()	kmem_cache_alloc(task_struct_cachep, GFP_KERNEL)
+#endif
 # define free_task_struct(tsk)	kmem_cache_free(task_struct_cachep, (tsk))
 static struct kmem_cache *task_struct_cachep;
 #endif
@@ -184,9 +196,15 @@ void __init fork_init(unsigned long mempages)
 #define ARCH_MIN_TASKALIGN	L1_CACHE_BYTES
 #endif
 	/* create a slab on which task_structs can be allocated */
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+	task_struct_cachep =
+		kmem_cache_create("task_struct", sizeof(struct task_struct),
+			ARCH_MIN_TASKALIGN, SLAB_PANIC | SLAB_NOTRACK | SLAB_CACHE_DMA, NULL);
+#else
 	task_struct_cachep =
 		kmem_cache_create("task_struct", sizeof(struct task_struct),
 			ARCH_MIN_TASKALIGN, SLAB_PANIC | SLAB_NOTRACK, NULL);
+#endif
 #endif
 
 	/* do the arch specific task caches init */
@@ -322,7 +340,11 @@ static int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm)
 				goto fail_nomem;
 			charge = len;
 		}
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+		tmp = kmem_cache_alloc(vm_area_cachep, GFP_KERNEL | GFP_DMA);
+#else
 		tmp = kmem_cache_alloc(vm_area_cachep, GFP_KERNEL);
+#endif
 		if (!tmp)
 			goto fail_nomem;
 		*tmp = *mpnt;
@@ -417,7 +439,11 @@ static inline void mm_free_pgd(struct mm_struct * mm)
 
 __cacheline_aligned_in_smp DEFINE_SPINLOCK(mmlist_lock);
 
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+#define allocate_mm()	(kmem_cache_alloc(mm_cachep, GFP_KERNEL | GFP_DMA))
+#else
 #define allocate_mm()	(kmem_cache_alloc(mm_cachep, GFP_KERNEL))
+#endif
 #define free_mm(mm)	(kmem_cache_free(mm_cachep, (mm)))
 
 static unsigned long default_dump_filter = MMF_DUMP_FILTER_DEFAULT;
@@ -1506,10 +1532,17 @@ void __init proc_caches_init(void)
 	fs_cachep = kmem_cache_create("fs_cache",
 			sizeof(struct fs_struct), 0,
 			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_NOTRACK, NULL);
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+	mm_cachep = kmem_cache_create("mm_struct",
+			sizeof(struct mm_struct), ARCH_MIN_MMSTRUCT_ALIGN,
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_NOTRACK|SLAB_CACHE_DMA, NULL);
+	vm_area_cachep = KMEM_CACHE(vm_area_struct, SLAB_PANIC|SLAB_CACHE_DMA);
+#else
 	mm_cachep = kmem_cache_create("mm_struct",
 			sizeof(struct mm_struct), ARCH_MIN_MMSTRUCT_ALIGN,
 			SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_NOTRACK, NULL);
 	vm_area_cachep = KMEM_CACHE(vm_area_struct, SLAB_PANIC);
+#endif
 	mmap_init();
 }
 

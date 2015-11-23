@@ -32,7 +32,16 @@ obj-$(CONFIG_CPU_CAVIUM_OCTEON)	+= c-octeon.o cex-oct.o tlb-r4k.o
 
 obj-$(CONFIG_IP22_CPU_SCACHE)	+= sc-ip22.o
 obj-$(CONFIG_R5000_CPU_SCACHE)  += sc-r5k.o
+
+obj-$(CONFIG_CPU_XLR)	+= c-phoenix.o tlb-r4k.o \
+				   cex-gen.o cerr-nlm.o
+obj-$(CONFIG_CPU_XLP)		+= c-phoenix.o tlb-r4k.o \
+				   cex-gen.o cerr-nlm.o
+
 obj-$(CONFIG_RM7000_CPU_SCACHE)	+= sc-rm7k.o
 obj-$(CONFIG_MIPS_CPU_SCACHE)	+= sc-mips.o
+obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o 
 
-EXTRA_CFLAGS += -Werror
+#EXTRA_CFLAGS += -Werror
+EXTRA_CFLAGS += -DNLM_HAL_LINUX_KERNEL
+

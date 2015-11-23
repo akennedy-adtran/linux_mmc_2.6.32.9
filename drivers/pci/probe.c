@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * probe.c - PCI detection and setup code
  */
@@ -14,6 +22,24 @@
 
 #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
 #define CARDBUS_RESERVE_BUSNR	3
+
+#ifdef CONFIG_NLM_XLR
+/* Hack! This file includes references to XLR
+ * specific routines/defines. To be removed...
+ * -------------------------------------------
+ * The Global ht_start_busno variable (set in
+ * pci-phoenix.c) is used here, as a reference 
+ * to programming the Seconday/Subordinate bus 
+ * nrs. during bridge scans...
+ */
+extern int ht_start_busno;
+/*
+ * for the is_xls routine.
+ */
+#include <asm/netlogic/sim.h>    
+extern void pcie_controller_init_done(void);
+extern int link0, link1, link2, link3;
+#endif
 
 /* Ugh.  Need to stop exporting this to modules. */
 LIST_HEAD(pci_root_buses);
@@ -149,6 +175,59 @@ static inline enum pci_bar_type decode_bar(struct resource *res, u32 bar)
 	return pci_bar_mem32;
 }
 
+#if defined (CONFIG_NLM_XLP) && defined (__LITTLE_ENDIAN)
+#include <asm/netlogic/hal/nlm_hal.h>
+#include <asm/netlogic/xlp.h>
+#define XLP_PCI_DEV_BASE 0x1000
+
+static u32 nlm_xlp_membar_fixup(u32 l, struct pci_dev *dev,
+	unsigned int pos, enum pci_bar_type type)
+{
+	unsigned char b;
+	u32 fixup;
+	int rev;
+
+	if (!is_nlm_xlp8xx()) {
+		return l;
+	}
+
+	if (!l)
+		return l;
+	if (pci_calc_resource_flags(l) != IORESOURCE_MEM)
+		return l;
+	rev = read_c0_prid() & 0xff;
+	if (!((rev == XLP_REVISION_A0) || (rev == XLP_REVISION_A1) ||
+			(rev == XLP_REVISION_A2))){
+		return l;
+	}
+	/* If not xlp chip or if the device < 0x1000 skip this device.
+	 * (XLP onchip devices start with device id 0x1000) and this fix
+	 * is applicable only to onchip devices
+	 */
+	if ((dev->vendor != PCI_VENDOR_ID_NETLOGIC) ||
+			(dev->device < XLP_PCI_DEV_BASE)) {
+		return l;
+	}
+	if (type == pci_bar_unknown) {
+		if ((l & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_MEMORY) {
+			if ((l & ~PCI_BASE_ADDRESS_MEM_MASK) & PCI_BASE_ADDRESS_MEM_TYPE_64)
+				type = pci_bar_mem64;
+			else
+				type = pci_bar_mem32;
+		}
+	}
+	if ((type != pci_bar_mem32) && (type != pci_bar_mem64))
+		return l;
+
+	b = (l >> 24) & 0xff;
+	fixup = ((b << 24) | (b << 16) | (b << 8) | (b));
+	return fixup;
+}
+
+#else /* CONFIG_NLM_XLP */
+#define nlm_xlp_membar_fixup(x, u1, u2, u3)(x)
+#endif /* CONFIG_NLM_XLP */
+
 /**
  * pci_read_base - read a PCI BAR
  * @dev: the PCI device
@@ -170,7 +249,7 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 	pci_read_config_dword(dev, pos, &l);
 	pci_write_config_dword(dev, pos, mask);
 	pci_read_config_dword(dev, pos, &sz);
-	pci_write_config_dword(dev, pos, l);
+	pci_write_config_dword(dev, pos, nlm_xlp_membar_fixup(l, dev, pos, type));
 
 	/*
 	 * All bits set in sz means the device isn't working properly.
@@ -493,6 +572,10 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 
 	pci_read_config_dword(dev, PCI_PRIMARY_BUS, &buses);
 
+#ifdef CONFIG_NLM_XLR
+    buses = buses + ((ht_start_busno<<8) | (ht_start_busno<<16));
+#endif
+
 	dev_dbg(&dev->dev, "scanning behind bridge, config %06x, pass %d\n",
 		buses & 0xffffff, pass);
 
@@ -509,7 +592,11 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 	pci_write_config_word(dev, PCI_BRIDGE_CONTROL,
 			      bctl & ~PCI_BRIDGE_CTL_MASTER_ABORT);
 
+#ifdef CONFIG_NLM_XLR
+    if ((buses & 0xffff00) && !is_cardbus && !broken) {
+#else
 	if ((buses & 0xffff00) && !pcibios_assign_all_busses() && !is_cardbus && !broken) {
+#endif
 		unsigned int cmax, busnr;
 		/*
 		 * Bus already configured by firmware, process it in the first
@@ -980,12 +1067,23 @@ static struct pci_dev *pci_scan_device(struct pci_bus *bus, int devfn)
 	dev = alloc_pci_dev();
 	if (!dev)
 		return NULL;
-
+    
+    
 	dev->bus = bus;
 	dev->devfn = devfn;
 	dev->vendor = l & 0xffff;
 	dev->device = (l >> 16) & 0xffff;
 
+	/* Assume 32-bit PCI; let 64-bit PCI cards (which are far rarer)
+	   set this higher, assuming the system even supports it.  */
+#ifdef CONFIG_NLM_XLR
+    if(xlr_revision_c())
+	    dev->dma_mask = DMA_BIT_MASK(31);
+    else
+	    dev->dma_mask = DMA_BIT_MASK(32);
+#else
+	dev->dma_mask = 0xffffffff;
+#endif
 	if (pci_setup_device(dev)) {
 		kfree(dev);
 		return NULL;
@@ -1024,7 +1122,14 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
 
 	dev->dev.dma_mask = &dev->dma_mask;
 	dev->dev.dma_parms = &dev->dma_parms;
+#ifdef CONFIG_NLM_XLR
+    if(xlr_revision_c())
+	    dev->dev.coherent_dma_mask = DMA_BIT_MASK(31);
+    else
+	    dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+#else
 	dev->dev.coherent_dma_mask = 0xffffffffull;
+#endif
 
 	pci_set_dma_max_seg_size(dev, 65536);
 	pci_set_dma_seg_boundary(dev, 0xffffffff);
@@ -1109,12 +1214,60 @@ unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus)
 {
 	unsigned int devfn, pass, max = bus->secondary;
 	struct pci_dev *dev;
+	unsigned int devfn_start = 0x00;
+	unsigned int devfn_max   = 0x100;
+
+#ifdef CONFIG_NLM_XLR
+	int all_absent = 0;
+
+	if(is_xls2xx() || is_xls1xx() || is_xls_b0()){
+		if(!link0 && !link1 && !link2 && !link3)
+			all_absent = 1;
+	}
+#endif
 
 	pr_debug("PCI: Scanning bus %04x:%02x\n", pci_domain_nr(bus), bus->number);
 
+#ifdef CONFIG_NLM_XLR
+	if (is_xls() && !is_xls2xx() && !is_xls1xx() && !is_xls_b0()) {
+		if (link0 && (!link1)) {
+			if (bus->number == 0)
+				devfn_max = 0x08;
+		}
+		if ((!link0) && link1) {
+			if (bus->number == 0)
+				devfn_start = 0x08;
+		}
+	}
+#endif
 	/* Go find them, Rover! */
-	for (devfn = 0; devfn < 0x100; devfn += 8)
-		pci_scan_slot(bus, devfn);
+	for (devfn = devfn_start; devfn < devfn_max; devfn += 8) {
+#ifdef CONFIG_NLM_XLR
+		if(bus->number==0 && (is_xls2xx() || is_xls1xx() || is_xls_b0()) && !all_absent){
+			switch(devfn){
+			case 0x0:
+				if(!link0)
+					continue;
+				break;
+			case 0x8:
+				if(!link1)
+					continue;
+				break;
+			case 0x10:
+				if(!link2)
+					continue;
+				break;
+			case 0x18:
+				if(!link3)
+					continue;
+				break;
+			default:
+				break;
+			}
+		}
+#endif
+ 		pci_scan_slot(bus, devfn);
+	}
 
 	/* Reserve buses for SR-IOV capability. */
 	max += pci_iov_bus_range(bus);
@@ -1130,6 +1283,13 @@ unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus)
 		if (pci_is_root_bus(bus))
 			bus->is_added = 1;
 	}
+
+
+#ifdef CONFIG_NLM_XLR
+    /*link2 and link3 are always set to zero incase of xls-4xx/6xx*/
+    if ((is_xls()) && (!link0) && (!link1) && (!link2) && (!link3))
+        return max;
+#endif
 
 	for (pass=0; pass < 2; pass++)
 		list_for_each_entry(dev, &bus->devices, bus_list) {

@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * Switch a MMU context.
  *
@@ -23,6 +32,16 @@
 #include <asm/smtc.h>
 #endif /* SMTC */
 #include <asm-generic/mm_hooks.h>
+
+#ifdef CONFIG_NLM_COMMON
+#include <asm/netlogic/mips-exts.h>
+#include <asm/netlogic/debug.h>
+#include <asm/mach-netlogic/mmu.h>
+#endif
+
+#ifndef CONFIG_NLM_XLP
+static inline void setup_user_pgd(pgd_t *pgd) { }
+#endif
 
 /*
  * For the fast tlb miss handlers, we keep a per cpu array of pointers
@@ -72,8 +91,15 @@ extern unsigned long smtc_asid_mask;
 /* End SMTC/34K debug hack */
 #else /* FIXME: not correct for R6000 */
 
+#ifdef CONFIG_NLMCOMMON_GLOBAL_TLB_SPLIT_ASID
+#define ASID_INC    0x1
+extern unsigned long nlm_asid_mask;
+#define ASID_MASK   nlm_asid_mask
+#else
+
 #define ASID_INC	0x1
 #define ASID_MASK	0xff
+#endif
 
 #endif
 
@@ -135,6 +161,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 {
 	unsigned int cpu = smp_processor_id();
 	unsigned long flags;
+	unsigned int pflags;
 #ifdef CONFIG_MIPS_MT_SMTC
 	unsigned long oldasid;
 	unsigned long mtflags;
@@ -173,9 +200,12 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	ehb(); /* Make sure it propagates to TCStatus */
 	evpe(mtflags);
 #else
+	disable_pgwalker(pflags);
 	write_c0_entryhi(cpu_asid(cpu, next));
 #endif /* CONFIG_MIPS_MT_SMTC */
 	TLBMISS_HANDLER_SETUP_PGD(next->pgd);
+	setup_user_pgd(next->pgd);
+	enable_pgwalker(pflags);
 
 	/*
 	 * Mark current->active_mm as not "active" anymore.
@@ -206,6 +236,7 @@ activate_mm(struct mm_struct *prev, struct mm_struct *next)
 {
 	unsigned long flags;
 	unsigned int cpu = smp_processor_id();
+	unsigned int pflags;
 
 #ifdef CONFIG_MIPS_MT_SMTC
 	unsigned long oldasid;
@@ -233,9 +264,13 @@ activate_mm(struct mm_struct *prev, struct mm_struct *next)
 	ehb(); /* Make sure it propagates to TCStatus */
 	evpe(mtflags);
 #else
+	disable_pgwalker(pflags);
 	write_c0_entryhi(cpu_asid(cpu, next));
 #endif /* CONFIG_MIPS_MT_SMTC */
+
 	TLBMISS_HANDLER_SETUP_PGD(next->pgd);
+	setup_user_pgd(next->pgd);
+	enable_pgwalker(pflags);
 
 	/* mark mmu ownership change */
 	cpumask_clear_cpu(cpu, mm_cpumask(prev));
@@ -252,6 +287,7 @@ static inline void
 drop_mmu_context(struct mm_struct *mm, unsigned cpu)
 {
 	unsigned long flags;
+	unsigned int pflags;
 #ifdef CONFIG_MIPS_MT_SMTC
 	unsigned long oldasid;
 	/* Can't use spinlock because called from TLB flush within DVPE */
@@ -278,10 +314,13 @@ drop_mmu_context(struct mm_struct *mm, unsigned cpu)
 		ehb(); /* Make sure it propagates to TCStatus */
 		evpe(prevvpe);
 #else /* not CONFIG_MIPS_MT_SMTC */
+		disable_pgwalker(pflags);
 		write_c0_entryhi(cpu_asid(cpu, mm));
+		enable_pgwalker(pflags);
 #endif /* CONFIG_MIPS_MT_SMTC */
 	} else {
 		/* will get a new context next time */
+
 #ifndef CONFIG_MIPS_MT_SMTC
 		cpu_context(cpu, mm) = 0;
 #else /* SMTC */
@@ -294,6 +333,7 @@ drop_mmu_context(struct mm_struct *mm, unsigned cpu)
 			cpu_context(i, mm) = 0;
 		}
 #endif /* CONFIG_MIPS_MT_SMTC */
+
 	}
 	local_irq_restore(flags);
 }

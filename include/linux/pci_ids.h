@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *	PCI Class, Vendor and Device IDs
  *
@@ -576,6 +584,8 @@
 #define PCI_DEVICE_ID_TRIDENT_8400	0x8400
 #define PCI_DEVICE_ID_TRIDENT_8420	0x8420
 #define PCI_DEVICE_ID_TRIDENT_8500	0x8500
+
+#define PCI_VENDOR_ID_NETLOGIC		0x184E
 
 #define PCI_VENDOR_ID_AI		0x1025
 #define PCI_DEVICE_ID_AI_M1435		0x1435

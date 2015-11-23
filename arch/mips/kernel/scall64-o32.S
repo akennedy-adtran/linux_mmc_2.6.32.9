@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -26,6 +34,32 @@
 
 	.align  5
 NESTED(handle_sys, PT_SIZE, sp)
+#ifdef CONFIG_64BIT
+#ifdef CONFIG_NLM_COMMON
+	.set push
+	.set	noat
+	.set mips64
+    	/* XLR Specific fast system calls */
+	dmfc0	k1, CP0_EPC
+	lw	k0, 0(k1)
+	dsll32	k0, k0, 0
+	dsrl32  k0, k0, 6
+	beqz	k0, 1f
+	nop
+	sll	k0, k0, 3
+	PTR_LA  k1, nlm_fs_table
+	PTR_ADDU k1,k0,k1
+	ld	k1, 0(k1)
+	jr	k1
+	nop
+	/* should never come here */
+2:	wait
+	b	2b
+	nop
+1:
+	.set pop
+#endif
+#endif
 	.set	noat
 	SAVE_SOME
 	TRACE_IRQS_ON_RELOAD
@@ -450,7 +484,7 @@ sys_call_table:
 	PTR	sys_io_submit
 	PTR	sys_io_cancel			/* 4245 */
 	PTR	sys_exit_group
-	PTR	sys32_lookup_dcookie
+	PTR	compat_sys_lookup_dcookie
 	PTR	sys_epoll_create
 	PTR	sys_epoll_ctl
 	PTR	sys_epoll_wait			/* 4250 */
@@ -471,9 +505,15 @@ sys_call_table:
 	PTR	compat_sys_clock_nanosleep	/* 4265 */
 	PTR	sys_tgkill
 	PTR	compat_sys_utimes
+#ifdef CONFIG_NUMA
+	PTR	sys_mbind
+	PTR	sys_get_mempolicy
+	PTR	sys_set_mempolicy
+#else
 	PTR	sys_ni_syscall			/* sys_mbind */
 	PTR	sys_ni_syscall			/* sys_get_mempolicy */
 	PTR	sys_ni_syscall			/* 4270 sys_set_mempolicy */
+#endif
 	PTR	compat_sys_mq_open
 	PTR	sys_mq_unlink
 	PTR	compat_sys_mq_timedsend
@@ -538,4 +578,10 @@ sys_call_table:
 	PTR	compat_sys_rt_tgsigqueueinfo
 	PTR	sys_perf_event_open
 	PTR	sys_accept4
+	/* RMI Added syscalls */
+	PTR	sys_vperfctr_open       /* 4335 */
+	PTR 	sys_vperfctr_control
+	PTR 	sys_vperfctr_unlink
+	PTR 	sys_vperfctr_iresume
+	PTR 	sys_vperfctr_read
 	.size	sys_call_table,.-sys_call_table

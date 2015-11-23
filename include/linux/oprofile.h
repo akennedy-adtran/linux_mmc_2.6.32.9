@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /**
  * @file oprofile.h
  *
@@ -167,6 +175,8 @@ void oprofile_put_buff(unsigned long *buf, unsigned int start,
 unsigned long oprofile_get_cpu_buffer_size(void);
 void oprofile_cpu_buffer_inc_smpl_lost(void);
  
+void nlm_common_oprofile_int_handler(int irq, void * dev_id, struct pt_regs *regs);
+
 /* cpu buffer functions */
 
 struct op_sample;

@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * Count register synchronisation.
  *
@@ -19,6 +27,7 @@
 #include <asm/atomic.h>
 #include <asm/barrier.h>
 #include <asm/mipsregs.h>
+#include <asm/r4k-timer.h>
 
 static atomic_t __cpuinitdata count_start_flag = ATOMIC_INIT(0);
 static atomic_t __cpuinitdata count_count_start = ATOMIC_INIT(0);

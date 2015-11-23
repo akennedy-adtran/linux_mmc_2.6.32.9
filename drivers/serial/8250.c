@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *  linux/drivers/char/8250.c
  *
@@ -518,6 +526,9 @@ static void set_io_from_upio(struct uart_port *p)
 		p->serial_out = dwapb_serial_out;
 		break;
 
+	case UPIO_NLM:
+		/* serial_in and serial_out are set in uart_port */
+		break;
 	default:
 		p->serial_in = io_serial_in;
 		p->serial_out = io_serial_out;
@@ -534,6 +545,7 @@ serial_out_sync(struct uart_8250_port *up, int offset, int value)
 	switch (p->iotype) {
 	case UPIO_MEM:
 	case UPIO_MEM32:
+	case UPIO_NLM: /* TODO Is this needed ? */
 #ifdef CONFIG_SERIAL_8250_AU1X00
 	case UPIO_AU:
 #endif
@@ -1498,7 +1510,7 @@ static void transmit_chars(struct uart_8250_port *up)
 
 static unsigned int check_modem_status(struct uart_8250_port *up)
 {
-	unsigned int status = serial_in(up, UART_MSR);
+        unsigned int status = serial_in(up, UART_MSR);
 
 	status |= up->msr_saved_flags;
 	up->msr_saved_flags = 0;
@@ -1835,7 +1847,6 @@ static void serial8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
 		mcr |= UART_MCR_LOOP;
 
 	mcr = (mcr & up->mcr_mask) | up->mcr_force | up->mcr;
-
 	serial_out(up, UART_MCR, mcr);
 }
 
@@ -1876,6 +1887,7 @@ static void wait_for_xmitr(struct uart_8250_port *up, int bits)
 		unsigned int tmout;
 		for (tmout = 1000000; tmout; tmout--) {
 			unsigned int msr = serial_in(up, UART_MSR);
+
 			up->msr_saved_flags |= msr & MSR_SAVE_FLAGS;
 			if (msr & UART_MSR_CTS)
 				break;
@@ -3161,6 +3173,27 @@ void serial8250_unregister_port(int line)
 	mutex_unlock(&serial_mutex);
 }
 EXPORT_SYMBOL(serial8250_unregister_port);
+
+
+/**
+ *      serial8250_unregister_by_port - remove a 16x50 serial port
+ *      at runtime.
+ *      @port: A &struct uart_port that describes the port to remove.
+ *
+ *      Remove one serial port.  This may not be called from interrupt
+ *      context.  We hand the port back to the our control.
+ */
+void serial8250_unregister_by_port(struct uart_port *port)
+{
+	struct uart_8250_port *uart;
+
+	mutex_lock(&serial_mutex);
+	uart = serial8250_find_match_or_unused(port);
+	mutex_unlock(&serial_mutex);
+
+	if (uart)
+		serial8250_unregister_port(uart->port.line);
+}
 
 static int __init serial8250_init(void)
 {

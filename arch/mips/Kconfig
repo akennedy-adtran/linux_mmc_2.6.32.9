@@ -4,7 +4,7 @@ config MIPS
 	select HAVE_GENERIC_DMA_COHERENT
 	select HAVE_IDE
 	select HAVE_OPROFILE
-	select HAVE_ARCH_KGDB
+	select HAVE_ARCH_KGDB if !WATCHDOG
 	# Horrible source of confusion.  Die, die, die ...
 	select EMBEDDED
 	select RTC_LIB if !LEMOTE_FULOONG2E
@@ -14,6 +14,9 @@ mainmenu "Linux/MIPS Kernel Configuration"
 menu "Machine selection"
 
 config ZONE_DMA
+	bool
+
+config N511
 	bool
 
 choice
@@ -629,6 +632,33 @@ config WR_PPMC
 	  This enables support for the Wind River MIPS32 4KC PPMC evaluation
 	  board, which is based on GT64120 bridge chip.
 
+config NLM_PTR
+	bool "Support for Netlogic ATX board"
+	depends on EXPERIMENTAL
+	select SMP
+	select BOOT_ELF32
+	select NLM_COMMON
+	select NLM_XLR
+	select SYS_HAS_CPU_XLR
+	select SYS_SUPPORTS_SMP
+	select HW_HAS_PCI
+	select SWAP_IO_SPACE
+	select SYS_SUPPORTS_32BIT_KERNEL
+    	select SYS_SUPPORTS_64BIT_KERNEL
+	select 64BIT_PHYS_ADDR
+	select SYS_SUPPORTS_BIG_ENDIAN
+	select SYS_SUPPORTS_HIGHMEM
+	select DMA_COHERENT
+	select CEVT_R4K
+	select CSRC_R4K
+	select IRQ_CPU
+	select ZONE_DMA if 64BIT
+	select SYNC_R4K
+	select SYS_HAS_EARLY_PRINTK
+	help
+	  This board is based on Netlogic XLR processor. 
+	  Say Y here to support this machine type
+
 config CAVIUM_OCTEON_SIMULATOR
 	bool "Cavium Networks Octeon Simulator"
 	select CEVT_R4K
@@ -643,6 +673,65 @@ config CAVIUM_OCTEON_SIMULATOR
 	  The Octeon simulator is software performance model of the Cavium
 	  Octeon Processor. It supports simulating Octeon processors on x86
 	  hardware.
+
+config NLM_XLP_SIM
+	bool "Support for Netlogic XLP Simulator"
+	depends on EXPERIMENTAL
+	select SMP
+	select BOOT_ELF32
+	select NLM_COMMON
+	select NLM_XLP
+	select SYS_HAS_CPU_XLP
+	select SYS_SUPPORTS_SMP
+	select HW_HAS_PCI
+	select SWAP_IO_SPACE
+	select SYS_SUPPORTS_32BIT_KERNEL
+    	select SYS_SUPPORTS_64BIT_KERNEL
+	select 64BIT_PHYS_ADDR
+	select SYS_SUPPORTS_BIG_ENDIAN
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select SYS_SUPPORTS_HIGHMEM
+	select DMA_COHERENT
+	select CEVT_R4K
+	select CSRC_R4K
+	select IRQ_CPU
+	select ZONE_DMA if 64BIT
+	select SYNC_R4K
+	select SYS_HAS_EARLY_PRINTK
+	help
+	  This board is based on Netlogic XLP Processor.
+	  Say Y here to support this machine type
+
+config NLM_XLP_EVP_BOARD
+        bool "Support for Netlogic XLP EVP board"
+        depends on EXPERIMENTAL
+        select SMP
+        select BOOT_ELF32
+        select NLM_COMMON
+        select NLM_XLP
+        select SYS_HAS_CPU_XLP
+        select SYS_SUPPORTS_SMP
+        select HW_HAS_PCI
+	select ARCH_SUPPORTS_MSI
+        select SWAP_IO_SPACE
+        select SYS_SUPPORTS_32BIT_KERNEL
+        select SYS_SUPPORTS_64BIT_KERNEL
+        select 64BIT_PHYS_ADDR
+        select SYS_SUPPORTS_BIG_ENDIAN
+        select SYS_SUPPORTS_LITTLE_ENDIAN
+        select SYS_SUPPORTS_HIGHMEM
+        select DMA_COHERENT
+        select CEVT_R4K	if !XLP_REPLACE_R4K_TIMER
+        select CSRC_R4K	if !XLP_REPLACE_R4K_TIMER
+        select IRQ_CPU
+        select ZONE_DMA if 64BIT
+        select SYNC_R4K	if !XLP_REPLACE_R4K_TIMER
+        select SYS_HAS_EARLY_PRINTK
+	select SYS_SUPPORTS_NUMA
+	select SYS_SUPPORTS_HUGETLBFS
+        help
+          This board is based on Netlogic XLP Processor.
+          Say Y here to support this machine type
 
 config CAVIUM_OCTEON_REFERENCE_BOARD
 	bool "Cavium Networks Octeon reference board"
@@ -673,6 +762,15 @@ config CAVIUM_OCTEON_REFERENCE_BOARD
 
 endchoice
 
+config RAPIDIO
+	bool "RapidIO support"
+	depends on NLM_XLR || NLM_XLP
+	help
+	  If you say Y here, the kernel will include drivers and
+	  infrastructure code to support RapidIO interconnect devices.
+
+source "drivers/rapidio/Kconfig"
+
 source "arch/mips/alchemy/Kconfig"
 source "arch/mips/basler/excite/Kconfig"
 source "arch/mips/bcm63xx/Kconfig"
@@ -683,10 +781,25 @@ source "arch/mips/sgi-ip27/Kconfig"
 source "arch/mips/sibyte/Kconfig"
 source "arch/mips/txx9/Kconfig"
 source "arch/mips/vr41xx/Kconfig"
+source "arch/mips/netlogic/Kconfig"
 source "arch/mips/cavium-octeon/Kconfig"
 source "arch/mips/loongson/Kconfig"
 
 endmenu
+
+menuconfig PARAVIRT_GUEST
+	bool "Paravirtualized guest support"
+	---help---
+	  Say Y here to get to see options related to running Linux under
+	  various hypervisors.  This option alone does not add any kernel code.
+
+	  If you say N, all options in this submenu will be skipped and disabled.
+
+if PARAVIRT_GUEST
+
+source "arch/mips/xen/Kconfig"
+
+endif
 
 config RWSEM_GENERIC_SPINLOCK
 	bool
@@ -736,6 +849,8 @@ config SCHED_OMIT_FRAME_POINTER
 	default y
 
 config GENERIC_HARDIRQS_NO__DO_IRQ
+# XLP_MERGE_TODO
+	default  n if NLM_XLP_SIM || NLM_XLP_EVP_BOARD || NLM_XLP_EVP_N511_BOARD
 	def_bool y
 
 #
@@ -805,6 +920,19 @@ config DMA_NONCOHERENT
 
 config DMA_NEED_PCI_MAP_STATE
 	bool
+
+config FDT
+	bool "Flattened Device Tree Support"
+	depends on NLM_XLP
+	default y
+	help
+	  When using Bootloaders such as U-Boot, firmware
+	  configuration is passed through to Linux using 
+	  an FDT. Although similar in nature to the Open
+	  Firmware DeviceTree framework, the scope of FDT
+	  support for NetLogic Kernels is mostly limited
+	  to a model of passing/parsing firmware info. 
+	  Similar to the PowerPC port.
 
 config EARLY_PRINTK
 	bool "Early printk" if EMBEDDED && DEBUG_KERNEL
@@ -1028,7 +1156,7 @@ config BOOT_ELF32
 config MIPS_L1_CACHE_SHIFT
 	int
 	default "4" if MACH_DECSTATION || MIKROTIK_RB532 || PMC_MSP4200_EVAL
-	default "6" if MIPS_CPU_SCACHE
+	default "6" if MIPS_CPU_SCACHE || CPU_XLP
 	default "7" if SGI_IP22 || SGI_IP27 || SGI_IP28 || SNI_RM || CPU_CAVIUM_OCTEON
 	default "5"
 
@@ -1273,6 +1401,33 @@ config CPU_SB1
 	select CPU_SUPPORTS_HIGHMEM
 	select WEAK_ORDERING
 
+config CPU_XLR
+	bool "XLR"
+	depends on SYS_HAS_CPU_XLR
+	select CPU_SUPPORTS_32BIT_KERNEL
+	select CPU_SUPPORTS_64BIT_KERNEL
+	select CPU_SUPPORTS_HIGHMEM
+	select WEAK_ORDERING
+	select WEAK_REORDERING_BEYOND_LLSC
+	select CPU_SUPPORTS_HUGEPAGES
+	help
+	  Netlogic Corporation XLR/XLS processors.
+
+config CPU_XLP
+	bool "XLP"
+	depends on SYS_HAS_CPU_XLP
+	select CPU_SUPPORTS_32BIT_KERNEL
+	select CPU_SUPPORTS_64BIT_KERNEL
+	select CPU_SUPPORTS_HIGHMEM
+	select CPU_HAS_LLSC
+	select WEAK_ORDERING
+	select WEAK_REORDERING_BEYOND_LLSC
+	select CPU_HAS_PREFETCH
+	select HAVE_EFFICIENT_UNALIGNED_ACCESS
+    select ARCH_WANT_OPTIONAL_GPIOLIB
+	help
+	  Netlogic Corporation XLP processors.
+
 config CPU_CAVIUM_OCTEON
 	bool "Cavium Octeon processor"
 	depends on SYS_HAS_CPU_CAVIUM_OCTEON
@@ -1363,6 +1518,9 @@ config SYS_HAS_CPU_RM9000
 config SYS_HAS_CPU_SB1
 	bool
 
+config SYS_HAS_CPU_PHOENIX
+	bool
+
 config SYS_HAS_CPU_CAVIUM_OCTEON
 	bool
 
@@ -1379,6 +1537,12 @@ config WEAK_ORDERING
 #
 config WEAK_REORDERING_BEYOND_LLSC
 	bool
+
+config SYS_HAS_CPU_XLR
+	bool
+config SYS_HAS_CPU_XLP
+	bool
+
 endmenu
 
 #
@@ -1401,7 +1565,7 @@ config CPU_MIPSR1
 
 config CPU_MIPSR2
 	bool
-	default y if CPU_MIPS32_R2 || CPU_MIPS64_R2 || CPU_CAVIUM_OCTEON
+	default y if CPU_MIPS32_R2 || CPU_MIPS64_R2 || CPU_CAVIUM_OCTEON || CPU_XLP
 
 config SYS_SUPPORTS_32BIT_KERNEL
 	bool
@@ -1444,7 +1608,11 @@ config 64BIT
 	select HAVE_SYSCALL_WRAPPERS
 	help
 	  Select this option if you want to build a 64-bit kernel.
-
+config NLM_16G_MEM_SUPPORT
+	bool "more than 16GB memory support"
+	depends on 64BIT
+	help
+	 Select this option if you want the kernel to support more than 16GB memory
 endchoice
 
 choice
@@ -1495,6 +1663,48 @@ config PAGE_SIZE_64KB
 	  the price of higher memory consumption.  This option is available on
 	  all non-R3000 family processor.  Not that at the time of this
 	  writing this option is still high experimental.
+
+endchoice
+
+choice
+        prompt "Huge page size"
+	depends on HUGETLB_PAGE
+        default HUGE_PAGE_SIZE_8M
+
+config HUGE_PAGE_SIZE_128K
+        bool "128kB"
+	help
+	  Using 128KB as the hugetlb page size
+
+config HUGE_PAGE_SIZE_512K
+        bool "512kB"
+	help
+	  Using 512KB as the hugetlb page size
+
+config HUGE_PAGE_SIZE_2M
+        bool "2mB"
+	help
+	  Using 2MB as the hugetlb page size
+
+config HUGE_PAGE_SIZE_8M
+        bool "8mB"
+	help
+	  Using 8MB as the hugetlb page size
+
+config HUGE_PAGE_SIZE_32M
+        bool "32mB"
+	help
+	  Using 32MB as the hugetlb page size
+
+config HUGE_PAGE_SIZE_128M
+        bool "128mB"
+	help
+	  Using 128MB as the hugetlb page size
+
+config HUGE_PAGE_SIZE_512M
+        bool "512mB"
+	help
+	  Using 512MB as the hugetlb page size
 
 endchoice
 
@@ -1686,7 +1896,9 @@ config SB1_PASS_2_1_WORKAROUNDS
 	default y
 
 config 64BIT_PHYS_ADDR
+	select PHYS_ADDR_T_64BIT
 	bool
+	default y
 
 config CPU_HAS_SMARTMIPS
 	depends on SYS_SUPPORTS_SMARTMIPS
@@ -1765,7 +1977,9 @@ config IRQ_PER_CPU
 #
 config HIGHMEM
 	bool "High Memory Support"
-	depends on 32BIT && CPU_SUPPORTS_HIGHMEM && SYS_SUPPORTS_HIGHMEM
+	depends on CPU_SUPPORTS_HIGHMEM && SYS_SUPPORTS_HIGHMEM
+	default y if 32BIT
+	default n if !32BIT
 
 config CPU_SUPPORTS_HIGHMEM
 	bool
@@ -1782,6 +1996,8 @@ config ARCH_FLATMEM_ENABLE
 
 config ARCH_DISCONTIGMEM_ENABLE
 	bool
+	default y if NLM_XLP_EVP_BOARD
+	default y if NLM_XLP_EVP_N511_BOARD
 	default y if SGI_IP27
 	help
 	  Say Y to support efficient handling of discontiguous physical memory,
@@ -1811,6 +2027,8 @@ config SYS_SUPPORTS_NUMA
 
 config NODES_SHIFT
 	int
+	default "2" if NLM_XLP_EVP_BOARD
+	default "2" if NLM_XLP_EVP_N511_BOARD
 	default "6"
 	depends on NEED_MULTIPLE_NODES
 
@@ -1901,7 +2119,7 @@ source "kernel/time/Kconfig"
 
 choice
 	prompt "Timer frequency"
-	default HZ_250
+	default HZ_1000
 	help
 	 Allows the configuration of the timer frequency.
 
@@ -2046,6 +2264,7 @@ config PCI
 	bool "Support for PCI controller"
 	depends on HW_HAS_PCI
 	select PCI_DOMAINS
+	select PCI_MSI if NLM_XLP
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -2055,6 +2274,7 @@ config PCI
 config PCI_DOMAINS
 	bool
 
+source "drivers/pci/pcie/Kconfig"
 source "drivers/pci/Kconfig"
 
 #
@@ -2167,7 +2387,6 @@ config BINFMT_ELF32
 endmenu
 
 menu "Power management options"
-
 config ARCH_HIBERNATION_POSSIBLE
 	def_bool y
 	depends on SYS_SUPPORTS_HOTPLUG_CPU || !SMP
@@ -2177,6 +2396,13 @@ config ARCH_SUSPEND_POSSIBLE
 	depends on SYS_SUPPORTS_HOTPLUG_CPU || !SMP
 
 source "kernel/power/Kconfig"
+
+if XLP_PIC_TIMER
+config XLP_CPUFREQ
+	def_bool n
+	depends on XLP_PIC_TIMER
+source "drivers/cpufreq/Kconfig"
+endif
 
 endmenu
 

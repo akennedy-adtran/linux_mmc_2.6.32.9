@@ -4,7 +4,7 @@
 
 config HW_RANDOM
 	tristate "Hardware Random Number Generator Core support"
-	default m
+	default y
 	---help---
 	  Hardware Random Number Generator Core infrastructure.
 
@@ -125,6 +125,11 @@ config HW_RANDOM_OMAP
 	  module will be called omap-rng.
 
  	  If unsure, say Y.
+
+config HW_RANDOM_MIPS_XLR
+	bool "Netlogic XLR Random Number Generator support"
+	depends on HW_RANDOM && NLM_COMMON
+	default y
 
 config HW_RANDOM_OCTEON
 	tristate "Octeon Random Number Generator support"

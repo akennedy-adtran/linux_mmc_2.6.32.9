@@ -1,3 +1,5 @@
+EXTRA_CFLAGS := $(CFLAGS) -DNLM_HAL_LINUX_KERNEL
+
 obj-$(CONFIG_DMA_ENGINE) += dmaengine.o
 obj-$(CONFIG_NET_DMA) += iovlock.o
 obj-$(CONFIG_DMATEST) += dmatest.o
@@ -10,3 +12,4 @@ obj-$(CONFIG_AT_HDMAC) += at_hdmac.o
 obj-$(CONFIG_MX3_IPU) += ipu/
 obj-$(CONFIG_TXX9_DMAC) += txx9dmac.o
 obj-$(CONFIG_SH_DMAE) += shdma.o
+obj-$(CONFIG_NLM_ADMA) += nlm_adma.o

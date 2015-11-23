@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 #ifndef DRIVERS_PCI_H
 #define DRIVERS_PCI_H
 
@@ -111,7 +119,7 @@ extern struct rw_semaphore pci_bus_sem;
 
 extern unsigned int pci_pm_d3_delay;
 
-#ifdef CONFIG_PCI_MSI
+#if defined(CONFIG_PCI_MSI)
 void pci_no_msi(void);
 extern void pci_msi_init_pci_dev(struct pci_dev *dev);
 #else

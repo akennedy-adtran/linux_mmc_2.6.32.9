@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -15,6 +23,32 @@
 
 #include <linux/compiler.h>
 #include <asm/hazards.h>
+#include <asm/mipsregs.h>
+
+#ifdef CONFIG_64BIT
+#define TI_PREEMPT_COUNT 36
+#else
+#define TI_PREEMPT_COUNT 20
+#endif
+
+#ifdef CONFIG_PREEMPT
+
+#define __preempt_disable \
+	"lw  $1, "STR(TI_PREEMPT_COUNT)"($28) \n" \
+	"addiu $1, 1 \n" \
+	"sw $1, "STR(TI_PREEMPT_COUNT)"($28) \n"
+
+#define __preempt_enable \
+	"lw  $1, "STR(TI_PREEMPT_COUNT)"($28) \n" \
+	"subu $1, 1 \n" \
+	"sw $1, "STR(TI_PREEMPT_COUNT)"($28) \n"
+
+#else
+
+#define __preempt_disable
+#define __preempt_enable
+
+#endif
 
 __asm__(
 	"	.macro	raw_local_irq_enable				\n"
@@ -29,10 +63,12 @@ __asm__(
 #elif defined(CONFIG_CPU_MIPSR2)
 	"	ei							\n"
 #else
+	__preempt_disable
 	"	mfc0	$1,$12						\n"
 	"	ori	$1,0x1f						\n"
 	"	xori	$1,0x1e						\n"
 	"	mtc0	$1,$12						\n"
+	__preempt_enable
 #endif
 	"	irq_enable_hazard					\n"
 	"	.set	pop						\n"
@@ -87,11 +123,13 @@ __asm__(
 #elif defined(CONFIG_CPU_MIPSR2)
 	"	di							\n"
 #else
+	__preempt_disable
 	"	mfc0	$1,$12						\n"
 	"	ori	$1,0x1f						\n"
 	"	xori	$1,0x1f						\n"
 	"	.set	noreorder					\n"
 	"	mtc0	$1,$12						\n"
+	__preempt_enable
 #endif
 	"	irq_disable_hazard					\n"
 	"	.set	pop						\n"
@@ -138,11 +176,13 @@ __asm__(
 	"	di	\\result					\n"
 	"	andi	\\result, 1					\n"
 #else
+	__preempt_disable
 	"	mfc0	\\result, $12					\n"
 	"	ori	$1, \\result, 0x1f				\n"
 	"	xori	$1, 0x1f					\n"
 	"	.set	noreorder					\n"
 	"	mtc0	$1, $12						\n"
+	__preempt_enable
 #endif
 	"	irq_disable_hazard					\n"
 	"	.set	pop						\n"
@@ -184,12 +224,14 @@ __asm__(
 	"	ins	$1, \\flags, 0, 1				\n"
 	"	mtc0	$1, $12						\n"
 #else
+	__preempt_disable
 	"	mfc0	$1, $12						\n"
 	"	andi	\\flags, 1					\n"
 	"	ori	$1, 0x1f					\n"
 	"	xori	$1, 0x1f					\n"
 	"	or	\\flags, $1					\n"
 	"	mtc0	\\flags, $12					\n"
+	__preempt_enable
 #endif
 	"	irq_disable_hazard					\n"
 	"	.set	pop						\n"

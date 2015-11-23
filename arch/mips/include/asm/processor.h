@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -37,8 +46,11 @@ extern unsigned int vced_count, vcei_count;
 /*
  * User space process size: 2GB. This is hardcoded into a few places,
  * so don't change it unless you know what you are doing.
+ *
+ * XLP_MERGE_TODO: changed TASK_SIZE from 0x7fff8000UL to 0x7fff8000UL
+ * to fix page alignment of initial stack (vm_start) for 64KB pages
  */
-#define TASK_SIZE	0x7fff8000UL
+#define TASK_SIZE	0x7fff0000UL
 #define STACK_TOP	TASK_SIZE
 
 /*
@@ -55,8 +67,11 @@ extern unsigned int vced_count, vcei_count;
  * is limited to 1TB by the R4000 architecture; R10000 and better can
  * support 16TB; the architectural reserve for future expansion is
  * 8192EB ...
+ *
+ * XLP_MERGE_TODO: changed TASK_SIZE32 from 0x7fff8000UL to 0x7fff8000UL
+ * to fix page alignment of initial stack (vm_start) for 64KB pages
  */
-#define TASK_SIZE32	0x7fff8000UL
+#define TASK_SIZE32	0x7fff0000UL
 #define TASK_SIZE	0x10000000000UL
 #define STACK_TOP	\
       (test_thread_flag(TIF_32BIT_ADDR) ? TASK_SIZE32 : TASK_SIZE)
@@ -214,6 +229,9 @@ struct thread_struct {
 	unsigned long trap_no;
 	unsigned long irix_trampoline;  /* Wheee... */
 	unsigned long irix_oldctx;
+#ifdef CONFIG_PERFCTR_VIRTUAL
+	struct vperfctr *perfctr;
+#endif
 #ifdef CONFIG_CPU_CAVIUM_OCTEON
     struct octeon_cop2_state cp2 __attribute__ ((__aligned__(128)));
     struct octeon_cvmseg_state cvmseg __attribute__ ((__aligned__(128)));

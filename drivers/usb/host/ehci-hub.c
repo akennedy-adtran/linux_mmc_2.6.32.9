@@ -248,7 +248,7 @@ static int ehci_bus_resume (struct usb_hcd *hcd)
 	if (time_before (jiffies, ehci->next_statechange))
 		msleep(5);
 	spin_lock_irq (&ehci->lock);
-	if (!test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags)) {
+	if (!HCD_HW_ACCESSIBLE(hcd)) {
 		spin_unlock_irq(&ehci->lock);
 		return -ESHUTDOWN;
 	}
@@ -516,6 +516,7 @@ ehci_hub_status_data (struct usb_hcd *hcd, char *buf)
 	u32		mask;
 	int		ports, i, retval = 1;
 	unsigned long	flags;
+	u32		ppcd = 0;
 
 	/* if !USB_SUSPEND, root hub timers won't get shut down ... */
 	if (!HC_IS_RUNNING(hcd->state))
@@ -545,7 +546,15 @@ ehci_hub_status_data (struct usb_hcd *hcd, char *buf)
 
 	/* port N changes (bit N)? */
 	spin_lock_irqsave (&ehci->lock, flags);
+
+	/* get per-port change detect bits */
+	if (ehci->has_ppcd)
+		ppcd = ehci_readl(ehci, &ehci->regs->status) >> 16;
+
 	for (i = 0; i < ports; i++) {
+		/* leverage per-port change bits feature */
+		if (ehci->has_ppcd && !(ppcd & (1 << i)))
+			continue;
 		temp = ehci_readl(ehci, &ehci->regs->port_status [i]);
 
 		/*
@@ -589,8 +598,8 @@ ehci_hub_descriptor (
 	desc->bDescLength = 7 + 2 * temp;
 
 	/* two bitmaps:  ports removable, and usb 1.0 legacy PortPwrCtrlMask */
-	memset (&desc->bitmap [0], 0, temp);
-	memset (&desc->bitmap [temp], 0xff, temp);
+	memset(&desc->u.hs.DeviceRemovable[0], 0, temp);
+	memset(&desc->u.hs.DeviceRemovable[temp], 0xff, temp);
 
 	temp = 0x0008;			/* per-port overcurrent reporting */
 	if (HCS_PPC (ehci->hcs_params))
@@ -694,6 +703,11 @@ static int ehci_hub_control (
 					  status_reg);
 			break;
 		case USB_PORT_FEAT_C_CONNECTION:
+			if (ehci->has_lpm) {
+				/* clear PORTSC bits on disconnect */
+				temp &= ~PORT_LPM;
+				temp &= ~PORT_DEV_ADDR;
+			}
 			ehci_writel(ehci, (temp & ~PORT_RWC_BITS) | PORT_CSC,
 					status_reg);
 			break;
@@ -741,7 +755,7 @@ static int ehci_hub_control (
 			 * power switching; they're allowed to just limit the
 			 * current.  khubd will turn the power back on.
 			 */
-			if (HCS_PPC (ehci->hcs_params)){
+			if (HCS_PPC(ehci->hcs_params)) {
 				ehci_writel(ehci,
 					temp & ~(PORT_RWC_BITS | PORT_POWER),
 					status_reg);

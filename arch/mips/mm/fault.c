@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -26,11 +35,75 @@
 #include <asm/ptrace.h>
 #include <asm/highmem.h>		/* For VMALLOC_END */
 
+#include <asm/netlogic/sim.h>
+#include <asm/mach-netlogic/xlp-mmu.h>
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+#define ENTER_CRITICAL(flags) local_irq_save(flags)
+#define EXIT_CRITICAL(flags) local_irq_restore(flags)
+#endif
+
 /*
  * This routine handles page faults.  It determines the address,
  * and the problem, and then passes it off to one of the appropriate
  * routines.
  */
+
+static inline char *access_violation(int code)
+{
+	switch (code) {
+	case 0: return "read access from";
+		break;
+	case 1: return "write access to";
+		break;
+	case 2: return "read-exec";
+		break;
+	default: return "unknown";
+		break;
+	}
+}
+
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+extern void dump_pgtable(pgd_t *pgd);
+extern void print_pgtable(unsigned long, unsigned long);
+
+extern unsigned long NONWIRED_START, NONWIRED_END;
+
+static void update_kernel_tlb(unsigned long address)
+{
+	unsigned long flags;
+	pgd_t *pgdp;
+	pud_t *pudp;
+	pmd_t *pmdp;
+	pte_t *ptep;
+	int pid;
+	unsigned long config6_flags;
+
+	ENTER_CRITICAL(flags);
+	disable_pgwalker(config6_flags);
+
+	pid = read_c0_entryhi() & ASID_MASK;
+	address &= (PAGE_MASK << 1);
+	write_c0_entryhi(address | pid);
+	pgdp = pgd_offset_k(address);
+	mtc0_tlbw_hazard();
+	pudp = pud_offset(pgdp, address);
+	pmdp = pmd_offset(pudp, address);
+	{
+		ptep = pte_offset_map(pmdp, address);
+
+		write_c0_entrylo0(pte_to_entrylo(pte_val(*ptep++)));
+		write_c0_entrylo1(pte_to_entrylo(pte_val(*ptep)));
+		mtc0_tlbw_hazard();
+		tlb_write_random();
+	}
+	tlbw_use_hazard();
+//      FLUSH_ITLB_VM(vma);
+	enable_pgwalker(config6_flags);
+	EXIT_CRITICAL(flags);
+}
+#endif
+
+
 asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long write,
 			      unsigned long address)
 {
@@ -40,12 +113,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long write,
 	const int field = sizeof(unsigned long) * 2;
 	siginfo_t info;
 	int fault;
-
-#if 0
-	printk("Cpu%d[%s:%d:%0*lx:%ld:%0*lx]\n", raw_smp_processor_id(),
-	       current->comm, current->pid, field, address, write,
-	       field, regs->cp0_epc);
-#endif
 
 	info.si_code = SEGV_MAPERR;
 
@@ -62,6 +129,11 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long write,
 # define VMALLOC_FAULT_TARGET no_context
 #else
 # define VMALLOC_FAULT_TARGET vmalloc_fault
+#endif
+
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+	if (unlikely(address >= NONWIRED_START && address < NONWIRED_END))
+		goto refill_kernel_tlb;
 #endif
 
 	if (unlikely(address >= VMALLOC_START && address <= VMALLOC_END))
@@ -136,15 +208,6 @@ bad_area_nosemaphore:
 	if (user_mode(regs)) {
 		tsk->thread.cp0_badvaddr = address;
 		tsk->thread.error_code = write;
-#if 0
-		printk("do_page_fault() #2: sending SIGSEGV to %s for "
-		       "invalid %s\n%0*lx (epc == %0*lx, ra == %0*lx)\n",
-		       tsk->comm,
-		       write ? "write access to" : "read access from",
-		       field, address,
-		       field, (unsigned long) regs->cp0_epc,
-		       field, (unsigned long) regs->regs[31]);
-#endif
 		info.si_signo = SIGSEGV;
 		info.si_errno = 0;
 		/* info.si_code has been set above */
@@ -192,15 +255,6 @@ do_sigbus:
 	 * Send a sigbus, regardless of whether we were in kernel
 	 * or user mode.
 	 */
-#if 0
-		printk("do_page_fault() #3: sending SIGBUS to %s for "
-		       "invalid %s\n%0*lx (epc == %0*lx, ra == %0*lx)\n",
-		       tsk->comm,
-		       write ? "write access to" : "read access from",
-		       field, address,
-		       field, (unsigned long) regs->cp0_epc,
-		       field, (unsigned long) regs->regs[31]);
-#endif
 	tsk->thread.cp0_badvaddr = address;
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
@@ -248,5 +302,11 @@ vmalloc_fault:
 			goto no_context;
 		return;
 	}
+#endif
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+refill_kernel_tlb:
+	update_kernel_tlb(address);
+	current->thread.cp0_baduaddr = address;
+	return;
 #endif
 }

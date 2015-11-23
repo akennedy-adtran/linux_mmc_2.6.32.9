@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /* PF_KEY user interface, this is defined by rfc2367 so
  * do not make arbitrary modifications or else this header
  * file will not be compliant.
@@ -234,6 +242,49 @@ struct sadb_x_kmaddress {
 	__u32	sadb_x_kmaddress_reserved;
 } __attribute__((packed));
 /* sizeof(struct sadb_x_kmaddress) == 8 */
+#ifdef CONFIG_NLM_NET_KEY
+/*
+ * Only considering V4 unicast address for prototyping.
+ */
+struct sadb_x_ph2_policy {
+        __u16  sadb_x_ph2_policy_len;
+        __u16  sadb_x_ph2_policy_exttype;
+        __u16  flags;
+        __u8   proto;
+        __u8   mode;
+        __u32  tunnel_src;
+        __u32  tunnel_dst;
+        __u16  reqid;
+        __u16  proxy_proto; /* This seems random. TBD */
+        __u32  spi;
+        __u32  pfkey_thread_id;
+        __u32  pad;
+}__attribute__((packed));
+
+struct sadb_x_nlm_ipsec_info {
+        uint16_t   sadb_x_ipsec_info_len;
+        uint16_t   sadb_x_ipsec_info_exttype;
+        uint16_t   info_type;
+        uint16_t   info_flag;
+}__attribute__((packed));
+
+struct sadb_x_nlm_spd_client_info {
+        uint16_t   sadb_x_spd_client_info_len;
+        uint16_t   sadb_x_spd_client_info_exttype;
+        uint16_t   client_num; 
+        uint16_t   pad;
+}__attribute__((packed));
+
+struct sadb_x_nlm_ipsec_clear {
+        uint16_t   sadb_x_ipsec_clear_len;
+        uint16_t   sadb_x_ipsec_clear_exttype;
+        uint16_t   clear_type;
+        uint16_t   clear_flag;
+}__attribute__((packed));
+
+#endif
+
+
 
 /* Message types */
 #define SADB_RESERVED		0
@@ -261,7 +312,17 @@ struct sadb_x_kmaddress {
 #define SADB_X_SPDDELETE2	22
 #define SADB_X_NAT_T_NEW_MAPPING	23
 #define SADB_X_MIGRATE		24
+#ifdef CONFIG_NLM_NET_KEY
+#define SADB_X_NLMS_PRIVATE	25
+#define SADB_X_EXT_NLM_PH2_POLICY 26
+#define SADB_X_NLM_IPSEC_INFO   27
+#define SADB_X_NLM_SPD_CLIENT_PROB  28
+#define SADB_X_NLM_SPD_CLIENT_PROB_REPLY  29
+#define SADB_X_NLM_IPSEC_CLEAR  30 
+#define SADB_MAX                30 
+#else
 #define SADB_MAX		24
+#endif
 
 /* Security Association flags */
 #define SADB_SAFLAGS_PFS	1
@@ -285,7 +346,8 @@ struct sadb_x_kmaddress {
 #define SADB_SATYPE_RIPV2	7
 #define SADB_SATYPE_MIP		8
 #define SADB_X_SATYPE_IPCOMP	9
-#define SADB_SATYPE_MAX		9
+#define SADB_X_SATYPE_IKE_SP    10
+#define SADB_SATYPE_MAX         10
 
 /* Authentication algorithms */
 #define SADB_AALG_NONE			0
@@ -357,7 +419,14 @@ struct sadb_x_kmaddress {
 #define SADB_X_EXT_SEC_CTX		24
 /* Used with MIGRATE to pass @ to IKE for negotiation */
 #define SADB_X_EXT_KMADDRESS		25
-#define SADB_EXT_MAX			25
+#ifdef CONFIG_NLM_NET_KEY
+#define SADB_X_EXT_NLM_IPSEC_INFO       27
+#define SADB_X_EXT_NLM_SPD_CLIENT_INFO  28
+#define SADB_X_EXT_NLM_IPSEC_CLEAR      29
+#define SADB_EXT_MAX                    30 
+#else
+#define SADB_EXT_MAX                    25
+#endif
 
 /* Identity Extension values */
 #define SADB_IDENTTYPE_RESERVED	0

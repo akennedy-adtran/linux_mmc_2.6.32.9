@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -50,7 +58,7 @@
 #define _CACHE_SHIFT                3
 #define _CACHE_MASK                 (7<<3)
 
-#else
+#elif defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
 
 #define _PAGE_PRESENT               (1<<0)  /* implemented in software */
 #define _PAGE_READ                  (1<<1)  /* implemented in software */
@@ -59,7 +67,6 @@
 #define _PAGE_MODIFIED              (1<<4)  /* implemented in software */
 #define _PAGE_FILE                  (1<<4)  /* set:pagecache unset:swap */
 
-#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
 
 #define _PAGE_GLOBAL                (1<<8)
 #define _PAGE_VALID                 (1<<9)
@@ -69,21 +76,131 @@
 #define _CACHE_UNCACHED             (1<<11)
 #define _CACHE_MASK                 (1<<11)
 
+#else /* 'Normal' r4K case */
+/*
+ * When using the RI/XI bit support, we have 13 bits of flags below
+ * the physical address. The RI/XI bits are placed such that a SRL 5
+ * can strip off the software bits, then a ROTR 2 can move the RI/XI
+ * into bits [63:62]. This also limits physical address to 56 bits,
+ * which is more than we need right now.
+ */
+
+/* implemented in software */
+#define _PAGE_PRESENT_SHIFT    (0)
+#define _PAGE_PRESENT      (1 << _PAGE_PRESENT_SHIFT)
+/* implemented in software, should be unused if kernel_uses_smartmips_rixi. */
+#define _PAGE_READ_SHIFT   (kernel_uses_smartmips_rixi ? _PAGE_PRESENT_SHIFT : _PAGE_PRESENT_SHIFT + 1)
+#define _PAGE_READ ({if (kernel_uses_smartmips_rixi) BUG(); 1 << _PAGE_READ_SHIFT; })
+/* implemented in software */
+#define _PAGE_WRITE_SHIFT  (_PAGE_READ_SHIFT + 1)
+#define _PAGE_WRITE        (1 << _PAGE_WRITE_SHIFT)
+/* implemented in software */
+#define _PAGE_ACCESSED_SHIFT   (_PAGE_WRITE_SHIFT + 1)
+#define _PAGE_ACCESSED     (1 << _PAGE_ACCESSED_SHIFT)
+/* implemented in software */
+#define _PAGE_MODIFIED_SHIFT   (_PAGE_ACCESSED_SHIFT + 1)
+#define _PAGE_MODIFIED     (1 << _PAGE_MODIFIED_SHIFT)
+/* set:pagecache unset:swap */
+#define _PAGE_FILE     (_PAGE_MODIFIED)
+
+#ifdef CONFIG_HUGETLB_PAGE
+/* huge tlb page */
+#define _PAGE_HUGE_SHIFT   (_PAGE_MODIFIED_SHIFT + 1)
+#define _PAGE_HUGE     (1 << _PAGE_HUGE_SHIFT)
 #else
-
-#define _PAGE_R4KBUG                (1<<5)  /* workaround for r4k bug  */
-#define _PAGE_HUGE                  (1<<5)  /* huge tlb page */
-#define _PAGE_GLOBAL                (1<<6)
-#define _PAGE_VALID                 (1<<7)
-#define _PAGE_SILENT_READ           (1<<7)  /* synonym                 */
-#define _PAGE_DIRTY                 (1<<8)  /* The MIPS dirty bit      */
-#define _PAGE_SILENT_WRITE          (1<<8)
-#define _CACHE_SHIFT		    9
-#define _CACHE_MASK                 (7<<9)
-
+#define _PAGE_HUGE_SHIFT   (_PAGE_MODIFIED_SHIFT)
+#define _PAGE_HUGE     ({BUG(); 1; })  /* Dummy value */
 #endif
+
+#ifdef CONFIG_NLM_XLP
+/*XLP has bit 57,56 in entrylo0/1 as RI:XI. We will use pte bits 63:62 to store 
+ *ri:xi, after right shift by 6, these bits will come to proper position.
+*/
+/* Page cannot be executed */
+#define _PAGE_NO_EXEC_SHIFT    (kernel_uses_smartmips_rixi ? 62: _PAGE_HUGE_SHIFT)
+#define _PAGE_NO_EXEC      ({if (!kernel_uses_smartmips_rixi) BUG(); 1ULL << _PAGE_NO_EXEC_SHIFT; })
+/* Page cannot be read */
+#define _PAGE_NO_READ_SHIFT    (kernel_uses_smartmips_rixi ? 63: _PAGE_NO_EXEC_SHIFT)
+#define _PAGE_NO_READ      ({if (!kernel_uses_smartmips_rixi) BUG(); 1ULL << _PAGE_NO_READ_SHIFT; })
+
+#define _PAGE_GLOBAL_SHIFT 6
+
+#else
+/* Page cannot be executed */
+#define _PAGE_NO_EXEC_SHIFT    (kernel_uses_smartmips_rixi ? _PAGE_HUGE_SHIFT + 1 : _PAGE_HUGE_SHIFT)
+#define _PAGE_NO_EXEC      ({if (!kernel_uses_smartmips_rixi) BUG(); 1 << _PAGE_NO_EXEC_SHIFT; })
+/* Page cannot be read */
+#define _PAGE_NO_READ_SHIFT    (kernel_uses_smartmips_rixi ? _PAGE_NO_EXEC_SHIFT + 1 : _PAGE_NO_EXEC_SHIFT)
+#define _PAGE_NO_READ      ({if (!kernel_uses_smartmips_rixi) BUG(); 1 << _PAGE_NO_READ_SHIFT; })
+
+#define _PAGE_GLOBAL_SHIFT (_PAGE_NO_READ_SHIFT + 1)
+#endif
+
+#define _PAGE_GLOBAL       (1 << _PAGE_GLOBAL_SHIFT)
+
+#define _PAGE_VALID_SHIFT  (_PAGE_GLOBAL_SHIFT + 1)
+#define _PAGE_VALID        (1 << _PAGE_VALID_SHIFT)
+/* synonym                 */
+#define _PAGE_SILENT_READ  (_PAGE_VALID)
+
+/* The MIPS dirty bit      */
+#define _PAGE_DIRTY_SHIFT  (_PAGE_VALID_SHIFT + 1)
+#define _PAGE_DIRTY        (1 << _PAGE_DIRTY_SHIFT)
+#define _PAGE_SILENT_WRITE (_PAGE_DIRTY)
+
+#define _CACHE_SHIFT       (_PAGE_DIRTY_SHIFT + 1)
+#define _CACHE_MASK        (7 << _CACHE_SHIFT)
+
+#define _PFN_SHIFT     (PAGE_SHIFT - 12 + _CACHE_SHIFT + 3)
+
 #endif /* defined(CONFIG_64BIT_PHYS_ADDR && defined(CONFIG_CPU_MIPS32) */
 
+#ifndef _PFN_SHIFT
+#define _PFN_SHIFT                  PAGE_SHIFT
+#endif
+#define _PFN_MASK      (~((1 << (_PFN_SHIFT)) - 1))
+
+#ifndef _PAGE_NO_READ
+#define _PAGE_NO_READ ({BUG(); 0; })
+#define _PAGE_NO_READ_SHIFT ({BUG(); 0; })
+#endif
+#ifndef _PAGE_NO_EXEC
+#define _PAGE_NO_EXEC ({BUG(); 0; })
+#endif
+#ifndef _PAGE_GLOBAL_SHIFT
+#define _PAGE_GLOBAL_SHIFT ilog2(_PAGE_GLOBAL)
+#endif
+
+#ifndef __ASSEMBLY__
+/*
+ * pte_to_entrylo converts a page table entry (PTE) into a Mips
+ * entrylo0/1 value.
+ */
+static inline uint64_t pte_to_entrylo(unsigned long pte_val)
+{
+   if (kernel_uses_smartmips_rixi) {
+#ifdef CONFIG_NLM_XLP
+       return (pte_val >> _PAGE_GLOBAL_SHIFT);
+#else
+       int sa;
+#ifdef CONFIG_32BIT
+       sa = 31 - _PAGE_NO_READ_SHIFT;
+#else
+       sa = 63 - _PAGE_NO_READ_SHIFT;
+#endif
+       /*
+        * C has no way to express that this is a DSRL
+        * _PAGE_NO_EXEC_SHIFT followed by a ROTR 2.  Luckily
+        * in the fast path this is done in assembly
+        */
+       return (pte_val >> _PAGE_GLOBAL_SHIFT) |
+           ((pte_val & (_PAGE_NO_EXEC | _PAGE_NO_READ)) << sa);
+#endif
+   }
+
+   return pte_val >> _PAGE_GLOBAL_SHIFT;
+}
+#endif
 
 /*
  * Cache attributes
@@ -101,6 +218,12 @@
 #define _CACHE_CACHABLE_COW         (5<<_CACHE_SHIFT)
 #define _CACHE_CACHABLE_NONCOHERENT (5<<_CACHE_SHIFT)
 #define _CACHE_UNCACHED_ACCELERATED (7<<_CACHE_SHIFT)
+
+#elif defined(CONFIG_CPU_XLR) || defined(CONFIG_CPU_XLP)
+
+#define _CACHE_UNCACHED             (2<<9)
+#define _CACHE_CACHABLE_COW         (3<<9)
+#define _CACHE_CACHABLE_NONCOHERENT (3<<9)
 
 #elif defined(CONFIG_CPU_RM9000)
 
@@ -130,9 +253,10 @@
 
 #endif
 
-#define __READABLE	(_PAGE_READ | _PAGE_SILENT_READ | _PAGE_ACCESSED)
+#define __READABLE (_PAGE_SILENT_READ | _PAGE_ACCESSED | (kernel_uses_smartmips_rixi ? 0 : _PAGE_READ))
+
 #define __WRITEABLE	(_PAGE_WRITE | _PAGE_SILENT_WRITE | _PAGE_MODIFIED)
 
-#define _PAGE_CHG_MASK  (PAGE_MASK | _PAGE_ACCESSED | _PAGE_MODIFIED | _CACHE_MASK)
+#define _PAGE_CHG_MASK  (_PFN_MASK | _PAGE_ACCESSED | _PAGE_MODIFIED | _CACHE_MASK)
 
 #endif /* _ASM_PGTABLE_BITS_H */

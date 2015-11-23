@@ -4754,7 +4754,7 @@ static int s_show(struct seq_file *m, void *p)
 
 	nr_inuse = nr_objs - nr_free;
 
-	seq_printf(m, "%-17s %6lu %6lu %6u %4u %4d", s->name, nr_inuse,
+	seq_printf(m, "%-24s %6lu %6lu %6u %4u %4d", s->name, nr_inuse,
 		   nr_objs, s->size, oo_objects(s->oo),
 		   (1 << oo_order(s->oo)));
 	seq_printf(m, " : tunables %4u %4u %4u", 0, 0, 0);

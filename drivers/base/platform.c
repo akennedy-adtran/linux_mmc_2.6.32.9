@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * platform.c - platform 'pseudo' bus for legacy devices
  *
@@ -191,7 +199,7 @@ int platform_device_add_resources(struct platform_device *pdev,
 {
 	struct resource *r;
 
-	r = kmalloc(sizeof(struct resource) * num, GFP_KERNEL);
+	r = kzalloc(sizeof(struct resource) * num, GFP_KERNEL);
 	if (r) {
 		memcpy(r, res, sizeof(struct resource) * num);
 		pdev->resource = r;

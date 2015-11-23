@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2006-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -695,13 +703,19 @@ give_sigsegv:
 	return -EFAULT;
 }
 
+static int sig_uses_siginfo(struct k_sigaction *ka)
+{
+	return ((ka)->sa.sa_flags & SA_SIGINFO);
+}
+
 /*
  * o32 compatibility on 64-bit kernels, without DSP ASE
  */
 struct mips_abi mips_abi_32 = {
 	.setup_frame	= setup_frame_32,
 	.setup_rt_frame	= setup_rt_frame_32,
-	.restart	= __NR_O32_restart_syscall
+	.restart	= __NR_O32_restart_syscall,
+	.uses_siginfo   = sig_uses_siginfo
 };
 
 SYSCALL_DEFINE4(32_rt_sigaction, int, sig,

@@ -284,6 +284,9 @@ done
 if [ ! -z ${output_file} ]; then
 	if [ -z ${cpio_file} ]; then
 		cpio_tfile="$(mktemp ${TMPDIR:-/tmp}/cpiofile.XXXXXX)"
+		tmp_cpio_list="$(mktemp ${TMPDIR:-/tmp}/cpiofile.XXXXXX)"
+		grep -v svn ${cpio_list} > ${tmp_cpio_list}
+		mv ${tmp_cpio_list} ${cpio_list}
 		usr/gen_init_cpio ${cpio_list} > ${cpio_tfile}
 	else
 		cpio_tfile=${cpio_file}

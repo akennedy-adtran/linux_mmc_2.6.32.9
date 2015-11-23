@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *  Zorro board IDs
  *
@@ -273,10 +281,10 @@
 #define  ZORRO_PROD_BSC_ISDN_MASTERCARD				ZORRO_ID(BSC_ALFADATA_3, 0x40, 0)
 #define  ZORRO_PROD_BSC_ISDN_MASTERCARD_II			ZORRO_ID(BSC_ALFADATA_3, 0x41, 0)
 
-#define ZORRO_MANUF_PHOENIX					0x0835
-#define  ZORRO_PROD_PHOENIX_ST506				ZORRO_ID(PHOENIX, 0x21, 0)
-#define  ZORRO_PROD_PHOENIX_SCSI				ZORRO_ID(PHOENIX, 0x22, 0)
-#define  ZORRO_PROD_PHOENIX_RAM					ZORRO_ID(PHOENIX, 0xBE, 0)
+#define ZORRO_MANUF_NETLOGIC					0x0835
+#define  ZORRO_PROD_NETLOGIC_ST506				ZORRO_ID(NETLOGIC, 0x21, 0)
+#define  ZORRO_PROD_NETLOGIC_SCSI				ZORRO_ID(NETLOGIC, 0x22, 0)
+#define  ZORRO_PROD_NETLOGIC_RAM					ZORRO_ID(NETLOGIC, 0xBE, 0)
 
 #define ZORRO_MANUF_ADVANCED_STORAGE_SYSTEMS			0x0836
 #define  ZORRO_PROD_ADVANCED_STORAGE_SYSTEMS_NEXUS		ZORRO_ID(ADVANCED_STORAGE_SYSTEMS, 0x01, 0)
@@ -528,10 +536,10 @@
 #define ZORRO_MANUF_REIS_WARE					0xAA11
 #define  ZORRO_PROD_REIS_WARE_HANDYSCANNER			ZORRO_ID(REIS_WARE, 0x11, 0)
 
-#define ZORRO_MANUF_PHOENIX_2					0xB5A8
-#define  ZORRO_PROD_PHOENIX_ST506_2				ZORRO_ID(PHOENIX_2, 0x21, 0)
-#define  ZORRO_PROD_PHOENIX_SCSI_2				ZORRO_ID(PHOENIX_2, 0x22, 0)
-#define  ZORRO_PROD_PHOENIX_RAM_2				ZORRO_ID(PHOENIX_2, 0xBE, 0)
+#define ZORRO_MANUF_NETLOGIC_2					0xB5A8
+#define  ZORRO_PROD_NETLOGIC_ST506_2				ZORRO_ID(NETLOGIC_2, 0x21, 0)
+#define  ZORRO_PROD_NETLOGIC_SCSI_2				ZORRO_ID(NETLOGIC_2, 0x22, 0)
+#define  ZORRO_PROD_NETLOGIC_RAM_2				ZORRO_ID(NETLOGIC_2, 0xBE, 0)
 
 #define ZORRO_MANUF_COMBITEC_2					0xC008
 #define  ZORRO_PROD_COMBITEC_HD					ZORRO_ID(COMBITEC_2, 0x2A, 0)

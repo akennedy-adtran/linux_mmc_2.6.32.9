@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2007-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -28,6 +36,7 @@ static int mips_next_event(unsigned long delta,
 	unsigned int cnt;
 	int res;
 
+/* 	if (delta > 100000000) printk("[%s]: delta=%ld evt=%p\n", __FUNCTION__, delta, evt); */
 	cnt = read_c0_count();
 	cnt += delta;
 	write_c0_compare(cnt);
@@ -68,6 +77,7 @@ irqreturn_t c0_compare_interrupt(int irq, void *dev_id)
 	 * above we now know that the reason we got here must be a timer
 	 * interrupt.  Being the paranoiacs we are we check anyway.
 	 */
+
 	if (!r2 || (read_c0_cause() & (1 << 30))) {
 		/* Clear Count/Compare Interrupt */
 		write_c0_compare(read_c0_compare());
@@ -90,6 +100,7 @@ struct irqaction c0_compare_irqaction = {
 
 void mips_event_handler(struct clock_event_device *dev)
 {
+	printk("[%s]: nothing to do\n", __FUNCTION__);
 }
 
 /*
@@ -171,9 +182,11 @@ int __cpuinit r4k_clockevent_init(void)
 	if (!cpu_has_counter || !mips_hpt_frequency)
 		return -ENXIO;
 
+	/* XLP_MERGE_TODO */
+#if !defined(CONFIG_NLM_XLP_SIM)
 	if (!c0_compare_int_usable())
 		return -ENXIO;
-
+#endif
 	/*
 	 * With vectored interrupts things are getting platform specific.
 	 * get_c0_compare_int is a hook to allow a platform to return the
@@ -189,8 +202,14 @@ int __cpuinit r4k_clockevent_init(void)
 	cd->features		= CLOCK_EVT_FEAT_ONESHOT;
 
 	/* Calculate the min / max delta */
+#ifdef CONFIG_NLM_COMMON
+	/* for 1GHz (and lesser), div_sc returns zero if shift = 32 */
+	cd->mult	= div_sc((unsigned long) mips_freq, NSEC_PER_SEC, 30);
+	cd->shift		= 30;
+#else
 	cd->mult	= div_sc((unsigned long) mips_freq, NSEC_PER_SEC, 32);
 	cd->shift		= 32;
+#endif
 	cd->max_delta_ns	= clockevent_delta2ns(0x7fffffff, cd);
 	cd->min_delta_ns	= clockevent_delta2ns(0x300, cd);
 

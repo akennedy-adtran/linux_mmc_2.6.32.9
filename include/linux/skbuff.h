@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *	Definitions for the 'struct sk_buff' memory handlers.
  *
@@ -197,6 +205,26 @@ struct skb_shared_info {
 	unsigned short	gso_segs;
 	unsigned short  gso_type;
 	__be32          ip6_frag_id;
+#ifdef CONFIG_NLMCOMMON_HW_BUFFER_MGMT
+
+        /* Several fileds to track SKB's which utilize automatic buffer 
+         * management:
+         *
+         * @nlm_flags: Non-zero means that this data buffer intends to use FMN
+         * features to return data back to originating device's free pool. 
+         * If more flags added later, we will transition to bit-scale 
+         * representation for semantics of this field.
+         *
+         * @nlm_owner: pointer to the device which owns this data buffer
+         *
+         * @nlm_refill: function to create new data buffers (e.g. to replace
+         * one to be freed for some reason).
+        */
+	unsigned int      nlm_flags;
+	struct net_device *nlm_owner;
+        int               (*nlm_refill)(struct net_device *dev);
+
+#endif /* CONFIG_NLMCOMMON_HW_BUFFER_MGMT */
 	union skb_shared_tx tx_flags;
 	struct sk_buff	*frag_list;
 	struct skb_shared_hwtstamps hwtstamps;
@@ -404,6 +432,10 @@ struct sk_buff {
 				*data;
 	unsigned int		truesize;
 	atomic_t		users;
+#ifdef CONFIG_NLM_NET_OPTS
+	struct sk_buff 		*netl_skb;
+	unsigned int 		queue_id;
+#endif
 };
 
 #ifdef __KERNEL__
@@ -445,13 +477,21 @@ extern struct sk_buff *__alloc_skb(unsigned int size,
 static inline struct sk_buff *alloc_skb(unsigned int size,
 					gfp_t priority)
 {
+#if defined(CONFIG_NLM_COMMON) && defined(CONFIG_64BIT)
+	return __alloc_skb(size, priority | GFP_DMA, 0, -1);
+#else
 	return __alloc_skb(size, priority, 0, -1);
+#endif
 }
 
 static inline struct sk_buff *alloc_skb_fclone(unsigned int size,
 					       gfp_t priority)
 {
+#if defined(CONFIG_NLM_COMMON) && defined(CONFIG_64BIT)
+	return __alloc_skb(size, priority | GFP_DMA, 1, -1);
+#else
 	return __alloc_skb(size, priority, 1, -1);
+#endif
 }
 
 extern int skb_recycle_check(struct sk_buff *skb, int skb_size);
@@ -1459,7 +1499,11 @@ static inline void __skb_queue_purge(struct sk_buff_head *list)
 static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 					      gfp_t gfp_mask)
 {
+#if defined(CONFIG_NLM_COMMON) && defined(CONFIG_64BIT)
+	struct sk_buff *skb = alloc_skb(length + NET_SKB_PAD, gfp_mask|GFP_DMA);
+#else
 	struct sk_buff *skb = alloc_skb(length + NET_SKB_PAD, gfp_mask);
+#endif
 	if (likely(skb))
 		skb_reserve(skb, NET_SKB_PAD);
 	return skb;
@@ -1486,7 +1530,11 @@ extern struct sk_buff *__netdev_alloc_skb(struct net_device *dev,
 static inline struct sk_buff *netdev_alloc_skb(struct net_device *dev,
 		unsigned int length)
 {
+#if defined(CONFIG_NLM_COMMON) && defined(CONFIG_64BIT)
+	return __netdev_alloc_skb(dev, length, GFP_ATOMIC | GFP_DMA);
+#else
 	return __netdev_alloc_skb(dev, length, GFP_ATOMIC);
+#endif
 }
 
 extern struct page *__netdev_alloc_page(struct net_device *dev, gfp_t gfp_mask);

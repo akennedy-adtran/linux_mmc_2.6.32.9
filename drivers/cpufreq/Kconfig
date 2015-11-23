@@ -1,5 +1,6 @@
 config CPU_FREQ
 	bool "CPU Frequency scaling"
+	select XLP_CPUFREQ if NLM_XLP && XLP_PIC_TIMER
 	help
 	  CPU Frequency scaling allows you to change the clock speed of 
 	  CPUs on the fly. This is a nice method to save power, because 

@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2014 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -52,6 +60,16 @@ struct pt_regs {
 	unsigned long long mpl[3];        /* MTM{0,1,2} */
 	unsigned long long mtp[3];        /* MTP{0,1,2} */
 #endif
+#ifdef CONFIG_NLM_XLP
+	unsigned long long tx_buf[4];
+	unsigned long long rx_buf[4];
+	unsigned int tx_msg_status;
+	unsigned int rx_msg_status;
+	unsigned int misc_status;
+	unsigned int msg_config;
+	unsigned int msg_err;
+#endif
+
 } __attribute__ ((aligned (8)));
 
 /* Arbitrarily choose the same ptrace numbers as used by the Sparc code. */
@@ -118,6 +136,7 @@ struct pt_watch_regs {
 #include <linux/linkage.h>
 #include <linux/types.h>
 #include <asm/isadep.h>
+#include <asm/kdebug.h>
 
 struct task_struct;
 

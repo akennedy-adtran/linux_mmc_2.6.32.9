@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * dcookies.c
  *
@@ -205,6 +213,51 @@ asmlinkage long SyS_lookup_dcookie(u64 cookie64, long buf, long len)
 }
 SYSCALL_ALIAS(sys_lookup_dcookie, SyS_lookup_dcookie);
 #endif
+
+#if defined (CONFIG_64BIT) && defined (CONFIG_NLM_COMMON)
+#if defined (CONFIG_MIPS32_O32) || defined (CONFIG_MIPS32_N32)
+#ifdef CONFIG_HAVE_SYSCALL_WRAPPERS
+int compat_SyS_lookup_dcookie(u32 cookie_msb, u32 cookie_lsb,
+        compat_uptr_t buf, compat_size_t len)
+{
+    u64 cookie;
+    char __user *user_buf;
+    size_t size;
+
+    size = (size_t)len;
+
+    user_buf = compat_ptr(buf);
+
+#ifdef CONFIG_CPU_BIG_ENDIAN
+    cookie = (((u64)cookie_msb) << 32) | (u64)cookie_lsb;
+#else
+    cookie = (((u64)cookie_lsb) << 32) | (u64)cookie_msb;
+#endif
+
+    return SYSC_lookup_dcookie(cookie, user_buf, size);
+
+}
+SYSCALL_ALIAS(compat_sys_lookup_dcookie, compat_SyS_lookup_dcookie);
+#else
+compat_sys_lookup_dcookie(u32 cookie_msb, u32 cookie_lsb,
+        compat_uptr_t buf, compat_size_t len)
+{
+    u64 cookie;
+    char __user *user_buf;
+    size_t size;
+
+    size = (size_t)len;
+
+    user_buf = compat_ptr(buf);
+    cookie = (((u64)cookie_msb) << 32) | (u64)cookie_lsb;
+
+    return sys_lookup_dcookie(cookie, user_buf, size);
+
+}
+#endif
+#endif
+#endif
+
 
 static int dcookie_init(void)
 {

@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2007-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *  linux/drivers/mmc/core/sd.c
  *
@@ -201,7 +209,11 @@ static int mmc_read_switch(struct mmc_card *card)
 
 	err = -EIO;
 
+#ifdef CONFIG_MMC_XLP
+	status = kmalloc(64, GFP_KERNEL|GFP_DMA);
+#else
 	status = kmalloc(64, GFP_KERNEL);
+#endif
 	if (!status) {
 		printk(KERN_ERR "%s: could not allocate a buffer for "
 			"switch capabilities.\n", mmc_hostname(card->host));
@@ -256,7 +268,11 @@ static int mmc_switch_hs(struct mmc_card *card)
 
 	err = -EIO;
 
+#ifdef CONFIG_MMC_XLP
+	status = kmalloc(64, GFP_KERNEL|GFP_DMA);
+#else
 	status = kmalloc(64, GFP_KERNEL);
+#endif
 	if (!status) {
 		printk(KERN_ERR "%s: could not allocate a buffer for "
 			"switch capabilities.\n", mmc_hostname(card->host));

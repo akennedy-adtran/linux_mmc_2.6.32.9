@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -56,6 +64,12 @@ void __init pagetable_init(void)
 {
 	unsigned long vaddr;
 	pgd_t *pgd_base;
+#ifdef CONFIG_HIGHMEM
+        pgd_t *pgd;
+        pud_t *pud;
+        pmd_t *pmd;
+        pte_t *pte;
+#endif
 
 	/* Initialize the entire pgd.  */
 	pgd_init((unsigned long)swapper_pg_dir);
@@ -67,4 +81,18 @@ void __init pagetable_init(void)
 	 */
 	vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
 	fixrange_init(vaddr, 0, pgd_base);
+
+#ifdef CONFIG_HIGHMEM
+        /*
+         * Permanent kmaps:
+         */
+        vaddr = PKMAP_BASE;
+        fixrange_init(vaddr, vaddr + PAGE_SIZE*LAST_PKMAP, pgd_base);
+
+        pgd = swapper_pg_dir + __pgd_offset(vaddr);
+        pud = pud_offset(pgd, vaddr);
+        pmd = pmd_offset(pud, vaddr);
+        pte = pte_offset_kernel(pmd, vaddr);
+        pkmap_page_table = pte;
+#endif
 }

@@ -709,6 +709,14 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 	return HRTIMER_RESTART;
 }
 
+/* Back-port Kernel 3.x parameter enabling or disabling per-CPU schedluer
+ * timer tick skew.
+ * Adds a kernel command line parameter skew_tick= that enables/disables
+ * an offset to the periodic timer tick per cpu to mitigate
+ * xtime_lock contention on larger systems.  Can set to zero for
+ * no skew or one for a skew (jiffy period / num_cpus). */
+static int sched_skew_tick = 1;
+
 /**
  * tick_setup_sched_timer - setup the tick emulation timer
  */
@@ -716,7 +724,6 @@ void tick_setup_sched_timer(void)
 {
 	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
 	ktime_t now = ktime_get();
-	u64 offset;
 
 	/*
 	 * Emulate tick processing via per-CPU hrtimers:
@@ -726,10 +733,14 @@ void tick_setup_sched_timer(void)
 
 	/* Get the next period (per cpu) */
 	hrtimer_set_expires(&ts->sched_timer, tick_init_jiffy_update());
-	offset = ktime_to_ns(tick_period) >> 1;
-	do_div(offset, num_possible_cpus());
-	offset *= smp_processor_id();
-	hrtimer_add_expires_ns(&ts->sched_timer, offset);
+
+	/* Optionally offset the tick to avert xtime_lock contention. */
+	if (sched_skew_tick) {
+		u64 offset = ktime_to_ns(tick_period) >> 1;
+		do_div(offset, num_possible_cpus());
+		offset *= smp_processor_id();
+		hrtimer_add_expires_ns(&ts->sched_timer, offset);
+	}
 
 	for (;;) {
 		hrtimer_forward(&ts->sched_timer, now, tick_period);
@@ -810,3 +821,12 @@ int tick_check_oneshot_change(int allow_nohz)
 	tick_nohz_switch_to_nohz();
 	return 0;
 }
+
+static int __init skew_tick(char *str)
+{
+	get_option(&str, &sched_skew_tick);
+
+	return 0;
+}
+early_param("skew_tick", skew_tick);
+

@@ -21,6 +21,15 @@ config PCI_MSI
 
 	   If you don't know what to do here, say N.
 
+config PCI_MSI_XLR
+   bool "Basic MSI support for the Netlogic XLR/XLS Platforms"
+   depends on NLM_XLR && PCI && !PCI_MSI
+   help
+     Enable Message Signaled Interrupt support for the PCI-E
+     slot on the Netlogic XLR/XLS Boards.
+
+     If you don't know what to do here, say N.
+
 config PCI_LEGACY
 	bool "Enable deprecated pci_find_* API"
 	depends on PCI

@@ -95,16 +95,6 @@ typedef unsigned long old_sigset_t;		/* at least 32 bits */
 #define MINSIGSTKSZ    2048
 #define SIGSTKSZ       8192
 
-#ifdef __KERNEL__
-
-#ifdef CONFIG_TRAD_SIGNALS
-#define sig_uses_siginfo(ka)	((ka)->sa.sa_flags & SA_SIGINFO)
-#else
-#define sig_uses_siginfo(ka)	(1)
-#endif
-
-#endif /* __KERNEL__ */
-
 #define SIG_BLOCK	1	/* for blocking signals */
 #define SIG_UNBLOCK	2	/* for unblocking signals */
 #define SIG_SETMASK	3	/* for setting the signal mask */

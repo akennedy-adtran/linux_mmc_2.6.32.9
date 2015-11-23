@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * Copyright (C) 2001, 2002, MontaVista Software Inc.
  * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
@@ -55,6 +63,10 @@ extern unsigned int __weak get_c0_compare_int(void);
 extern int r4k_clockevent_init(void);
 #endif
 
+#if defined CONFIG_XLP_REPLACE_R4K_TIMER
+extern int xlp_pic_ced_timer_init(int);
+extern void xlp_pic_cs_timer_init(int);
+#endif
 static inline int mips_clockevent_init(void)
 {
 #ifdef CONFIG_MIPS_MT_SMTC
@@ -63,6 +75,8 @@ static inline int mips_clockevent_init(void)
 	return smtc_clockevent_init();
 #elif defined(CONFIG_CEVT_R4K)
 	return r4k_clockevent_init();
+#elif defined CONFIG_XLP_REPLACE_R4K_TIMER
+	return xlp_pic_ced_timer_init(1);
 #else
 	return -ENXIO;
 #endif
@@ -79,9 +93,10 @@ static inline int init_mips_clocksource(void)
 {
 #ifdef CONFIG_CSRC_R4K
 	return init_r4k_clocksource();
-#else
-	return 0;
+#elif defined CONFIG_XLP_REPLACE_R4K_TIMER
+	xlp_pic_cs_timer_init(0);
 #endif
+	return 0;
 }
 
 extern void clocksource_set_clock(struct clocksource *cs, unsigned int clock);

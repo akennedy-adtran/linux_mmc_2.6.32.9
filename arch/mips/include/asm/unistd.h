@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -356,15 +365,23 @@
 #define __NR_perf_event_open		(__NR_Linux + 333)
 #define __NR_accept4			(__NR_Linux + 334)
 
+#define __NR_vperfctr                   (__NR_Linux + 335)
+#define __NR_vperfctr_open              (__NR_vperfctr + 0)
+#define __NR_vperfctr_control           (__NR_vperfctr + 1)
+#define __NR_vperfctr_unlink            (__NR_vperfctr + 2)
+#define __NR_vperfctr_iresume           (__NR_vperfctr + 3)
+#define __NR_vperfctr_read              (__NR_vperfctr + 4)
+
+
 /*
  * Offset of the last Linux o32 flavoured syscall
  */
-#define __NR_Linux_syscalls		334
+#define __NR_Linux_syscalls		340
 
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI32 */
 
 #define __NR_O32_Linux			4000
-#define __NR_O32_Linux_syscalls		334
+#define __NR_O32_Linux_syscalls		340
 
 #if _MIPS_SIM == _MIPS_SIM_ABI64
 
@@ -667,15 +684,23 @@
 #define __NR_perf_event_open		(__NR_Linux + 292)
 #define __NR_accept4			(__NR_Linux + 293)
 
+#define __NR_vperfctr                   (__NR_Linux + 294)
+#define __NR_vperfctr_open              (__NR_vperfctr + 0)
+#define __NR_vperfctr_control           (__NR_vperfctr + 1)
+#define __NR_vperfctr_unlink            (__NR_vperfctr + 2)
+#define __NR_vperfctr_iresume           (__NR_vperfctr + 3)
+#define __NR_vperfctr_read              (__NR_vperfctr + 4)
+
+
 /*
  * Offset of the last Linux 64-bit flavoured syscall
  */
-#define __NR_Linux_syscalls		293
+#define __NR_Linux_syscalls		299
 
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI64 */
 
 #define __NR_64_Linux			5000
-#define __NR_64_Linux_syscalls		293
+#define __NR_64_Linux_syscalls		299
 
 #if _MIPS_SIM == _MIPS_SIM_NABI32
 
@@ -981,16 +1006,23 @@
 #define __NR_rt_tgsigqueueinfo		(__NR_Linux + 295)
 #define __NR_perf_event_open		(__NR_Linux + 296)
 #define __NR_accept4			(__NR_Linux + 297)
+#define __NR_vperfctr                   (__NR_Linux + 298)
+#define __NR_vperfctr_open              (__NR_vperfctr + 0)
+#define __NR_vperfctr_control           (__NR_vperfctr + 1)
+#define __NR_vperfctr_unlink            (__NR_vperfctr + 2)
+#define __NR_vperfctr_iresume           (__NR_vperfctr + 3)
+#define __NR_vperfctr_read              (__NR_vperfctr + 4)
+#define __NR_mmap2			(__NR_Linux + 303)
 
 /*
  * Offset of the last N32 flavoured syscall
  */
-#define __NR_Linux_syscalls		297
+#define __NR_Linux_syscalls		304
 
 #endif /* _MIPS_SIM == _MIPS_SIM_NABI32 */
 
 #define __NR_N32_Linux			6000
-#define __NR_N32_Linux_syscalls		297
+#define __NR_N32_Linux_syscalls		304
 
 #ifdef __KERNEL__
 

@@ -97,7 +97,7 @@
 	move	ra,t1
 #endif /* CONFIG_MIPS_MT_SMTC */
 	mfc0	t1, CP0_STATUS		/* Do we really need this? */
-	li	a3, 0xff01
+	li	a3, 0x4000ff01
 	and	t1, a3
 	LONG_L	a2, THREAD_STATUS(a1)
 	nor	a3, $0, a3

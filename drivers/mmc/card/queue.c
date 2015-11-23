@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2007-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *  linux/drivers/mmc/card/queue.c
  *
@@ -144,7 +152,11 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card, spinlock_t *lock
 			bouncesz = host->max_blk_count * 512;
 
 		if (bouncesz > 512) {
+#ifdef CONFIG_MMC_XLP
+			mq->bounce_buf = kmalloc(bouncesz, GFP_KERNEL|GFP_DMA);
+#else
 			mq->bounce_buf = kmalloc(bouncesz, GFP_KERNEL);
+#endif
 			if (!mq->bounce_buf) {
 				printk(KERN_WARNING "%s: unable to "
 					"allocate bounce buffer\n",

@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -354,8 +363,13 @@ sys_call_table:
 	PTR	sys_tgkill			/* 5225 */
 	PTR	sys_utimes
 	PTR	sys_mbind
+#ifdef CONFIG_NUMA
+	PTR	sys_get_mempolicy
+	PTR	sys_set_mempolicy
+#else
 	PTR	sys_ni_syscall			/* sys_get_mempolicy */
 	PTR	sys_ni_syscall			/* sys_set_mempolicy */
+#endif
 	PTR	sys_mq_open			/* 5230 */
 	PTR	sys_mq_unlink
 	PTR	sys_mq_timedsend
@@ -412,9 +426,18 @@ sys_call_table:
 	PTR	sys_signalfd4
 	PTR	sys_eventfd2
 	PTR	sys_epoll_create1		/* 5285 */
-	PTR	sys_dup3
-	PTR	sys_pipe2
-	PTR	sys_inotify_init1
+    PTR	sys_dup3
+    PTR	sys_pipe2
+    PTR	sys_inotify_init1
+
+    /* RMI specific syscalls */
+    PTR     sys_vperfctr_open
+    PTR     sys_vperfctr_control /* 5290 */
+    PTR     sys_vperfctr_unlink
+    PTR     sys_vperfctr_iresume
+    PTR     sys_vperfctr_read
+
+
 	PTR	sys_preadv
 	PTR	sys_pwritev			/* 5390 */
 	PTR	sys_rt_tgsigqueueinfo

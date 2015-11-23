@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2008-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *  Originally written by Glenn Engel, Lake Stevens Instrument Division
  *
@@ -66,11 +74,46 @@ static void kgdb_call_nmi_hook(void *ignored)
 	kgdb_nmicallback(raw_smp_processor_id(), NULL);
 }
 
+#ifdef CONFIG_NLM_COMMON
+#include <asm/netlogic/interrupt.h>
+spinlock_t nlm_kgdb_lock = SPIN_LOCK_UNLOCKED;
+
+void nlm_kgdb_smp_hook(void)
+{
+	int i;
+	int cpu = smp_processor_id();
+	int cpus = num_online_cpus() - 1;
+	unsigned long flags;
+	extern struct plat_smp_ops *mp_ops;
+
+	BUG_ON(!cpu_online(cpu));
+
+	if (!cpus)
+		return;
+
+	spin_lock_irqsave(&nlm_kgdb_lock, flags);
+	for (i = 0; i < NR_CPUS; i++)
+		if (cpu_online(i) && i != cpu)
+			mp_ops->send_ipi_single(i, SMP_CALL_KGDB_HOOK_RVEC);
+	spin_unlock_irqrestore(&nlm_kgdb_lock, flags);
+}
+
+void nlm_kgdb_call_nmi_hook(void)
+{
+	kgdb_nmicallback(raw_smp_processor_id(), NULL);
+}
+#endif
+
 void kgdb_roundup_cpus(unsigned long flags)
 {
+#ifdef CONFIG_NLM_COMMON
+	nlm_kgdb_smp_hook();
+	return;
+#else
 	local_irq_enable();
 	smp_call_function(kgdb_call_nmi_hook, NULL, 0);
 	local_irq_disable();
+#endif
 }
 
 static int compute_signal(int tt)
@@ -180,6 +223,29 @@ void sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *p)
 	*(ptr++) = regs->cp0_epc;
 }
 
+#ifdef CONFIG_NLM_COMMON
+extern void nlm_common_flush_l1_icache_ipi(void *);
+extern void nlm_common_flush_l1_caches_ipi(void *);
+#endif
+
+#ifdef CONFIG_NLM_COMMON
+irqreturn_t xlr_kgdb_ipi_handler(int irq, struct pt_regs *regs)
+{
+	//int cpu = smp_processor_id();
+	kgdb_call_nmi_hook(NULL);
+
+	nlm_common_flush_l1_caches_ipi(NULL);
+#if 0
+	if(g_xlr_kgdb[cpu]) {
+		g_xlr_kgdb[cpu] = 0;
+		kgdb_call_nmi_hook(NULL);
+	}
+#endif
+
+	return IRQ_HANDLED;
+}
+#endif
+
 /*
  * Calls linux_debug_hook before the kernel dies. If KGDB is enabled,
  * then try to fall into the debugger
@@ -206,8 +272,12 @@ static int kgdb_mips_notify(struct notifier_block *self, unsigned long cmd,
 			regs->cp0_epc += 4;
 
 	/* In SMP mode, __flush_cache_all does IPI */
+#ifdef CONFIG_NLM_COMMON
+	nlm_common_flush_l1_icache_ipi(NULL);
+#else
 	local_irq_enable();
 	__flush_cache_all();
+#endif
 
 	return NOTIFY_STOP;
 }

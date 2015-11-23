@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 #ifndef _NET_NEIGHBOUR_H
 #define _NET_NEIGHBOUR_H
 
@@ -318,12 +326,19 @@ static inline int neigh_hh_output(struct hh_cache *hh, struct sk_buff *skb)
 	int hh_len;
 
 	do {
+#ifndef CONFIG_NLM_NET_OPTS
 		int hh_alen;
+#endif
 
 		seq = read_seqbegin(&hh->hh_lock);
 		hh_len = hh->hh_len;
+#ifdef CONFIG_NLM_NET_OPTS
+		*(uint64_t *)(unsigned long)(skb->data - 16) = *(uint64_t *)hh->hh_data;
+		*(uint64_t *)(unsigned long)(skb->data - 8) = *(uint64_t *)((unsigned long)hh->hh_data + 8);
+#else
 		hh_alen = HH_DATA_ALIGN(hh_len);
 		memcpy(skb->data - hh_alen, hh->hh_data, hh_alen);
+#endif
 	} while (read_seqretry(&hh->hh_lock, seq));
 
 	skb_push(skb, hh_len);

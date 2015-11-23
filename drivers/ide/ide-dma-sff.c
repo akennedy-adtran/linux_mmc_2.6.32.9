@@ -1,9 +1,23 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/ide.h>
 #include <linux/scatterlist.h>
 #include <linux/dma-mapping.h>
 #include <linux/io.h>
+
+#ifdef CONFIG_NLM_COMMON
+extern u8 nlm_ide_mm_inb (unsigned long port);              /* readb  */
+extern void nlm_ide_mm_outb (u8 value, unsigned long port); /* writeb */
+extern void nlm_ide_mm_outl (u32 value, unsigned long port);
+#endif
 
 /**
  *	config_drive_for_dma	-	attempt to activate IDE DMA
@@ -56,7 +70,11 @@ u8 ide_dma_sff_read_status(ide_hwif_t *hwif)
 	if (hwif->host_flags & IDE_HFLAG_MMIO)
 		return readb((void __iomem *)addr);
 	else
+#ifdef CONFIG_NLM_COMMON
+		return (u8) nlm_ide_mm_inb(addr);
+#else
 		return inb(addr);
+#endif
 }
 EXPORT_SYMBOL_GPL(ide_dma_sff_read_status);
 
@@ -67,7 +85,11 @@ static void ide_dma_sff_write_status(ide_hwif_t *hwif, u8 val)
 	if (hwif->host_flags & IDE_HFLAG_MMIO)
 		writeb(val, (void __iomem *)addr);
 	else
+#ifdef CONFIG_NLM_COMMON
+		nlm_ide_mm_outb(val, addr);
+#else
 		outb(val, addr);
+#endif
 }
 
 /**
@@ -201,13 +223,21 @@ int ide_dma_setup(ide_drive_t *drive, struct ide_cmd *cmd)
 		writel(hwif->dmatable_dma,
 		       (void __iomem *)(hwif->dma_base + ATA_DMA_TABLE_OFS));
 	else
+#ifdef CONFIG_NLM_COMMON
+		nlm_ide_mm_outl(hwif->dmatable_dma, hwif->dma_base + ATA_DMA_TABLE_OFS);
+#else
 		outl(hwif->dmatable_dma, hwif->dma_base + ATA_DMA_TABLE_OFS);
+#endif
 
 	/* specify r/w */
 	if (mmio)
 		writeb(rw, (void __iomem *)(hwif->dma_base + ATA_DMA_CMD));
 	else
+#ifdef CONFIG_NLM_COMMON
+		nlm_ide_mm_outb(rw, hwif->dma_base + ATA_DMA_CMD);
+#else
 		outb(rw, hwif->dma_base + ATA_DMA_CMD);
+#endif
 
 	/* read DMA status for INTR & ERROR flags */
 	dma_stat = hwif->dma_ops->dma_sff_read_status(hwif);
@@ -274,8 +304,13 @@ void ide_dma_start(ide_drive_t *drive)
 		writeb(dma_cmd | ATA_DMA_START,
 		       (void __iomem *)(hwif->dma_base + ATA_DMA_CMD));
 	} else {
+#ifdef CONFIG_NLM_COMMON
+		dma_cmd = (u8)nlm_ide_mm_inb(hwif->dma_base + ATA_DMA_CMD);
+		nlm_ide_mm_outb(dma_cmd | ATA_DMA_START, hwif->dma_base + ATA_DMA_CMD);
+#else
 		dma_cmd = inb(hwif->dma_base + ATA_DMA_CMD);
 		outb(dma_cmd | ATA_DMA_START, hwif->dma_base + ATA_DMA_CMD);
+#endif
 	}
 }
 EXPORT_SYMBOL_GPL(ide_dma_start);
@@ -292,8 +327,13 @@ int ide_dma_end(ide_drive_t *drive)
 		writeb(dma_cmd & ~ATA_DMA_START,
 		       (void __iomem *)(hwif->dma_base + ATA_DMA_CMD));
 	} else {
+#ifdef CONFIG_NLM_COMMON
+		dma_cmd = (u8)nlm_ide_mm_inb(hwif->dma_base + ATA_DMA_CMD);
+		nlm_ide_mm_outb(dma_cmd & ~ATA_DMA_START, hwif->dma_base + ATA_DMA_CMD);
+#else
 		dma_cmd = inb(hwif->dma_base + ATA_DMA_CMD);
 		outb(dma_cmd & ~ATA_DMA_START, hwif->dma_base + ATA_DMA_CMD);
+#endif
 	}
 
 	/* get DMA status */

@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * File:	portdrv_core.c
  * Purpose:	PCI Express Port Bus Driver's Core Functions

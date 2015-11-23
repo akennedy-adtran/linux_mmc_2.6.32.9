@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * cpu.h: Values of the PRId register used to match up
  *        various MIPS cpu types.
@@ -34,6 +42,7 @@
 #define PRID_COMP_LSI		0x080000
 #define PRID_COMP_LEXRA		0x0b0000
 #define PRID_COMP_CAVIUM	0x0d0000
+#define PRID_COMP_NLM		0x0c0000
 
 
 /*
@@ -223,6 +232,7 @@ enum cpu_type_enum {
 	 */
 	CPU_5KC, CPU_20KC, CPU_25KF, CPU_SB1, CPU_SB1A, CPU_LOONGSON2,
 	CPU_CAVIUM_OCTEON,
+	CPU_XLR, CPU_XLP,
 
 	CPU_LAST
 };
@@ -272,6 +282,7 @@ enum cpu_type_enum {
 #define MIPS_CPU_VINT		0x00080000 /* CPU supports MIPSR2 vectored interrupts */
 #define MIPS_CPU_VEIC		0x00100000 /* CPU supports MIPSR2 external interrupt controller mode */
 #define MIPS_CPU_ULRI		0x00200000 /* CPU has ULRI feature */
+#define MIPS_CPU_NLM_CACHE	0x00400000 
 
 /*
  * CPU ASE encodings

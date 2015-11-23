@@ -311,7 +311,7 @@ do {									\
 #endif /* CONFIG_64BIT */
 
 struct task_struct;
-
+struct pt_regs;
 extern void elf_dump_regs(elf_greg_t *, struct pt_regs *regs);
 extern int dump_task_regs(struct task_struct *, elf_gregset_t *);
 extern int dump_task_fpu(struct task_struct *, elf_fpregset_t *);

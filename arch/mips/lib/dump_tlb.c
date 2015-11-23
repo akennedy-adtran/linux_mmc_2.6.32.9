@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * Dump R4x00 TLB for debugging purposes.
  *
@@ -51,6 +59,13 @@ static void dump_tlb(int first, int last)
 	unsigned long s_entryhi, entryhi, asid;
 	unsigned long long entrylo0, entrylo1;
 	unsigned int s_index, pagemask, c0, c1, i;
+#ifdef CONFIG_NLM_XLP
+	unsigned int asid_mask = 0x3ff;
+#else
+	unsigned int asid_mask = 0xff;
+#endif
+	int wired = read_c0_wired();
+	int print_tlb = 0;
 
 	s_entryhi = read_c0_entryhi();
 	s_index = read_c0_index();
@@ -66,9 +81,16 @@ static void dump_tlb(int first, int last)
 		entrylo0 = read_c0_entrylo0();
 		entrylo1 = read_c0_entrylo1();
 
+		print_tlb = 0;
+		if ( (i >= 0) && (i < wired) ) print_tlb = 1;
+		else {
+			if ( ((entryhi & ~0x1ffffUL) != CKSEG0)
+			     && ((entryhi & asid_mask) == asid) )
+				print_tlb = 1;
+		}
+
 		/* Unused entries have a virtual address of CKSEG0.  */
-		if ((entryhi & ~0x1ffffUL) != CKSEG0
-		    && (entryhi & 0xff) == asid) {
+		if (print_tlb) {
 #ifdef CONFIG_32BIT
 			int width = 8;
 #else
@@ -107,5 +129,8 @@ static void dump_tlb(int first, int last)
 
 void dump_tlb_all(void)
 {
-	dump_tlb(0, current_cpu_data.tlbsize - 1);
+	int ntlbs = current_cpu_data.tlbsize - 1;
+
+	printk("Dumping TLBS (0 --> %d): nwired = %d\n", ntlbs, read_c0_wired());
+	dump_tlb(0, ntlbs);
 }

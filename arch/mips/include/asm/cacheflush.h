@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -40,9 +49,13 @@ extern void __flush_dcache_page(struct page *page);
 
 static inline void flush_dcache_page(struct page *page)
 {
+#ifdef CONFIG_NLM_COMMON
+	extern void nlm_common_flush_dcache_page(struct page *page);
+	nlm_common_flush_dcache_page(page);  
+#else
 	if (cpu_has_dc_aliases || !cpu_has_ic_fills_f_dc)
 		__flush_dcache_page(page);
-
+#endif
 }
 
 #define flush_dcache_mmap_lock(mapping)		do { } while (0)
@@ -106,6 +119,10 @@ extern void (*flush_data_cache_page)(unsigned long addr);
 	set_bit(PG_dcache_dirty, &(page)->flags)
 #define ClearPageDcacheDirty(page)	\
 	clear_bit(PG_dcache_dirty, &(page)->flags)
+#ifdef CONFIG_NLM_COMMON
+#define TestPageDcacheDirty(page)	\
+	test_bit(PG_dcache_dirty, &(page)->flags)
+#endif
 
 /* Run kernel code uncached, useful for cache probing functions. */
 unsigned long run_uncached(void *func);

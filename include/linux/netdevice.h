@@ -323,7 +323,7 @@ struct napi_struct {
 	 * to the per-cpu poll_list, and whoever clears that bit
 	 * can remove from the list right before clearing the bit.
 	 */
-	struct list_head	poll_list;
+	struct list_head	poll_list	__attribute__((aligned(64)));
 
 	unsigned long		state;
 	int			weight;

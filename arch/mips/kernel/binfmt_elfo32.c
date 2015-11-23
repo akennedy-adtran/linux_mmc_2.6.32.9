@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * Support for o32 Linux/MIPS ELF binaries.
  *
@@ -48,7 +56,11 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 	__res;								\
 })
 
-#define TASK32_SIZE		0x7fff8000UL
+/*
+ * XLP_MERGE_TODO: changed TASK_SIZE from 0x7fff8000UL to 0x7fff8000UL
+ * to fix page alignment of initial stack (vm_start) for 64KB pages
+ */
+#define TASK32_SIZE		0x7fff0000UL
 #undef ELF_ET_DYN_BASE
 #define ELF_ET_DYN_BASE         (TASK32_SIZE / 3 * 2)
 
@@ -69,6 +81,11 @@ extern void elf32_core_copy_regs(elf_gregset_t grp, struct pt_regs *regs);
 	elf32_core_copy_regs(*(_dest), task_pt_regs(_tsk));		\
 	__res;								\
 })
+
+#include <asm/elf.h>
+#undef ELF_CORE_COPY_REGS
+void elf32_core_copy_regs(elf_gregset_t grp, struct pt_regs *regs);
+#define ELF_CORE_COPY_REGS(_dest,_regs) elf32_core_copy_regs(_dest,_regs);
 
 #include <linux/module.h>
 #include <linux/elfcore.h>
@@ -127,23 +144,30 @@ jiffies_to_compat_timeval(unsigned long jiffies, struct compat_timeval *value)
 	value->tv_usec = rem / NSEC_PER_USEC;
 }
 
+int elf32_dump_task_regs (struct task_struct *tsk, elf_gregset_t *regs)
+{
+	elf32_core_copy_regs(*regs, task_pt_regs(tsk));
+	return 1;
+}
+
+#define COMPAT_REG_BASE 6
 void elf32_core_copy_regs(elf_gregset_t grp, struct pt_regs *regs)
 {
 	int i;
 
-	for (i = 0; i < EF_R0; i++)
+	for (i = 0; i < COMPAT_REG_BASE; i++)
 		grp[i] = 0;
-	grp[EF_R0] = 0;
+	grp[COMPAT_REG_BASE] = 0;
 	for (i = 1; i <= 31; i++)
-		grp[EF_R0 + i] = (elf_greg_t) regs->regs[i];
-	grp[EF_R26] = 0;
-	grp[EF_R27] = 0;
-	grp[EF_LO] = (elf_greg_t) regs->lo;
-	grp[EF_HI] = (elf_greg_t) regs->hi;
-	grp[EF_CP0_EPC] = (elf_greg_t) regs->cp0_epc;
-	grp[EF_CP0_BADVADDR] = (elf_greg_t) regs->cp0_badvaddr;
-	grp[EF_CP0_STATUS] = (elf_greg_t) regs->cp0_status;
-	grp[EF_CP0_CAUSE] = (elf_greg_t) regs->cp0_cause;
+		grp[COMPAT_REG_BASE + i] = (elf_greg_t) regs->regs[i];
+	grp[EF_R26 + COMPAT_REG_BASE] = 0;
+	grp[EF_R27 + COMPAT_REG_BASE] = 0;
+	grp[EF_LO + COMPAT_REG_BASE] = (elf_greg_t) regs->lo;
+	grp[EF_HI + COMPAT_REG_BASE] = (elf_greg_t) regs->hi;
+	grp[EF_CP0_EPC + COMPAT_REG_BASE] = (elf_greg_t) regs->cp0_epc;
+	grp[EF_CP0_BADVADDR + COMPAT_REG_BASE] = (elf_greg_t) regs->cp0_badvaddr;
+	grp[EF_CP0_STATUS + COMPAT_REG_BASE] = (elf_greg_t) regs->cp0_status;
+	grp[EF_CP0_CAUSE + COMPAT_REG_BASE] = (elf_greg_t) regs->cp0_cause;
 #ifdef EF_UNUSED0
 	grp[EF_UNUSED0] = 0;
 #endif

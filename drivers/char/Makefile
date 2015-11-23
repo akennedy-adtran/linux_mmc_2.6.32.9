@@ -6,6 +6,7 @@
 # This file contains the font map for the default (hardware) font
 #
 FONTMAPFILE = cp437.uni
+EXTRA_CFLAGS := $(CFLAGS) -DNLM_HAL_LINUX_KERNEL 
 
 obj-y	 += mem.o random.o tty_io.o n_tty.o tty_ioctl.o tty_ldisc.o tty_buffer.o tty_port.o
 
@@ -30,10 +31,11 @@ obj-$(CONFIG_ISTALLION)		+= istallion.o
 obj-$(CONFIG_NOZOMI)		+= nozomi.o
 obj-$(CONFIG_DIGIEPCA)		+= epca.o
 obj-$(CONFIG_SPECIALIX)		+= specialix.o
-obj-$(CONFIG_MOXA_INTELLIO)	+= moxa.o
-obj-$(CONFIG_A2232)		+= ser_a2232.o generic_serial.o
-obj-$(CONFIG_ATARI_DSP56K)	+= dsp56k.o
-obj-$(CONFIG_MOXA_SMARTIO)	+= mxser.o
+obj-$(CONFIG_MOXA_INTELLIO)		+= moxa.o
+obj-$(CONFIG_A2232)			+= ser_a2232.o generic_serial.o
+obj-$(CONFIG_ATARI_DSP56K)		+= dsp56k.o
+obj-$(CONFIG_MOXA_SMARTIO)		+= mxser.o
+obj-$(CONFIG_NLMCOMMON_UART) += nlm_common_uart.o
 obj-$(CONFIG_COMPUTONE)		+= ip2/
 obj-$(CONFIG_RISCOM8)		+= riscom8.o
 obj-$(CONFIG_ISI)		+= isicom.o
@@ -81,9 +83,9 @@ obj-$(CONFIG_EFI_RTC)		+= efirtc.o
 obj-$(CONFIG_DS1302)		+= ds1302.o
 obj-$(CONFIG_XILINX_HWICAP)	+= xilinx_hwicap/
 ifeq ($(CONFIG_GENERIC_NVRAM),y)
-  obj-$(CONFIG_NVRAM)	+= generic_nvram.o
+  obj-$(CONFIG_NVRAM)		+= generic_nvram.o
 else
-  obj-$(CONFIG_NVRAM)	+= nvram.o
+  obj-$(CONFIG_NVRAM)		+= nvram.o
 endif
 obj-$(CONFIG_TOSHIBA)		+= toshiba.o
 obj-$(CONFIG_I8K)		+= i8k.o
@@ -103,6 +105,13 @@ obj-$(CONFIG_MWAVE)		+= mwave/
 obj-$(CONFIG_AGP)		+= agp/
 obj-$(CONFIG_PCMCIA)		+= pcmcia/
 obj-$(CONFIG_IPMI_HANDLER)	+= ipmi/
+obj-$(CONFIG_NLM_VUART)		+= nlm_vuart.o
+obj-$(CONFIG_NLM_CMEM)		+= nlm_cmem.o
+obj-$(CONFIG_NLM_MSGRING)	+= nlm_msgring.o
+obj-$(CONFIG_XEN)			+= nlm_sharedmem.o
+obj-$(CONFIG_NLMCOMMON_PCIX_GEN_DRIVER) += nlm_pcix_gen_dev.o
+obj-$(CONFIG_NLMCOMMON_PCIX_GEN_DRIVER) += nlm_pcix_gen_host.o
+obj-$(CONFIG_NLM_XLP_DMA)           += nlm_xlp_dma.o
 
 obj-$(CONFIG_HANGCHECK_TIMER)	+= hangcheck-timer.o
 obj-$(CONFIG_TCG_TPM)		+= tpm/

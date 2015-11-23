@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2005-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * random.c -- A strong random number generator
  *
@@ -998,6 +1007,17 @@ void rand_initialize_disk(struct gendisk *disk)
 }
 #endif
 
+#if defined(CONFIG_NLM_COMMON) && defined(CONFIG_HW_RANDOM)
+static ssize_t
+random_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
+{
+  get_random_bytes(buf, nbytes);
+
+  file_accessed(file);
+	
+  return nbytes;
+}
+#else
 static ssize_t
 random_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 {
@@ -1053,12 +1073,25 @@ random_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 
 	return (count ? count : retval);
 }
+#endif
 
+#if defined(CONFIG_NLM_COMMON) && defined(CONFIG_HW_RANDOM)
+static ssize_t
+urandom_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
+{
+  get_random_bytes(buf, nbytes);
+
+  file_accessed(file);
+	
+  return nbytes;
+}
+#else
 static ssize_t
 urandom_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 {
 	return extract_entropy_user(&nonblocking_pool, buf, nbytes);
 }
+#endif
 
 static unsigned int
 random_poll(struct file *file, poll_table * wait)

@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  *  linux/kernel/exit.c
  *
@@ -49,6 +58,10 @@
 #include <linux/init_task.h>
 #include <linux/perf_event.h>
 #include <trace/events/sched.h>
+
+#ifdef CONFIG_PERFCTR
+#include <linux/perfctr.h>
+#endif
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -206,6 +219,9 @@ repeat:
 			leader->exit_state = EXIT_DEAD;
 	}
 
+#ifdef CONFIG_PERFCTR
+    perfctr_release_task(p);
+#endif
 	write_unlock_irq(&tasklist_lock);
 	release_thread(p);
 	call_rcu(&p->rcu, delayed_put_task_struct);

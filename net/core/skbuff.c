@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *	Routines having to do with the 'struct sk_buff' memory handlers.
  *
@@ -202,6 +210,10 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	skb->data = data;
 	skb_reset_tail_pointer(skb);
 	skb->end = skb->tail + size;
+#ifdef CONFIG_NLM_NET_OPTS
+	skb->netl_skb = NULL;
+	skb->queue_id = -1;
+#endif
 	kmemcheck_annotate_bitfield(skb, flags1);
 	kmemcheck_annotate_bitfield(skb, flags2);
 #ifdef NET_SKBUFF_DATA_USES_OFFSET
@@ -216,6 +228,12 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	shinfo->gso_segs = 0;
 	shinfo->gso_type = 0;
 	shinfo->ip6_frag_id = 0;
+#ifdef CONFIG_NLMCOMMON_HW_BUFFER_MGMT
+	shinfo->nlm_flags = 0;
+	shinfo->nlm_owner = NULL;
+	shinfo->nlm_refill = NULL;
+#endif /* CONFIG_NLMCOMMON_HW_BUFFER_MGMT */
+	shinfo->frag_list = NULL;
 	shinfo->tx_flags.flags = 0;
 	skb_frag_list_init(skb);
 	memset(&shinfo->hwtstamps, 0, sizeof(shinfo->hwtstamps));
@@ -230,6 +248,10 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 		atomic_set(fclone_ref, 1);
 
 		child->fclone = SKB_FCLONE_UNAVAILABLE;
+#ifdef CONFIG_NLM_NET_OPTS
+		child->netl_skb = NULL;
+		child->queue_id = -1;
+#endif
 	}
 out:
 	return skb;
@@ -348,7 +370,13 @@ static void skb_release_data(struct sk_buff *skb)
 		}
 
 		if (skb_has_frags(skb))
-			skb_drop_fraglist(skb);
+            skb_drop_fraglist(skb);
+
+#ifdef CONFIG_NLMCOMMON_HW_BUFFER_MGMT
+        if (skb_shinfo(skb)->nlm_flags && skb_shinfo(skb)->nlm_refill)
+            skb_shinfo(skb)->nlm_refill(skb_shinfo(skb)->nlm_owner);
+#endif /* CONFIG_NLMCOMMON_HW_BUFFER_MGMT */
+
 
 		kfree(skb->head);
 	}
@@ -533,6 +561,10 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	skb_dst_set(new, dst_clone(skb_dst(old)));
 #ifdef CONFIG_XFRM
 	new->sp			= secpath_get(old->sp);
+#endif
+#ifdef CONFIG_NLM_NET_OPTS
+	new->netl_skb = NULL;
+	new->queue_id = -1;
 #endif
 	memcpy(new->cb, old->cb, sizeof(old->cb));
 	new->csum		= old->csum;
@@ -805,6 +837,11 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 	int size = nhead + (skb->end - skb->head) + ntail;
 #endif
 	long off;
+
+#if defined (CONFIG_NLM_COMMON) && defined (CONFIG_64BIT)
+	gfp_mask |= GFP_DMA;
+#endif
+
 
 	BUG_ON(nhead < 0);
 

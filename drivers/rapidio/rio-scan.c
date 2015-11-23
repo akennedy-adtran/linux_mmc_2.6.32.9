@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2005-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * RapidIO enumeration and discovery support
  *
@@ -55,6 +63,9 @@ static int rio_mport_phys_table[] = {
 static int rio_sport_phys_table[] = {
 	RIO_EFB_PAR_EP_FREE_ID,
 	RIO_EFB_SER_EP_FREE_ID,
+#ifdef CONFIG_NLM_COMMON
+    0x9,
+#endif
 	-1,
 };
 
@@ -385,8 +396,12 @@ static struct rio_dev __devinit *rio_setup_device(struct rio_net *net,
 	rdev->dev.dma_mask = &rdev->dma_mask;
 	rdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
 
+#ifdef CONFIG_NLM_COMMON
+	if (rdev->dst_ops & RIO_DST_OPS_DOORBELL)
+#else
 	if ((rdev->pef & RIO_PEF_INB_DOORBELL) &&
 	    (rdev->dst_ops & RIO_DST_OPS_DOORBELL))
+#endif
 		rio_init_dbell_res(&rdev->riores[RIO_DOORBELL_RESOURCE],
 				   0, 0xffff);
 

@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2014 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  *  linux/init/main.c
  *
@@ -369,12 +378,6 @@ static void __init smp_init(void)
 {
 	unsigned int cpu;
 
-	/*
-	 * Set up the current CPU as possible to migrate to.
-	 * The other ones will be done by cpu_up/cpu_down()
-	 */
-	set_cpu_active(smp_processor_id(), true);
-
 	/* FIXME: This should be done in userspace --RR */
 	for_each_present_cpu(cpu) {
 		if (num_online_cpus() >= setup_max_cpus)
@@ -413,16 +416,23 @@ static void __init setup_command_line(char *command_line)
  * gcc-3.4 accidentally inlines this function, so use noinline.
  */
 
+static __initdata DECLARE_COMPLETION(kthreadd_done);
 static noinline void __init_refok rest_init(void)
 	__releases(kernel_lock)
 {
 	int pid;
 
 	rcu_scheduler_starting();
+	/*
+	 * We need to spawn init first so that it obtains pid-1, however
+	 * the init task will end up wanting to create kthreads, which, if
+	 * we schedule it before we create kthreadd, will OOPS.
+	 */
 	kernel_thread(kernel_init, NULL, CLONE_FS | CLONE_SIGHAND);
 	numa_default_policy();
 	pid = kernel_thread(kthreadd, NULL, CLONE_FS | CLONE_FILES);
 	kthreadd_task = find_task_by_pid_ns(pid, &init_pid_ns);
+	complete(&kthreadd_done);
 	unlock_kernel();
 
 	/*
@@ -486,6 +496,7 @@ static void __init boot_cpu_init(void)
 	int cpu = smp_processor_id();
 	/* Mark the boot cpu "present", "online" etc for SMP and UP case */
 	set_cpu_online(cpu, true);
+	set_cpu_active(cpu, true);
 	set_cpu_present(cpu, true);
 	set_cpu_possible(cpu, true);
 }
@@ -618,7 +629,6 @@ asmlinkage void __init start_kernel(void)
 	console_init();
 	if (panic_later)
 		panic(panic_later, panic_param);
-
 	lockdep_info();
 
 	/*
@@ -797,12 +807,15 @@ static void run_init_process(char *init_filename)
 	kernel_execve(init_filename, argv_init, envp_init);
 }
 
+#include <asm/netlogic/cpumask.h>
 /* This is a non __init function. Force it to be noinline otherwise gcc
  * makes it inline to init() and it becomes part of init.text section
  */
 static noinline int init_post(void)
 	__releases(kernel_lock)
 {
+	struct cpumask cpumask;
+
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
 	free_initmem();
@@ -811,8 +824,13 @@ static noinline int init_post(void)
 	system_state = SYSTEM_RUNNING;
 	numa_default_policy();
 
+	/* migrate the cpu to run on cpu@0 node@0 */
+	sched_bindto_save_affinity(0, &cpumask);
+
 	if (sys_open((const char __user *) "/dev/console", O_RDWR, 0) < 0)
 		printk(KERN_WARNING "Warning: unable to open an initial console.\n");
+
+	sched_bindto_restore_affinity(&cpumask);
 
 	(void) sys_dup(0);
 	(void) sys_dup(0);
@@ -846,6 +864,9 @@ static noinline int init_post(void)
 
 static int __init kernel_init(void * unused)
 {
+#if defined(CONFIG_NLM_XLP)
+	struct cpumask old_mask, new_mask;
+#endif
 	lock_kernel();
 
 	/*
@@ -876,8 +897,24 @@ static int __init kernel_init(void * unused)
 	smp_init();
 	sched_init_smp();
 
+#if defined(CONFIG_NLM_XLP)
+	/* On XLP Ax, PIC device specific registers cannot be accessed
+	 * cross different nodes. So the kernel_init has to run on node 0.
+	 * On XLP B0, the flash device cannot be accessed cross node, so flash
+	 * driver has to run on node 0.
+	 * For simplicity, just let is run on vcpu 0.
+	 */
+	cpumask_copy(&old_mask, &current->cpus_allowed);
+	cpumask_clear(&new_mask);
+	cpumask_set_cpu(0, &new_mask);
+	set_cpus_allowed_ptr(current, &new_mask);
+#endif
+
 	do_basic_setup();
 
+#if defined(CONFIG_NLM_XLP)
+	set_cpus_allowed_ptr(current, &old_mask);
+#endif
 	/*
 	 * check if there is an early userspace init.  If yes, let it do all
 	 * the work

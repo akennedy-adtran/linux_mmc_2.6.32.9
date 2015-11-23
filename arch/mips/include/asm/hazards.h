@@ -234,6 +234,8 @@ ASMMACRO(irq_disable_hazard,
 ASMMACRO(back_to_back_c0_hazard,
 	 _ssnop; _ssnop; _ssnop;
 	)
+ASMMACRO(tlbw_eret_hazard,
+	)
 #define instruction_hazard() do { } while (0)
 
 #endif

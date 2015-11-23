@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -49,6 +57,7 @@ volatile cpumask_t cpu_callin_map;	/* Bitmask of started secondaries */
 int __cpu_number_map[NR_CPUS];		/* Map physical to logical */
 int __cpu_logical_map[NR_CPUS];		/* Map logical to physical */
 
+EXPORT_SYMBOL(__cpu_number_map);
 /* Number of TCs (or siblings in Intel speak) per CPU core */
 int smp_num_siblings = 1;
 EXPORT_SYMBOL(smp_num_siblings);
@@ -93,7 +102,7 @@ __cpuinit void register_smp_ops(struct plat_smp_ops *ops)
  */
 asmlinkage __cpuinit void start_secondary(void)
 {
-	unsigned int cpu;
+	unsigned int cpu = smp_processor_id();
 
 #ifdef CONFIG_MIPS_MT_SMTC
 	/* Only do cpu_probe for first TC of CPU */
@@ -102,15 +111,18 @@ asmlinkage __cpuinit void start_secondary(void)
 	cpu_probe();
 	cpu_report();
 	per_cpu_trap_init();
-	mips_clockevent_init();
+	if (mips_clockevent_init() != 0) {
+		printk("[%s]: unable to setup timer interrupt!!\n", __FUNCTION__);
+	}
 	mp_ops->init_secondary();
 
 	/*
 	 * XXX parity protection should be folded in here when it's converted
 	 * to an option instead of something based on .cputype
 	 */
-
+	local_irq_enable();
 	calibrate_delay();
+/* 	pgd_current[cpu] = (unsigned long)init_mm.pgd; */
 	preempt_disable();
 	cpu = smp_processor_id();
 	cpu_data[cpu].udelay_val = loops_per_jiffy;
@@ -126,6 +138,9 @@ asmlinkage __cpuinit void start_secondary(void)
 
 	cpu_idle();
 }
+
+#include <asm/netlogic/debug.h>
+#include <asm/netlogic/mips-exts.h>
 
 /*
  * Call into both interrupt handlers, as we share the IPI for them
@@ -229,6 +244,11 @@ int setup_profiling_timer(unsigned int multiplier)
 
 static void flush_tlb_all_ipi(void *info)
 {
+#ifdef CONFIG_NLMCOMMON_GLOBAL_TLB_SPLIT_ASID
+#include <asm/netlogic/mips-exts.h>
+	if((nlm_asid_mask == 0x3f) && netlogic_thr_id())
+		return;
+#endif
 	local_flush_tlb_all();
 }
 

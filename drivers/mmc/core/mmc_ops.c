@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2007-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *  linux/drivers/mmc/core/mmc_ops.h
  *
@@ -255,7 +263,11 @@ mmc_send_cxd_data(struct mmc_card *card, struct mmc_host *host,
 	/* dma onto stack is unsafe/nonportable, but callers to this
 	 * routine normally provide temporary on-stack buffers ...
 	 */
+#ifdef CONFIG_MMC_XLP
+	data_buf = kmalloc(len, GFP_KERNEL|GFP_DMA);
+#else
 	data_buf = kmalloc(len, GFP_KERNEL);
+#endif
 	if (data_buf == NULL)
 		return -ENOMEM;
 

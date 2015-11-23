@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -26,6 +35,30 @@
 
 	.align  5
 NESTED(handle_sys, PT_SIZE, sp)
+#ifdef CONFIG_32BIT
+#ifdef CONFIG_NLM_COMMON
+	.set push
+	.set mips64
+    /* XLR Specific fast system calls */
+	mfc0	k1, CP0_EPC
+	lw	k0, 0(k1)
+	dsll32	k0, k0, 0
+	dsrl32  k0, k0, 6
+	beqz	k0, 1f
+	nop
+	sll	k0, k0, 2
+	lw	k1, nlm_fs_table(k0)
+	jr	k1
+	nop
+	/* should never come here */
+2:	wait
+	b	2b
+	nop
+	.set pop
+1:
+#endif
+#endif
+
 	.set	noat
 	SAVE_SOME
 	TRACE_IRQS_ON_RELOAD
@@ -583,6 +616,13 @@ einval:	li	v0, -ENOSYS
 	sys	sys_rt_tgsigqueueinfo	4
 	sys	sys_perf_event_open	5
 	sys	sys_accept4		4
+
+	/* RMI Added syscalls */
+	sys     sys_vperfctr_open	2 /* 4335 */
+	sys     sys_vperfctr_control	3
+	sys     sys_vperfctr_unlink     1
+	sys     sys_vperfctr_iresume    1
+	sys     sys_vperfctr_read       4
 	.endm
 
 	/* We pre-compute the number of _instruction_ bytes needed to

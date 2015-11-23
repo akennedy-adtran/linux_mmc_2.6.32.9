@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /* ------------------------------------------------------------------------- */
 /*									     */
 /* i2c-id.h - identifier values for i2c drivers and adapters		     */
@@ -29,6 +38,46 @@
 
 /*
  * ---- Adapter types ----------------------------------------------------
+ *
+ * First, we distinguish between several algorithms to access the hardware
+ * interface types, as a PCF 8584 needs other care than a bit adapter.
+ */
+
+#define I2C_ALGO_NONE	0x000000
+#define I2C_ALGO_BIT	0x010000	/* bit style adapters		*/
+#define I2C_ALGO_PCF	0x020000	/* PCF 8584 style adapters	*/
+#define I2C_ALGO_ATI	0x030000	/* ATI video card		*/
+#define I2C_ALGO_SMBUS	0x040000
+#define I2C_ALGO_ISA 	0x050000	/* lm_sensors ISA pseudo-adapter */
+#define I2C_ALGO_SAA7146 0x060000	/* SAA 7146 video decoder bus	*/
+#define I2C_ALGO_ACB 	0x070000	/* ACCESS.bus algorithm         */
+#define I2C_ALGO_IIC    0x080000 	/* ITE IIC bus */
+#define I2C_ALGO_SAA7134 0x090000
+#define I2C_ALGO_MPC824X 0x0a0000	/* Motorola 8240 / 8245         */
+#define I2C_ALGO_IPMI 	0x0b0000	/* IPMI dummy adapter */
+#define I2C_ALGO_IPMB 	0x0c0000	/* IPMB adapter */
+#define I2C_ALGO_MPC107 0x0d0000
+#define I2C_ALGO_EC     0x100000        /* ACPI embedded controller     */
+
+#define I2C_ALGO_MPC8XX 0x110000	/* MPC8xx PowerPC I2C algorithm */
+#define I2C_ALGO_OCP    0x120000	/* IBM or otherwise On-chip I2C algorithm */
+#define I2C_ALGO_BITHS	0x130000	/* enhanced bit style adapters	*/
+#define I2C_ALGO_OCP_IOP3XX  0x140000	/* XSCALE IOP3XX On-chip I2C alg */
+
+#define I2C_ALGO_SIBYTE 0x150000	/* Broadcom SiByte SOCs		*/
+#define I2C_ALGO_SGI	0x160000        /* SGI algorithm                */
+#define I2C_ALGO_PALM	0x170000        /* PalmChip algorithm           */
+
+#define I2C_ALGO_EXP	0x800000	/* experimental			*/
+
+#define I2C_ALGO_MASK	0xff0000	/* Mask for algorithms		*/
+#define I2C_ALGO_SHIFT	0x10	/* right shift to get index values 	*/
+
+#define I2C_HW_ADAPS	0x10000		/* # adapter types		*/
+#define I2C_HW_MASK	0xffff		
+
+
+/* hw specific modules that are defined per algorithm layer
  */
 
 /* --- Bit algorithm adapters						*/
@@ -55,5 +104,8 @@
 /* --- Miscellaneous adapters */
 #define I2C_HW_SAA7146		0x060000 /* SAA7146 video decoder bus */
 #define I2C_HW_SAA7134		0x090000 /* SAA7134 video decoder bus */
+
+/* --- Palm Chip adapter */
+#define I2C_HW_PALM_BK3220 	0x00
 
 #endif /* LINUX_I2C_ID_H */

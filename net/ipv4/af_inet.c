@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
@@ -1564,7 +1572,10 @@ static int __init inet_init(void)
 	 *	Tell SOCKET that we are alive...
 	 */
 
-	(void)sock_register(&inet_family_ops);
+	rc = sock_register(&inet_family_ops);
+	if (rc) {
+		BUG();
+	}
 
 #ifdef CONFIG_SYSCTL
 	ip_static_sysctl_init();

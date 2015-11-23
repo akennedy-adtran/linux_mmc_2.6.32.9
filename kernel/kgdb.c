@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2008-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * KGDB stub.
  *
@@ -55,6 +63,10 @@
 #include <asm/unaligned.h>
 
 static int kgdb_break_asap;
+
+#ifdef CONFIG_NLM_COMMON
+extern void nlm_common_flush_l1_icache_ipi(void *);
+#endif
 
 #define KGDB_MAX_THREAD_QUERY 17
 struct kgdb_state {
@@ -485,10 +497,14 @@ static int write_mem_msg(int binary)
 			err = kgdb_ebin2mem(ptr, (char *)addr, length);
 		else
 			err = kgdb_hex2mem(ptr, (char *)addr, length);
+#ifdef CONFIG_NLM_COMMON
+		nlm_common_flush_l1_icache_ipi(NULL);
+#endif
 		if (err)
 			return err;
 		if (CACHE_FLUSH_IS_SAFE)
 			flush_icache_range(addr, addr + length);
+
 		return 0;
 	}
 
@@ -581,6 +597,9 @@ static void kgdb_wait(struct pt_regs *regs)
 	while (atomic_read(&passive_cpu_wait[cpu]))
 		cpu_relax();
 
+#ifdef CONFIG_NLM_COMMON
+	nlm_common_flush_l1_icache_ipi(NULL);
+#endif
 	kgdb_info[cpu].debuggerinfo = NULL;
 	kgdb_info[cpu].task = NULL;
 
@@ -602,6 +621,9 @@ static void kgdb_wait(struct pt_regs *regs)
  */
 static void kgdb_flush_swbreak_addr(unsigned long addr)
 {
+#ifdef CONFIG_NLM_COMMON
+	nlm_common_flush_l1_icache_ipi(NULL);
+#endif
 	if (!CACHE_FLUSH_IS_SAFE)
 		return;
 
@@ -629,8 +651,14 @@ static int kgdb_activate_sw_breakpoints(void)
 		addr = kgdb_break[i].bpt_addr;
 		error = kgdb_arch_set_breakpoint(addr,
 				kgdb_break[i].saved_instr);
-		if (error)
+
+#ifdef CONFIG_NLM_COMMON
+		nlm_common_flush_l1_icache_ipi(NULL);
+#endif
+		if (error) {
+			printk(KERN_INFO "KGDB: BP install failed: %lx", addr);
 			return error;
+		}
 
 		kgdb_flush_swbreak_addr(addr);
 		kgdb_break[i].state = BP_ACTIVE;
@@ -669,6 +697,9 @@ static int kgdb_set_sw_break(unsigned long addr)
 		}
 	}
 
+#ifdef CONFIG_NLM_COMMON
+	nlm_common_flush_l1_icache_ipi(NULL);
+#endif
 	if (breakno == -1)
 		return -E2BIG;
 
@@ -676,6 +707,9 @@ static int kgdb_set_sw_break(unsigned long addr)
 	kgdb_break[breakno].type = BP_BREAKPOINT;
 	kgdb_break[breakno].bpt_addr = addr;
 
+#ifdef CONFIG_NLM_COMMON
+	nlm_common_flush_l1_icache_ipi(NULL);
+#endif
 	return 0;
 }
 
@@ -691,8 +725,14 @@ static int kgdb_deactivate_sw_breakpoints(void)
 		addr = kgdb_break[i].bpt_addr;
 		error = kgdb_arch_remove_breakpoint(addr,
 					kgdb_break[i].saved_instr);
-		if (error)
+
+#ifdef CONFIG_NLM_COMMON
+		nlm_common_flush_l1_icache_ipi(NULL);
+#endif
+		if (error) {
+			printk(KERN_INFO "KGDB: BP remove failed: %lx\n", addr);
 			return error;
+		}
 
 		kgdb_flush_swbreak_addr(addr);
 		kgdb_break[i].state = BP_SET;
@@ -708,9 +748,15 @@ static int kgdb_remove_sw_break(unsigned long addr)
 		if ((kgdb_break[i].state == BP_SET) &&
 				(kgdb_break[i].bpt_addr == addr)) {
 			kgdb_break[i].state = BP_REMOVED;
+#ifdef CONFIG_NLM_COMMON
+			nlm_common_flush_l1_icache_ipi(NULL);
+#endif
 			return 0;
 		}
 	}
+#ifdef CONFIG_NLM_COMMON
+	nlm_common_flush_l1_icache_ipi(NULL);
+#endif
 	return -ENOENT;
 }
 
@@ -745,6 +791,10 @@ static int remove_all_break(void)
 setundefined:
 		kgdb_break[i].state = BP_UNDEFINED;
 	}
+
+#ifdef CONFIG_NLM_COMMON
+	nlm_common_flush_l1_icache_ipi(NULL);
+#endif
 
 	/* Clear hardware breakpoints. */
 	if (arch_kgdb_ops.remove_all_hw_break)

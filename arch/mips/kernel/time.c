@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * Copyright 2001 MontaVista Software Inc.
  * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
@@ -75,9 +83,15 @@ void __init clocksource_set_clock(struct clocksource *cs, unsigned int clock)
 {
 	u64 temp;
 	u32 shift;
+ 	int shift_val;
+#ifdef CONFIG_NLM_COMMON
+ 	shift_val=30;
+ #else
+ 	shift_val=32;
+#endif
 
 	/* Find a shift value */
-	for (shift = 32; shift > 0; shift--) {
+	for (shift = shift_val; shift > 0; shift--) {
 		temp = (u64) NSEC_PER_SEC << shift;
 		do_div(temp, clock);
 		if ((temp >> 32) == 0)

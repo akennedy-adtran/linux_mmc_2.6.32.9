@@ -1,6 +1,9 @@
 #
 # Makefile for USB Host Controller Drivers
 #
+ifeq ($(CONFIG_NLM_XLP),y)
+	EXTRA_CFLAGS := $(CFLAGS) -DNLM_HAL_LINUX_KERNEL
+endif
 
 ifeq ($(CONFIG_USB_DEBUG),y)
 	EXTRA_CFLAGS		+= -DDEBUG
@@ -12,7 +15,12 @@ fhci-objs := fhci-hcd.o fhci-hub.o fhci-q.o fhci-mem.o \
 ifeq ($(CONFIG_FHCI_DEBUG),y)
 fhci-objs += fhci-dbg.o
 endif
-xhci-objs := xhci-hcd.o xhci-mem.o xhci-pci.o xhci-ring.o xhci-hub.o xhci-dbg.o
+xhci-hcd-objs := xhci.o xhci-mem.o xhci-ring.o xhci-hub.o xhci-dbg.o
+xhci-hcd-$(CONFIG_PCI)	+= xhci-pci.o
+
+ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
+	xhci-hcd-y		+= xhci-plat.o
+endif
 
 obj-$(CONFIG_USB_WHCI_HCD)	+= whci/
 
@@ -25,7 +33,7 @@ obj-$(CONFIG_USB_ISP1362_HCD)	+= isp1362-hcd.o
 obj-$(CONFIG_USB_OHCI_HCD)	+= ohci-hcd.o
 obj-$(CONFIG_USB_UHCI_HCD)	+= uhci-hcd.o
 obj-$(CONFIG_USB_FHCI_HCD)	+= fhci.o
-obj-$(CONFIG_USB_XHCI_HCD)	+= xhci.o
+obj-$(CONFIG_USB_XHCI_HCD)	+= xhci-hcd.o
 obj-$(CONFIG_USB_SL811_HCD)	+= sl811-hcd.o
 obj-$(CONFIG_USB_SL811_CS)	+= sl811_cs.o
 obj-$(CONFIG_USB_U132_HCD)	+= u132-hcd.o

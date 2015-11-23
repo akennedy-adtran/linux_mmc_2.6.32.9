@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /******************************************************************************
  * grant_table.h
  *
@@ -174,6 +182,7 @@ typedef uint32_t grant_handle_t;
  *     to be accounted to the correct grant reference!
  */
 #define GNTTABOP_map_grant_ref        0
+__DEFINE_GUEST_HANDLE(ulong, unsigned long);
 struct gnttab_map_grant_ref {
     /* IN parameters. */
     uint64_t host_addr;
@@ -319,6 +328,41 @@ struct gnttab_query_size {
     int16_t  status;              /* GNTST_* */
 };
 DEFINE_GUEST_HANDLE_STRUCT(gnttab_query_size);
+
+/*
+ * GNTTABOP_update_services: Update the database of services. It will add an entry
+ * into local database for service_id.
+ */
+#define GNTTABOP_update_service           8
+struct gnttab_update_service {
+       /* IN parameters. */
+       uint32_t dom_id;
+       uint32_t shared_page_for_dom_id;
+       uint32_t start_ref_id;
+       uint32_t nr_pages;
+       uint32_t service_id;
+       uint64_t pfn;
+       /* OUT parameters. */
+       int16_t  status;
+};
+DEFINE_GUEST_HANDLE_STRUCT(gnttab_update_service_t);
+
+/*
+ * GNTTABOP_query_service: Query the database of services for a particular service id.
+ */
+#define GNTTABOP_query_service            9
+struct gnttab_query_service {
+       /* IN parametes. */
+       uint32_t dom_id;
+       uint32_t service_id;
+       uint32_t shared_page_by_dom_id;
+       /* OUT parameters. */
+       uint32_t start_ref_id;
+       uint32_t nr_pages;
+       uint64_t pfn;
+       int16_t  status;
+};
+DEFINE_GUEST_HANDLE_STRUCT(gnttab_query_service_t);
 
 /*
  * Bitfield values for update_pin_status.flags.

@@ -160,6 +160,22 @@ config MMC_AU1X
 
 	  If unsure, say N.
 
+config MMC_XLP
+	tristate "XLP MMC/SD/SDIO Host Controller"
+	depends on NLM_XLP
+	help
+	  This selects the XLP sdio/mmc/sd card interface.
+	  If you have a XLP platform with a MMC slot, say Y or M here.
+
+config MMC_XLP_ENABLE_SLOT_1
+	bool "Enable slot 1"
+	default y
+	depends on NLM_XLP && MMC_XLP
+	help
+	  Enable both SD/MMC slots.  If not selected, only slot 0 will
+	  be enabled and the GPIOs used for slot 1 will be available for
+	  use as GPIOs.
+
 choice
 	prompt "Atmel SD/MMC Driver"
 	default MMC_ATMELMCI if AVR32

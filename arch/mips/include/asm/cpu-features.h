@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -40,6 +48,9 @@
 #endif
 #ifndef cpu_has_octeon_cache
 #define cpu_has_octeon_cache	0
+#endif
+#ifndef cpu_has_nlm_cache
+#define cpu_has_nlm_cache  (cpu_data[0].options & MIPS_CPU_NLM_CACHE)
 #endif
 #ifndef cpu_has_fpu
 #define cpu_has_fpu		(current_cpu_data.options & MIPS_CPU_FPU)
@@ -94,6 +105,9 @@
 #endif
 #ifndef cpu_has_smartmips
 #define cpu_has_smartmips      (cpu_data[0].ases & MIPS_ASE_SMARTMIPS)
+#endif
+#ifndef kernel_uses_smartmips_rixi
+#define kernel_uses_smartmips_rixi 0
 #endif
 #ifndef cpu_has_vtag_icache
 #define cpu_has_vtag_icache	(cpu_data[0].icache.flags & MIPS_CACHE_VTAG)
@@ -191,6 +205,9 @@
 # ifndef cpu_has_64bit_addresses
 # define cpu_has_64bit_addresses	0
 # endif
+# ifndef cpu_vmbits
+# define cpu_vmbits 31
+# endif
 #endif
 
 #ifdef CONFIG_64BIT
@@ -208,6 +225,10 @@
 # endif
 # ifndef cpu_has_64bit_addresses
 # define cpu_has_64bit_addresses	1
+# endif
+# ifndef cpu_vmbits
+# define cpu_vmbits cpu_data[0].vmbits
+# define __NEED_VMBITS_PROBE
 # endif
 #endif
 

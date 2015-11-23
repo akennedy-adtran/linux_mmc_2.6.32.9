@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * syscalls.h - Linux syscall interfaces (non-arch-specific)
  *
@@ -649,7 +657,18 @@ asmlinkage long sys_mkdir(const char __user *pathname, int mode);
 asmlinkage long sys_chdir(const char __user *filename);
 asmlinkage long sys_fchdir(unsigned int fd);
 asmlinkage long sys_rmdir(const char __user *pathname);
+#if defined (CONFIG_64BIT) && defined (CONFIG_NLM_COMMON)
+#if defined (CONFIG_MIPS32_O32) || defined (CONFIG_MIPS32_N32)
+long sys_lookup_dcookie(u64 cookie64, char __user *buf, size_t len);
+#include <asm/compat.h>
+asmlinkage long compat_sys_lookup_dcookie(u32 cookie_msb, u32 cookie_lsb,
+                                      compat_uptr_t buf, compat_size_t len);
+#else
 asmlinkage long sys_lookup_dcookie(u64 cookie64, char __user *buf, size_t len);
+#endif
+#else
+asmlinkage long sys_lookup_dcookie(u64 cookie64, char __user *buf, size_t len);
+#endif
 asmlinkage long sys_quotactl(unsigned int cmd, const char __user *special,
 				qid_t id, void __user *addr);
 asmlinkage long sys_getdents(unsigned int fd,

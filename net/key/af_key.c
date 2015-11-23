@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * net/key/af_key.c	An implementation of PF_KEYv2 sockets.
  *
@@ -406,6 +414,12 @@ static u8 sadb_ext_min_len[] = {
 	[SADB_X_EXT_NAT_T_OA]		= (u8) sizeof(struct sadb_address),
 	[SADB_X_EXT_SEC_CTX]		= (u8) sizeof(struct sadb_x_sec_ctx),
 	[SADB_X_EXT_KMADDRESS]		= (u8) sizeof(struct sadb_x_kmaddress),
+#ifdef CONFIG_NLM_NET_KEY
+	[SADB_X_EXT_NLM_PH2_POLICY]     = (u8) sizeof(struct sadb_x_ph2_policy),
+	[SADB_X_EXT_NLM_IPSEC_INFO]     = (u8) sizeof(struct sadb_x_nlm_ipsec_info),
+	[SADB_X_EXT_NLM_SPD_CLIENT_INFO]     = (u8) sizeof(struct sadb_x_nlm_spd_client_info),
+	[SADB_X_EXT_NLM_IPSEC_CLEAR]     = (u8) sizeof(struct sadb_x_nlm_ipsec_clear),
+#endif
 };
 
 /* Verify sadb_address_{len,prefixlen} against sa_family.  */
@@ -534,13 +548,17 @@ static int parse_exthdrs(struct sk_buff *skb, struct sadb_msg *hdr, void **ext_h
 		ext_type = ehdr->sadb_ext_type;
 		if (ext_len < sizeof(uint64_t) ||
 		    ext_len > len ||
-		    ext_type == SADB_EXT_RESERVED)
+		    ext_type == SADB_EXT_RESERVED) {
+			printk("Invalid ext_len: len: %d\n", len);
 			return -EINVAL;
+                }
 
 		if (ext_type <= SADB_EXT_MAX) {
 			int min = (int) sadb_ext_min_len[ext_type];
-			if (ext_len < min)
+			if (ext_len < min) {
+				printk("Invalid ext_Len: type: %d, min: %d, ext_len: %d\n", ext_type, min, ext_len);
 				return -EINVAL;
+			}
 			if (ext_hdrs[ext_type-1] != NULL)
 				return -EINVAL;
 			if (ext_type == SADB_EXT_ADDRESS_SRC ||
@@ -1196,6 +1214,7 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct net *net,
 		/* x->algo.flags = sa->sadb_sa_flags; */
 	}
 	if (sa->sadb_sa_encrypt) {
+		int try_aead = 0;
 		if (hdr->sadb_msg_satype == SADB_X_SATYPE_IPCOMP) {
 			struct xfrm_algo_desc *a = xfrm_calg_get_byid(sa->sadb_sa_encrypt);
 			if (!a) {
@@ -1211,8 +1230,8 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct net *net,
 			int keysize = 0;
 			struct xfrm_algo_desc *a = xfrm_ealg_get_byid(sa->sadb_sa_encrypt);
 			if (!a) {
-				err = -ENOSYS;
-				goto out;
+				try_aead = 1;
+                                goto try_aead;
 			}
 			key = (struct sadb_key*) ext_hdrs[SADB_EXT_KEY_ENCRYPT-1];
 			if (key)
@@ -1228,6 +1247,32 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct net *net,
 			}
 			x->props.ealgo = sa->sadb_sa_encrypt;
 		}
+try_aead:
+		if (try_aead) {
+                        int keysize = 0;
+                        struct xfrm_algo_desc *aead = xfrm_aead_get_byid(sa->sadb_sa_encrypt);
+                        if (!aead) {
+                                printk("xfrm_aead_get_byid(%d) failed !\n",
+                                                sa->sadb_sa_encrypt);
+                                err = -ENOSYS;
+                                goto out;
+                        }
+                        key = (struct sadb_key*) ext_hdrs[SADB_EXT_KEY_ENCRYPT-1];
+                        if (key)
+                                keysize = (key->sadb_key_bits + 7) / 8;
+                        x->aead = kmalloc(sizeof(*x->aead) + keysize, GFP_KERNEL);
+                        if (!x->aead)
+                                goto out;
+                        strcpy(x->aead->alg_name, aead->name);
+                        x->aead->alg_key_len = 0;
+                        if (key) {
+                                x->aead->alg_key_len = key->sadb_key_bits;
+                                memcpy(x->aead->alg_key, key+1, keysize);
+                        }
+                        x->aead->alg_icv_len = aead->uinfo.aead.icv_truncbits;
+                        printk("Configured AEAD algorithm !\n");
+                }
+
 	}
 	/* x->algo.flags = sa->sadb_sa_flags; */
 
@@ -1287,9 +1332,11 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct net *net,
 		memset(&natt->encap_oa, 0, sizeof(natt->encap_oa));
 	}
 
+	printk("xfrm_init_state: start\n");
 	err = xfrm_init_state(x);
 	if (err)
 		goto out;
+	printk("xfrm_init_state: done\n");
 
 	x->km.seq = hdr->sadb_msg_seq;
 	return x;
@@ -2724,7 +2771,47 @@ static int pfkey_spdflush(struct sock *sk, struct sk_buff *skb, struct sadb_msg 
 
 typedef int (*pfkey_handler)(struct sock *sk, struct sk_buff *skb,
 			     struct sadb_msg *hdr, void **ext_hdrs);
+
+#ifdef CONFIG_NLM_NET_KEY
+/*
+ * PFKEY handlers specific to NetLogic IPSec implementation.
+ */
+int spdadd_cnt = 0;
+static int pfkey_nlms_op(struct sock *sk, struct sk_buff *skb,
+			 struct sadb_msg *hdr, void **ext_hdrs)
+{
+	switch (hdr->sadb_msg_type) {
+	case SADB_X_NLMS_PRIVATE:
+	case SADB_X_NLM_SPD_CLIENT_PROB_REPLY:
+		/* This is the msg send back by IPsec to indicate the previous
+		 * pfkey msg has been processed. Kernel should go ahead to
+		 * send back the response to the sender of the PFKEY command.
+		 */
+		pfkey_broadcast(skb_clone(skb, GFP_KERNEL),
+				GFP_ATOMIC, BROADCAST_ALL, NULL, sock_net(sk));
+		break;
+	case SADB_ADD:
+	case SADB_UPDATE:
+	case SADB_DUMP:
+	case SADB_ACQUIRE:
+	case SADB_X_SPDADD:
+	case SADB_X_NLM_IPSEC_INFO:
+        case SADB_X_NLM_IPSEC_CLEAR:
+	case SADB_X_NLM_SPD_CLIENT_PROB:
+        case SADB_X_SPDFLUSH:
+        case SADB_FLUSH:
+		pfkey_broadcast(skb_clone(skb, GFP_KERNEL),
+				GFP_ATOMIC, BROADCAST_REGISTERED, NULL, sock_net(sk));
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+#endif
+
 static pfkey_handler pfkey_funcs[SADB_MAX + 1] = {
+#ifndef CONFIG_NLM_NET_KEY
 	[SADB_RESERVED]		= pfkey_reserved,
 	[SADB_GETSPI]		= pfkey_getspi,
 	[SADB_UPDATE]		= pfkey_add,
@@ -2748,6 +2835,36 @@ static pfkey_handler pfkey_funcs[SADB_MAX + 1] = {
 	[SADB_X_SPDSETIDX]	= pfkey_spdadd,
 	[SADB_X_SPDDELETE2]	= pfkey_spdget,
 	[SADB_X_MIGRATE]	= pfkey_migrate,
+#else
+	[SADB_RESERVED]		= pfkey_nlms_op,
+	[SADB_GETSPI]		= pfkey_nlms_op,
+	[SADB_UPDATE]		= pfkey_nlms_op,
+	[SADB_ADD]		= pfkey_nlms_op,
+	[SADB_DELETE]		= pfkey_nlms_op,
+	[SADB_GET]		= pfkey_get,
+	[SADB_ACQUIRE]		= pfkey_nlms_op,
+	[SADB_REGISTER]		= pfkey_register,
+	[SADB_EXPIRE]		= NULL,
+	[SADB_FLUSH]		= pfkey_nlms_op,
+	[SADB_DUMP]		= pfkey_nlms_op,
+	[SADB_X_PROMISC]	= pfkey_promisc,
+	[SADB_X_PCHANGE]	= NULL,
+	[SADB_X_SPDUPDATE]      = pfkey_nlms_op,
+	[SADB_X_SPDADD]		= pfkey_nlms_op,
+	[SADB_X_SPDDELETE]      = pfkey_nlms_op,
+	[SADB_X_SPDGET]		= pfkey_nlms_op,
+	[SADB_X_SPDACQUIRE]     = NULL,
+	[SADB_X_SPDDUMP]	= pfkey_nlms_op,
+	[SADB_X_SPDFLUSH]       = pfkey_nlms_op,
+	[SADB_X_SPDSETIDX]      = pfkey_nlms_op,
+	[SADB_X_SPDDELETE2]     = pfkey_nlms_op,
+	[SADB_X_MIGRATE]	= pfkey_migrate,
+	[SADB_X_NLMS_PRIVATE]   = pfkey_nlms_op,
+	[SADB_X_NLM_IPSEC_INFO]   = pfkey_nlms_op,
+	[SADB_X_NLM_SPD_CLIENT_PROB]   = pfkey_nlms_op,
+	[SADB_X_NLM_SPD_CLIENT_PROB_REPLY]   = pfkey_nlms_op,
+	[SADB_X_NLM_IPSEC_CLEAR]   = pfkey_nlms_op,
+#endif
 };
 
 static int pfkey_process(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr)
@@ -2755,8 +2872,15 @@ static int pfkey_process(struct sock *sk, struct sk_buff *skb, struct sadb_msg *
 	void *ext_hdrs[SADB_EXT_MAX];
 	int err;
 
+#ifdef CONFIG_NLM_NET_KEY
+	if (hdr->sadb_msg_type != SADB_X_SPDADD && hdr->sadb_msg_type != SADB_ADD) {
+		pfkey_broadcast(skb_clone(skb, GFP_KERNEL), GFP_KERNEL,
+			BROADCAST_PROMISC_ONLY, NULL, sock_net(sk));
+        }
+#else
 	pfkey_broadcast(skb_clone(skb, GFP_KERNEL), GFP_KERNEL,
 			BROADCAST_PROMISC_ONLY, NULL, sock_net(sk));
+#endif
 
 	memset(ext_hdrs, 0, sizeof(ext_hdrs));
 	err = parse_exthdrs(skb, hdr, ext_hdrs);

@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2014 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *  linux/mm/memory.c
  *
@@ -235,7 +243,6 @@ void free_pgd_range(struct mmu_gather *tlb,
 {
 	pgd_t *pgd;
 	unsigned long next;
-	unsigned long start;
 
 	/*
 	 * The next few lines have given us lots of grief...
@@ -279,7 +286,6 @@ void free_pgd_range(struct mmu_gather *tlb,
 	if (addr > end - 1)
 		return;
 
-	start = addr;
 	pgd = pgd_offset(tlb->mm, addr);
 	do {
 		next = pgd_addr_end(addr, end);
@@ -1670,9 +1676,19 @@ static int remap_pte_range(struct mm_struct *mm, pmd_t *pmd,
 			unsigned long pfn, pgprot_t prot)
 {
 	pte_t *pte;
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+	spinlock_t *uninitialized_var(ptl);
+#else
 	spinlock_t *ptl;
+#endif
 
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+	pte = (mm == &init_mm) ?
+		pte_alloc_kernel(pmd, addr) :
+		pte_alloc_map_lock(mm, pmd, addr, &ptl);
+#else
 	pte = pte_alloc_map_lock(mm, pmd, addr, &ptl);
+#endif
 	if (!pte)
 		return -ENOMEM;
 	arch_enter_lazy_mmu_mode();
@@ -1682,7 +1698,12 @@ static int remap_pte_range(struct mm_struct *mm, pmd_t *pmd,
 		pfn++;
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 	arch_leave_lazy_mmu_mode();
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+	if (mm != &init_mm)
+		pte_unmap_unlock(pte - 1, ptl);
+#else
 	pte_unmap_unlock(pte - 1, ptl);
+#endif
 	return 0;
 }
 
@@ -3087,6 +3108,125 @@ int make_pages_present(unsigned long addr, unsigned long end)
 	return ret == len ? 0 : -EFAULT;
 }
 
+#ifdef CONFIG_NLMCOMMON_VM_DEBUG
+#ifdef CONFIG_NLMCOMMON_USERSEGV_DEBUG
+void dump_pgtable(pgd_t *pgd_start)
+{
+  pgd_t *pgd;
+  pte_t *ptep;
+  int i, j;
+  int pgd_counter = 0;
+
+  if (!pgd_start) {
+    printk("[%s]: pgd_start == NULL (Kernel Thread?)\n", __FUNCTION__);
+    return;
+  }
+  printk("dumping page table: pgd_start = %lx\n", (unsigned long)pgd_start);
+  for(i=0;i<PTRS_PER_PGD;i++) 
+    {    
+      pgd = pgd_start + i;      
+      if (pgd_none(*pgd) || pgd_val(*pgd)==(unsigned long)invalid_pte_table) {
+	pgd_counter++;
+	continue;	
+      }
+
+      printk("pgd[%d]= %lx: \n", i, pgd_val(*pgd));
+      for(j=0;j<PTRS_PER_PTE;j++) 
+        {
+	  ptep = (pte_t *)page_address(pmd_page(*(pmd_t*)(pgd))) + j;
+
+          if (pte_none(*ptep) || 
+	      pte_val(*ptep)==(unsigned long)invalid_pte_table) {	    
+	    continue;
+	  }
+          printk("\t\tpte[%d] = %llx, vpage=%lx\n", j, (unsigned long long)pte_val(*ptep), 
+		 (((unsigned long)i<<PGDIR_SHIFT)
+		  |((unsigned long)j<<PAGE_SHIFT))
+		 );
+        }
+    }
+  printk("[%s]: pgd_counter = %d\n", __FUNCTION__, pgd_counter);
+}
+
+void dump_current_pgtable(void)
+{
+  printk("[%s]: current = %lx, current->mm=%lx, current->active_mm=%lx\n", 
+	 __FUNCTION__,
+	 (unsigned long)current, (unsigned long)current->mm,
+	 (unsigned long)current->active_mm);
+  dump_pgtable(current->mm->pgd);
+}
+
+#else /* !CONFIG_NLMCOMMON_USERSEGV_DEBUG */
+
+static void print_pte_range(pte_t *pte, int pgd_index, int pmd_index)
+{
+	int i;
+	
+	for (i = 0; i < PTRS_PER_PTE; ++pte, ++i)
+	{
+		if (pte_none(*pte))
+			continue;
+		printk("\t\tpte[%d] = %llx, vpage = %lx\n", i, pte_val(*pte), 
+			  	((unsigned long)pgd_index << PGDIR_SHIFT)
+				| ((unsigned long)pmd_index << PAGE_SHIFT));
+	}
+}
+
+static void print_pmd_range(pmd_t *pmd, int pgd_index)
+{
+	int i;
+
+	for (i = 0; i < PTRS_PER_PMD; ++pmd, ++i)
+	{
+		if (pmd_none(*pmd))
+			continue;
+	 	print_pte_range((pte_t *) pmd_val(*pmd), pgd_index, i);
+	}
+}
+
+void dump_pgtable(pgd_t *pgd)
+{
+	int i = 0;
+
+	if (pgd == NULL) {
+		printk("NULL pgd ... bailing out\n");
+		return;
+	}
+
+	printk("dumping page table: pgd=%lx\n", (unsigned long)pgd);   
+	for (i = 0; i < PTRS_PER_PGD; ++pgd, ++i) 
+    {    
+		if (pgd_none(*pgd))
+			continue;	
+		print_pmd_range((pmd_t *) pgd_val(*pgd), i);
+	}
+}
+
+#endif /* CONFIG_NLMCOMMON_USERSEGV_DEBUG */
+
+void dump_mm_pgtable(struct mm_struct *mm)
+{
+	if (!mm) {
+    	printk("[%s]: mm == NULL (Kernel Thread?)\n", __FUNCTION__);
+    	return;
+	}
+
+	dump_pgtable(mm->pgd);
+}
+
+#ifndef CONFIG_NLMCOMMON_USERSEGV_DEBUG
+void dump_current_pgtable(void)
+{
+  printk("[%s]: current = %lx, current->mm=%lx, current->active_mm=%lx\n", 
+	 __FUNCTION__,
+	 (unsigned long)current, (unsigned long)current->mm,
+	 (unsigned long)current->active_mm);
+  dump_mm_pgtable(current->mm);
+}
+#endif
+#endif /* CONFIG_NLMCOMMON_VM_DEBUG */
+
 #if !defined(__HAVE_ARCH_GATE_AREA)
 
 #if defined(AT_SYSINFO_EHDR)
@@ -3376,4 +3516,36 @@ void might_fault(void)
 		might_lock_read(&current->mm->mmap_sem);
 }
 EXPORT_SYMBOL(might_fault);
+#endif
+
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+#include <asm/mach-netlogic/mmu.h>
+
+int __init map_kernel_addrspace(unsigned long addr, unsigned long pfn,
+				unsigned long max_pfn)
+{
+	pgd_t *pgd;
+	unsigned long end;
+	unsigned long next;
+	pgprot_t prot;
+	int err;
+
+	printk("(%s): addr = 0x%lx, pfn = 0x%lx, max_pfn = 0x%lx\n", __func__,
+		addr, pfn, max_pfn);
+
+	end = addr + ((max_pfn - pfn) << PAGE_SHIFT);
+
+	prot = __pgprot(KERNEL_PAGE_ATTR);
+	pfn -= addr >> PAGE_SHIFT;
+	pgd = pgd_offset(&init_mm, addr);
+	do {
+		next = pgd_addr_end(addr, end);
+		err = remap_pud_range(&init_mm, pgd, addr, next,
+		pfn + (addr >> PAGE_SHIFT), prot);
+		if (err)
+			break;
+	} while (pgd++, addr = next, addr != end);
+
+	return err;
+}
 #endif

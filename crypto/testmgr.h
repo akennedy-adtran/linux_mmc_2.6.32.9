@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2008-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * Algorithm testing framework and tests.
  *
@@ -439,12 +447,10 @@ static struct hash_testvec rmd320_tv_template[] = {
 		.tap	= { 28, 28 },
 	}
 };
-
 /*
  * SHA1 test vectors  from from FIPS PUB 180-1
  */
 #define SHA1_TEST_VECTORS	2
-
 static struct hash_testvec sha1_tv_template[] = {
 	{
 		.plaintext = "abc",

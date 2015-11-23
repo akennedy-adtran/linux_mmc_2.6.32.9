@@ -704,6 +704,11 @@ config BLK_DEV_IDE_AU1XXX
        bool "IDE for AMD Alchemy Au1200"
        depends on SOC_AU1200
        select IDE_XFER_MODE
+
+config BLK_DEV_IDE_PHOENIX
+       bool "IDE for Netlogic XLR eval boards" 
+       depends on NLM_COMMON 
+
 choice
        prompt "IDE Mode for AMD Alchemy Au1200"
        default CONFIG_BLK_DEV_IDE_AU1XXX_PIO_DBDMA

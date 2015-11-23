@@ -64,6 +64,7 @@
 #define smp_read_barrier_depends()	do { } while(0)
 
 #ifdef CONFIG_CPU_HAS_SYNC
+
 #define __sync()				\
 	__asm__ __volatile__(			\
 		".set	push\n\t"		\
@@ -74,6 +75,7 @@
 		: /* no output */		\
 		: /* no input */		\
 		: "memory")
+
 #else
 #define __sync()	do { } while(0)
 #endif

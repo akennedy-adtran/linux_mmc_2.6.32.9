@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -18,6 +26,27 @@
 #endif
 #ifdef CONFIG_MIPS_MT_SMTC
 #include <asm/mipsmtregs.h>
+#endif
+
+#ifdef CONFIG_PREEMPT
+
+.macro __preempt_disable
+lw  t0, TI_PRE_COUNT($28);
+addiu t0, 1;
+sw t0, TI_PRE_COUNT($28);
+.endm
+
+	.macro __preempt_enable
+lw  t0, TI_PRE_COUNT($28)
+	subu t0, 1
+sw t0, TI_PRE_COUNT($28)
+	.endm
+
+#else
+
+#define __preempt_disable
+#define __preempt_enable
+
 #endif
 
 #ifdef CONFIG_MIPS_MT_SMTC
@@ -47,17 +76,21 @@
 	.endm
 #else
 	.macro	local_irq_enable reg=t0
+	__preempt_disable
 	mfc0	\reg, CP0_STATUS
 	ori	\reg, \reg, 1
 	mtc0	\reg, CP0_STATUS
+	__preempt_enable
 	irq_enable_hazard
 	.endm
 
 	.macro	local_irq_disable reg=t0
+	__preempt_disable
 	mfc0	\reg, CP0_STATUS
 	ori	\reg, \reg, 1
 	xori	\reg, \reg, 1
 	mtc0	\reg, CP0_STATUS
+	__preempt_enable
 	irq_disable_hazard
 	.endm
 #endif /* CONFIG_MIPS_MT_SMTC */

@@ -250,6 +250,13 @@ out:
 
 static int __init oprofile_init(void)
 {
+	/* Architecture must fill in the interrupt ops and the
+	 * logical CPU type, or we can fall back to the timer
+	 * interrupt profiler.
+	 */
+
+	// oprofile_ops{} contains virtual pointes to all functions that are invoked
+	// whenever the counters have to be stopped, started or restored
 	int err;
 
 	err = oprofile_arch_init(&oprofile_ops);

@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * Generic pidhash and scalable, time-bounded PID allocator
  *
@@ -494,8 +503,13 @@ struct pid *find_ge_pid(int nr, struct pid_namespace *ns)
 /*
  * The pid hash table is scaled according to the amount of memory in the
  * machine.  From a minimum of 16 slots up to 4096 slots at one gigabyte or
- * more.
+ * more. KGDB needs to know if this function has been called already,
+ * since we might have entered KGDB very early.
  */
+#ifdef CONFIG_KGDB
+int pidhash_init_done;
+#endif
+
 void __init pidhash_init(void)
 {
 	int i, pidhash_size;
@@ -507,6 +521,11 @@ void __init pidhash_init(void)
 
 	for (i = 0; i < pidhash_size; i++)
 		INIT_HLIST_HEAD(&pid_hash[i]);
+
+#ifdef CONFIG_KGDB
+	pidhash_init_done = 1;
+#endif
+
 }
 
 void __init pidmap_init(void)

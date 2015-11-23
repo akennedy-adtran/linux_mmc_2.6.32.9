@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -14,6 +22,9 @@
 
 #include <asm/mipsmtregs.h>
 
+#if CONFIG_NLM_XLP
+#include <asm/netlogic/xlp_irq.h>
+#endif
 #include <irq.h>
 
 #ifdef CONFIG_I8259

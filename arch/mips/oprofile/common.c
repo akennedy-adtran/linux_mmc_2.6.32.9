@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2005-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -11,13 +20,15 @@
 #include <linux/oprofile.h>
 #include <linux/smp.h>
 #include <asm/cpu-info.h>
+#include <asm/processor.h>
 
 #include "op_impl.h"
 
 extern struct op_mips_model op_model_mipsxx_ops __attribute__((weak));
 extern struct op_mips_model op_model_rm9000_ops __attribute__((weak));
 extern struct op_mips_model op_model_loongson2_ops __attribute__((weak));
-
+extern struct op_mips_model op_model_xlr __attribute__((weak));
+extern struct op_mips_model op_model_xlp __attribute__((weak));
 static struct op_mips_model *model;
 
 static struct op_counter_config ctr[20];
@@ -76,6 +87,12 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
 	int res;
 
 	switch (current_cpu_type()) {
+	case CPU_XLR:
+		lmodel = &op_model_xlr;
+		break;
+	case CPU_XLP:
+		lmodel = &op_model_xlp;
+		break;
 	case CPU_5KC:
 	case CPU_20KC:
 	case CPU_24K:
@@ -114,6 +131,7 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
 	ops->start		= op_mips_start;
 	ops->stop		= op_mips_stop;
 	ops->cpu_type		= lmodel->cpu_type;
+	ops->backtrace		= op_mips_backtrace;
 
 	printk(KERN_INFO "oprofile: using %s performance monitoring.\n",
 	       lmodel->cpu_type);

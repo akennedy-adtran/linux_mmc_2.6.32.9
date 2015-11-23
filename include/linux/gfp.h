@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 #ifndef __LINUX_GFP_H
 #define __LINUX_GFP_H
 
@@ -311,7 +319,12 @@ extern struct page *alloc_page_vma(gfp_t gfp_mask,
 #endif
 #define alloc_page(gfp_mask) alloc_pages(gfp_mask, 0)
 
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+extern unsigned long (*__get_free_pages)(gfp_t gfp_mask, unsigned int order);
+extern unsigned long ____get_free_pages(gfp_t gfp_mask, unsigned int order);
+#else
 extern unsigned long __get_free_pages(gfp_t gfp_mask, unsigned int order);
+#endif
 extern unsigned long get_zeroed_page(gfp_t gfp_mask);
 
 void *alloc_pages_exact(size_t size, gfp_t gfp_mask);

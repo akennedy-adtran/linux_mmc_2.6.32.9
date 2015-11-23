@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2006-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -73,6 +81,11 @@ void *dma_alloc_noncoherent(struct device *dev, size_t size,
 
 	gfp = massage_gfp_flags(dev, gfp);
 
+
+#if defined (CONFIG_NLM_COMMON) && defined (CONFIG_64BIT)
+	/* force allocations to happen in DMA zone */
+	gfp |= __GFP_DMA;
+#endif
 	ret = (void *) __get_free_pages(gfp, get_order(size));
 
 	if (ret != NULL) {
@@ -95,6 +108,10 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 
 	gfp = massage_gfp_flags(dev, gfp);
 
+#if defined (CONFIG_NLM_COMMON) && defined (CONFIG_64BIT)
+	/* force allocations to happen in DMA zone */
+	gfp |= __GFP_DMA;
+#endif
 	ret = (void *) __get_free_pages(gfp, get_order(size));
 
 	if (ret) {
@@ -186,6 +203,7 @@ void dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
 
 EXPORT_SYMBOL(dma_unmap_single);
 
+#ifndef CONFIG_NLM_COMMON
 int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 	enum dma_data_direction direction)
 {
@@ -205,6 +223,23 @@ int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 
 	return nents;
 }
+#else
+int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+	enum dma_data_direction direction)
+{
+	int i;
+
+	BUG_ON(direction == DMA_NONE);
+
+	for (i = 0; i < nents; i++, sg++) {
+		sg->dma_address = dma_map_page(dev, sg_page(sg), sg->offset, 
+						sg->length, direction); 
+	}
+
+	return nents;
+}
+
+#endif
 
 EXPORT_SYMBOL(dma_map_sg);
 

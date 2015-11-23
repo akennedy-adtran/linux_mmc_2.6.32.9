@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * PCI Express Hot Plug Controller Driver
  *
@@ -58,7 +66,6 @@ u8 pciehp_handle_attention_button(struct slot *p_slot)
 {
 	u32 event_type;
 	struct controller *ctrl = p_slot->ctrl;
-
 	/* Attention Button Change */
 	ctrl_dbg(ctrl, "Attention button interrupt received\n");
 

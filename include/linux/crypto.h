@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2005-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * Scatterlist Cryptographic API.
  *
@@ -50,6 +58,8 @@
 #define CRYPTO_ALG_DEAD			0x00000020
 #define CRYPTO_ALG_DYING		0x00000040
 #define CRYPTO_ALG_ASYNC		0x00000080
+
+#define CRYPTO_ALG_HW                   0x00000100
 
 /*
  * Set this bit if and only if the algorithm requires another algorithm of
@@ -331,6 +341,11 @@ struct crypto_alg {
 	void (*cra_destroy)(struct crypto_alg *alg);
 	
 	struct module *cra_module;
+	struct crypto_alg *cra_helper; /* Only makes sense for hw algs. 
+					This is a pointer to sw implementation, 
+					it can be used as fallback 
+					implementation if hw one cannot handle 
+					particular request. */
 };
 
 /*
@@ -392,6 +407,48 @@ struct blkcipher_tfm {
 struct cipher_tfm {
 	int (*cit_setkey)(struct crypto_tfm *tfm,
 	                  const u8 *key, unsigned int keylen);
+#if defined(CONFIG_CRYPTO_HW)
+	int (*cit_encrypt_hmac)(struct crypto_tfm *tfm,
+				struct scatterlist *dst,
+				struct scatterlist *src,
+				unsigned int nsg,
+				unsigned int nbytes,
+				struct crypto_tfm *tfm_auth,
+				int offset,
+				unsigned int digest_bytes,
+				u8* key, unsigned int *keylen,
+				u8* digest_out);
+	int (*cit_encrypt_iv_hmac)(struct crypto_tfm *tfm,
+				   struct scatterlist *dst,
+				   struct scatterlist *src,
+				   unsigned int nsg,
+				   unsigned int nbytes, u8 *iv,
+				   struct crypto_tfm *tfm_auth,
+				   int offset,
+				   unsigned int digest_bytes,
+				   u8* key, unsigned int *keylen,
+				   u8* digest_out);
+	int (*cit_decrypt_hmac)(struct crypto_tfm *tfm,
+				struct scatterlist *dst,
+				struct scatterlist *src,
+				unsigned int nsg,
+				unsigned int nbytes,
+				struct crypto_tfm *tfm_auth,
+				int offset,
+				unsigned int digest_bytes,
+				u8* key, unsigned int *keylen,
+				u8* digest_out);
+	int (*cit_decrypt_iv_hmac)(struct crypto_tfm *tfm,
+				   struct scatterlist *dst,
+				   struct scatterlist *src,
+				   unsigned int nsg,
+				   unsigned int nbytes, u8 *iv,
+				   struct crypto_tfm *tfm_auth,
+				   int offset,
+				   unsigned int digest_bytes,
+				   u8* key, unsigned int *keylen,
+				   u8* digest_out);
+#endif
 	void (*cit_encrypt_one)(struct crypto_tfm *tfm, u8 *dst, const u8 *src);
 	void (*cit_decrypt_one)(struct crypto_tfm *tfm, u8 *dst, const u8 *src);
 };

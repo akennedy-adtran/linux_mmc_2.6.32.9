@@ -18,15 +18,15 @@ KBUILD_DEFCONFIG := ip22_defconfig
 # Select the object file format to substitute into the linker script.
 #
 ifdef CONFIG_CPU_LITTLE_ENDIAN
-32bit-tool-archpref	= mipsel
-64bit-tool-archpref	= mips64el
+32bit-tool-archpref	= mips64-nlm-linux-
+64bit-tool-archpref	= mips64-nlm-linux-
 32bit-bfd		= elf32-tradlittlemips
 64bit-bfd		= elf64-tradlittlemips
 32bit-emul		= elf32ltsmip
 64bit-emul		= elf64ltsmip
 else
-32bit-tool-archpref	= mips
-64bit-tool-archpref	= mips64
+32bit-tool-archpref	= mips64-nlm-linux-
+64bit-tool-archpref	= mips64-nlm-linux-
 32bit-bfd		= elf32-tradbigmips
 64bit-bfd		= elf64-tradbigmips
 32bit-emul		= elf32btsmip
@@ -40,6 +40,10 @@ endif
 ifdef CONFIG_64BIT
 tool-archpref		= $(64bit-tool-archpref)
 UTS_MACHINE		:= mips64
+endif
+
+ifdef CONFIG_CROSSCOMPILE
+CROSS_COMPILE		:= $(tool-archpref)
 endif
 
 ifneq ($(SUBARCH),$(ARCH))
@@ -154,6 +158,7 @@ ifeq (,$(findstring march=octeon, $(cflags-$(CONFIG_CPU_CAVIUM_OCTEON))))
 cflags-$(CONFIG_CPU_CAVIUM_OCTEON) += -Wa,-march=octeon
 endif
 
+cflags-$(CONFIG_CPU_XLP)    += $(call cc-option,-march=xlp) -Wa,--trap
 cflags-$(CONFIG_CPU_R4000_WORKAROUNDS)	+= $(call cc-option,-mfix-r4000,)
 cflags-$(CONFIG_CPU_R4400_WORKAROUNDS)	+= $(call cc-option,-mfix-r4400,)
 cflags-$(CONFIG_CPU_DADDI_WORKAROUNDS)	+= $(call cc-option,-mno-daddi,)
@@ -624,7 +629,39 @@ else
 load-$(CONFIG_CPU_CAVIUM_OCTEON) 	+= 0xffffffff81100000
 endif
 
-cflags-y			+= -I$(srctree)/arch/mips/include/asm/mach-generic
+#
+# NETLOGIC SOC Common (common)
+core-$(CONFIG_NLM_COMMON)      	+= arch/mips/netlogic/common/
+cflags-$(CONFIG_NLM_COMMON)    	+= -DXLS -I$(srctree)/arch/mips/include/asm/mach-netlogic
+cflags-$(CONFIG_NLM_COMMON)    	+= -I$(srctree)/arch/mips/include/asm/netlogic
+
+core-$(CONFIG_XEN)			+= arch/mips/xen/
+
+# This address is now configured via kernel configuration file
+load-$(CONFIG_NLM_PTR)          	+= $(CONFIG_NLM_COMMON_LOAD_ADDRESS)
+
+#
+# NETLOGIC XLP Soc, Simulator and boards
+#
+core-$(CONFIG_NLM_XLP) 		+= arch/mips/netlogic/xlp/
+core-$(CONFIG_NLM_XLP) 		+= arch/mips/netlogic/boot/
+cflags-$(CONFIG_NLM_XLP_SIM)        	+= -DXLP_SIM=1
+cflags-$(CONFIG_NLM_XLP)    		+= -I$(srctree)/arch/mips/include/asm/netlogic/hal -DNLM_HAL_LINUX_KERNEL
+cflags-$(CONFIG_NLM_XLP)    		+= -I$(srctree)/arch/mips/netlogic/boot
+
+# This address is now configured via kernel configuration file
+load-$(CONFIG_NLM_XLP_SIM)      += $(CONFIG_NLM_COMMON_LOAD_ADDRESS)
+load-$(CONFIG_NLM_XLP_EVP_BOARD) += $(CONFIG_NLM_COMMON_LOAD_ADDRESS)
+load-$(CONFIG_NLM_XLP_EVP_N511_BOARD) += $(CONFIG_NLM_COMMON_LOAD_ADDRESS)
+
+# gcc461 supports the below option, gcc445 does not
+cflags-$(CONFIG_CPU_XLP)    += $(call cc-option,-Wno-error=unused-but-set-variable)
+
+#
+# Generic MIPS headers
+#
+cflags-y                        += -I$(srctree)/arch/mips/include/asm/mach-generic
+
 drivers-$(CONFIG_PCI)		+= arch/mips/pci/
 
 #
@@ -656,6 +693,12 @@ KBUILD_CPPFLAGS += -D"DATAOFFSET=$(if $(dataoffset-y),$(dataoffset-y),0)"
 
 LDFLAGS			+= -m $(ld-emul)
 
+ifdef CONFIG_CPU_LITTLE_ENDIAN
+AFLAGS += -EL
+CFLAGS += -EL
+LDFLAGS += -EL
+endif
+
 ifdef CONFIG_MIPS
 CHECKFLAGS += $(shell $(CC) $(KBUILD_CFLAGS) -dM -E -xc /dev/null | \
 	egrep -vw '__GNUC_(|MINOR_|PATCHLEVEL_)_' | \
@@ -667,11 +710,33 @@ endif
 
 OBJCOPYFLAGS		+= --remove-section=.reginfo
 
+ifdef CONFIG_MAPPED_KERNEL
+PHYS_LOAD_ADDRESS = -D"PHYSADDR=$(CONFIG_PHYS_LOAD_ADDRESS)"
+endif
+
+#
+# Choosing incompatible machines durings configuration will result in
+# error messages during linking.  Select a default linkscript if
+# none has been choosen above.
+#
+
+
+CPPFLAGS_vmlinux.lds := \
+	$(CFLAGS) \
+	-D"LOADADDR=$(load-y)" $(PHYS_LOAD_ADDRESS) \
+	-D"JIFFIES=$(JIFFIES)" \
+	-D"DATAOFFSET=$(if $(dataoffset-y),$(dataoffset-y),0)"
+
+ifdef CONFIG_MAPPED_KERNEL
+KBUILD_CFLAGS += -D"LOADADDR=$(load-y)ULL" -D"PHYSADDR=$(CONFIG_PHYS_LOAD_ADDRESS)ULL"
+KBUILD_CFLAGS += -D"LOADADDR_ASM=$(load-y)" -D"PHYSADDR_ASM=$(CONFIG_PHYS_LOAD_ADDRESS)"
+endif
+
 head-y := arch/mips/kernel/head.o arch/mips/kernel/init_task.o
 
 libs-y			+= arch/mips/lib/
 
-core-y			+= arch/mips/kernel/ arch/mips/mm/ arch/mips/math-emu/
+core-y			+= arch/mips/kernel/ arch/mips/mm/ arch/mips/math-emu/ 
 
 drivers-$(CONFIG_OPROFILE)	+= arch/mips/oprofile/
 
@@ -716,11 +781,11 @@ CLEAN_FILES += vmlinux.ecoff \
 
 archprepare:
 ifdef CONFIG_MIPS32_N32
-	@echo '  Checking missing-syscalls for N32'
+	$(Q)echo '  Checking missing-syscalls for N32'
 	$(Q)$(MAKE) $(build)=. missing-syscalls EXTRA_CFLAGS="-mabi=n32"
 endif
 ifdef CONFIG_MIPS32_O32
-	@echo '  Checking missing-syscalls for O32'
+	$(Q)echo '  Checking missing-syscalls for O32'
 	$(Q)$(MAKE) $(build)=. missing-syscalls EXTRA_CFLAGS="-mabi=32"
 endif
 

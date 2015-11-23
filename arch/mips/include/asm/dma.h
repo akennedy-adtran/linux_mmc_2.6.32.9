@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * linux/include/asm/dma.h: Defines for using and allocating dma channels.
  * Written by Hennus Bergman, 1992.
@@ -88,7 +96,11 @@
 /* don't care; ISA bus master won't work, ISA slave DMA supports 32bit addr */
 #define MAX_DMA_ADDRESS		PAGE_OFFSET
 #else
+#if defined(CONFIG_NLM_COMMON) && defined(CONFIG_64BIT)
+#define MAX_DMA_ADDRESS		(PAGE_OFFSET + 0xc0000000)
+#else
 #define MAX_DMA_ADDRESS		(PAGE_OFFSET + 0x01000000)
+#endif
 #endif
 #define MAX_DMA_PFN		PFN_DOWN(virt_to_phys((void *)MAX_DMA_ADDRESS))
 #define MAX_DMA32_PFN		(1UL << (32 - PAGE_SHIFT))

@@ -819,6 +819,12 @@ int spi_write_then_read(struct spi_device *spi,
 	memset(x, 0, sizeof x);
 	if (n_tx) {
 		x[0].len = n_tx;
+
+		#ifdef CONFIG_SPI_XLP
+		if(n_rx)
+			x[0].spi_cont_cmd = 1;
+		#endif
+
 		spi_message_add_tail(&x[0], &message);
 	}
 	if (n_rx) {

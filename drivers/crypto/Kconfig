@@ -222,4 +222,15 @@ config CRYPTO_DEV_PPC4XX
 	help
 	  This option allows you to have support for AMCC crypto acceleration.
 
+config CRYPTO_XLR
+	tristate "Support for the XLR Security engine"
+	depends on CRYPTO && NLM_COMMON 
+	default Y
+	help
+	  Say 'Y' here to use the XLR hardware Security engine for the 
+	  Crypto operations.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called xlr_sec.
+
 endif # CRYPTO_HW

@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  *  linux/kernel/printk.c
  *
@@ -651,7 +660,7 @@ static const char recursion_bug_msg [] =
 		KERN_CRIT "BUG: recent printk recursion!\n";
 static int recursion_bug;
 static int new_text_line = 1;
-static char printk_buf[1024];
+static char printk_buf[1024] __cacheline_aligned;
 
 int printk_delay_msec __read_mostly;
 
@@ -710,6 +719,11 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 		strcpy(printk_buf, recursion_bug_msg);
 		printed_len = strlen(recursion_bug_msg);
 	}
+#ifdef CONFIG_NLMCOMMON_SMP_PREFIX
+	sprintf(printk_buf+printed_len, "% 3d:", (smp_processor_id() & 0xff));
+	printed_len += 4;
+#endif
+
 	/* Emit the output into the temporary buffer */
 	printed_len += vscnprintf(printk_buf + printed_len,
 				  sizeof(printk_buf) - printed_len, fmt, args);
@@ -1047,14 +1061,18 @@ void release_console_sem(void)
 		up(&console_sem);
 		return;
 	}
-
+	
+	__asm__ volatile(
+		".set push\n"
+		".set noreorder\n");
 	console_may_schedule = 0;
 
 	for ( ; ; ) {
 		spin_lock_irqsave(&logbuf_lock, flags);
 		wake_klogd |= log_start - log_end;
-		if (con_start == log_end)
+		if (con_start == log_end){
 			break;			/* Nothing to print */
+		}
 		_con_start = con_start;
 		_log_end = log_end;
 		con_start = log_end;		/* Flush */
@@ -1069,6 +1087,10 @@ void release_console_sem(void)
 	spin_unlock_irqrestore(&logbuf_lock, flags);
 	if (wake_klogd)
 		wake_up_klogd();
+
+	__asm__ volatile(
+		".set reorder\n"
+		".set pop\n");
 }
 EXPORT_SYMBOL(release_console_sem);
 

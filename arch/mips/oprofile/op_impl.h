@@ -1,4 +1,13 @@
-/**
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
+/*
  * @file arch/alpha/oprofile/op_impl.h
  *
  * @remark Copyright 2002 OProfile authors
@@ -35,5 +44,7 @@ struct op_mips_model {
 	char *cpu_type;
 	unsigned char num_counters;
 };
+
+void op_mips_backtrace(struct pt_regs * const regs, unsigned int depth); 
 
 #endif

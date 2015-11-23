@@ -20,6 +20,5 @@ int fixup_exception(struct pt_regs *regs)
 
 		return 1;
 	}
-
 	return 0;
 }

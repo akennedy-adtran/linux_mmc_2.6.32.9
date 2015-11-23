@@ -78,3 +78,10 @@ config NET_KEY_MIGRATE
 
 	  If unsure, say N.
 
+config NLM_NET_KEY
+        bool "NetLogic PF_KEY"
+        depends on NET_KEY && EXPERIMENTAL
+        ---help---
+          Enable NetLogic specific PF_KEY handlers.
+
+          Say Y unless you know what you are doing.

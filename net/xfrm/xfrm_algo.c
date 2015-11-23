@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * xfrm algorithm interface
  *
@@ -558,6 +566,13 @@ struct xfrm_algo_desc *xfrm_calg_get_byid(int alg_id)
 }
 EXPORT_SYMBOL_GPL(xfrm_calg_get_byid);
 
+struct xfrm_algo_desc *xfrm_aead_get_byid(int alg_id)
+{
+        return xfrm_find_algo(&xfrm_aead_list, xfrm_alg_id_match,
+                        (void *)(unsigned long)alg_id, 1);
+}
+EXPORT_SYMBOL_GPL(xfrm_aead_get_byid);
+
 static int xfrm_alg_name_match(const struct xfrm_algo_desc *entry,
 			       const void *data)
 {
@@ -688,6 +703,17 @@ int xfrm_count_enc_supported(void)
 	return n;
 }
 EXPORT_SYMBOL_GPL(xfrm_count_enc_supported);
+
+int xfrm_count_aead_supported(void)
+{
+        int i, n;
+
+        for (i = 0, n = 0; i < aead_entries(); i++)
+                if (aead_list[i].available)
+                        n++;
+        return n;
+}
+EXPORT_SYMBOL_GPL(xfrm_count_aead_supported);
 
 /* Move to common area: it is shared with AH. */
 

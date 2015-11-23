@@ -174,6 +174,56 @@ static int ethtool_set_settings(struct net_device *dev, void __user *useraddr)
 	return dev->ethtool_ops->set_settings(dev, &cmd);
 }
 
+static int ethtool_msec_tx_config(struct net_device *dev, void __user *useraddr)
+{
+	struct ethtool_cmd cmd;
+
+	if (!dev->ethtool_ops->set_settings)
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&cmd, useraddr, sizeof(cmd)))
+		return -EFAULT;
+
+	return dev->ethtool_ops->msec_tx_config(dev, &cmd);
+}
+
+static int ethtool_msec_tx_mem_config(struct net_device *dev, void __user *useraddr)
+{
+	struct ethtool_cmd cmd;
+
+	if (!dev->ethtool_ops->set_settings)
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&cmd, useraddr, sizeof(cmd)))
+		return -EFAULT;
+
+	return dev->ethtool_ops->msec_tx_mem_config(dev, &cmd);
+}
+static int ethtool_msec_rx_config(struct net_device *dev, void __user *useraddr)
+{
+	struct ethtool_cmd cmd;
+
+	if (!dev->ethtool_ops->set_settings)
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&cmd, useraddr, sizeof(cmd)))
+		return -EFAULT;
+
+	return dev->ethtool_ops->msec_rx_config(dev, &cmd);
+}
+static int ethtool_msec_rx_mem_config(struct net_device *dev, void __user *useraddr)
+{
+	struct ethtool_cmd cmd;
+
+	if (!dev->ethtool_ops->set_settings)
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&cmd, useraddr, sizeof(cmd)))
+		return -EFAULT;
+
+	return dev->ethtool_ops->msec_rx_mem_config(dev, &cmd);
+}
+
 static int ethtool_get_drvinfo(struct net_device *dev, void __user *useraddr)
 {
 	struct ethtool_drvinfo info;
@@ -965,6 +1015,18 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 	old_features = dev->features;
 
 	switch (ethcmd) {
+	case ETHTOOL_MAC_SEC_TX:
+		rc = ethtool_msec_tx_config(dev, useraddr);
+		break;
+	case ETHTOOL_MAC_SEC_TX_MEM:
+		rc = ethtool_msec_tx_mem_config(dev, useraddr);
+		break;
+	case ETHTOOL_MAC_SEC_RX:
+		rc = ethtool_msec_rx_config(dev, useraddr);
+		break;
+	case ETHTOOL_MAC_SEC_RX_MEM:
+		rc = ethtool_msec_rx_mem_config(dev, useraddr);
+		break;
 	case ETHTOOL_GSET:
 		rc = ethtool_get_settings(dev, useraddr);
 		break;

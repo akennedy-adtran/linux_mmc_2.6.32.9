@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2009-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file COPYING in the main directory of this archive
@@ -58,6 +66,9 @@
 #define	MACH_MIKROTIK_RB532	0	/* Mikrotik RouterBoard 532 	*/
 #define MACH_MIKROTIK_RB532A	1	/* Mikrotik RouterBoard 532A 	*/
 
+#define MACH_GROUP_RMI         23
+#define MACH_PTR                0
+
 /*
  * Valid machtype for Loongson family
  */
@@ -69,7 +80,11 @@
 #define MACH_DEXXON_GDIUM2F10  5
 #define MACH_LOONGSON_END      6
 
+#ifdef CONFIG_NLM_COMMON
+#define CL_SIZE			(2048)
+#else
 #define CL_SIZE			COMMAND_LINE_SIZE
+#endif
 
 extern char *system_type;
 const char *get_system_type(void);
@@ -91,12 +106,12 @@ struct boot_mem_map {
 		phys_t addr;	/* start of memory segment */
 		phys_t size;	/* size of memory segment */
 		long type;		/* type of memory segment */
-	} map[BOOT_MEM_MAP_MAX];
+	} map[BOOT_MEM_MAP_MAX + 1];
 };
 
 extern struct boot_mem_map boot_mem_map;
 
-extern void add_memory_region(phys_t start, phys_t size, long type);
+extern void add_memory_region(uint64_t start, uint64_t size, long type);
 
 extern void prom_init(void);
 extern void prom_free_prom_memory(void);

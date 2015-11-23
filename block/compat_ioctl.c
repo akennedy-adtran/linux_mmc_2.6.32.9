@@ -186,8 +186,8 @@ static int compat_blkpg_ioctl(struct block_device *bdev, fmode_t mode,
 		unsigned int cmd, struct compat_blkpg_ioctl_arg __user *ua32)
 {
 	struct blkpg_ioctl_arg __user *a = compat_alloc_user_space(sizeof(*a));
-	compat_caddr_t udata;
-	compat_int_t n;
+	compat_caddr_t udata = 0;
+	compat_int_t n = 0;
 	int err;
 
 	err = get_user(n, &ua32->op);

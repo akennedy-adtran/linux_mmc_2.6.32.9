@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2005-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * RapidIO sysfs attributes and support
  *
@@ -14,7 +22,9 @@
 #include <linux/rio.h>
 #include <linux/rio_drv.h>
 #include <linux/stat.h>
-
+#ifdef CONFIG_NLM_COMMON
+#include <linux/capability.h>
+#endif
 #include "rio.h"
 
 /* Sysfs support */

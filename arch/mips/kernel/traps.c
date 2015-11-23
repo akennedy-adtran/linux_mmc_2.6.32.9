@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2007-2014 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -49,6 +57,12 @@
 #include <asm/stacktrace.h>
 #include <asm/irq.h>
 
+#ifndef CONFIG_NLM_COMMON
+static void mmu_init(void) { }
+#else
+#include <asm/mach-netlogic/mmu.h>
+#endif
+
 extern void check_wait(void);
 extern asmlinkage void r4k_wait(void);
 extern asmlinkage void rollback_handle_int(void);
@@ -69,6 +83,7 @@ extern asmlinkage void handle_cpu(void);
 extern asmlinkage void handle_ov(void);
 extern asmlinkage void handle_tr(void);
 extern asmlinkage void handle_fpe(void);
+extern asmlinkage void handle_rixi(void);
 extern asmlinkage void handle_mdmx(void);
 extern asmlinkage void handle_watch(void);
 extern asmlinkage void handle_mt(void);
@@ -89,6 +104,9 @@ void (*board_nmi_handler_setup)(void);
 void (*board_ejtag_handler_setup)(void);
 void (*board_bind_eic_interrupt)(int irq, int regset);
 
+#ifdef CONFIG_NLM_COMMON
+extern unsigned long nlm_common_ebase;
+#endif
 
 static void show_raw_backtrace(unsigned long reg29)
 {
@@ -230,7 +248,6 @@ static void __show_regs(const struct pt_regs *regs)
 	const int field = 2 * sizeof(unsigned long);
 	unsigned int cause = regs->cp0_cause;
 	int i;
-
 	printk("Cpu %d\n", smp_processor_id());
 
 	/*
@@ -566,6 +583,9 @@ static int simulate_llsc(struct pt_regs *regs, unsigned int opcode)
 	return -1;			/* Must be something else ... */
 }
 
+extern void nlm_cpu_stat_update_rdhwr(void);
+extern void nlm_cpu_stat_update_fp(void);
+
 /*
  * Simulate trapping 'rdhwr' instructions to provide user accessible
  * registers not implemented in hardware.
@@ -578,6 +598,7 @@ static int simulate_rdhwr(struct pt_regs *regs, unsigned int opcode)
 		int rd = (opcode & RD) >> 11;
 		int rt = (opcode & RT) >> 16;
 		switch (rd) {
+
 		case 0:		/* CPU number */
 			regs->regs[rt] = smp_processor_id();
 			return 0;
@@ -600,6 +621,9 @@ static int simulate_rdhwr(struct pt_regs *regs, unsigned int opcode)
 			return 0;
 		case 29:
 			regs->regs[rt] = ti->tp_value;
+#if defined(CONFIG_NLM_COMMON)
+			nlm_cpu_stat_update_rdhwr();
+#endif
 			return 0;
 		default:
 			return -1;
@@ -662,6 +686,9 @@ asmlinkage void do_fpe(struct pt_regs *regs, unsigned long fcr31)
 		/* Run the emulator */
 		sig = fpu_emulator_cop1Handler(regs, &current->thread.fpu, 1);
 
+#if defined(CONFIG_NLM_COMMON)
+				nlm_cpu_stat_update_fp();
+#endif
 		/*
 		 * We can't allow the emulated instruction to leave any of
 		 * the cause bit set in $fcr31.
@@ -692,6 +719,37 @@ asmlinkage void do_fpe(struct pt_regs *regs, unsigned long fcr31)
 	info.si_errno = 0;
 	info.si_addr = (void __user *) regs->cp0_epc;
 	force_sig_info(SIGFPE, &info, current);
+}
+
+asmlinkage void do_rixi(struct pt_regs *regs)
+{
+	struct task_struct *tsk = current;
+	siginfo_t info;
+
+	/*
+	 * TODO: need notify_die() intimation ?
+	 */
+	die_if_kernel("rixi exception in kernel code", regs);
+
+	/*
+	 * TODO: is there a possibility of permissions (RX)
+	 *       changing along with the receipt of a RIXI
+	 *       exception ? If so, we will have to check
+	 *       the vm_flags of the vma correponding to the
+	 *       faulting address
+	 */
+
+	tsk->thread.cp0_badvaddr = regs->cp0_badvaddr;
+	/*
+	 * TODO: need to set appropriate code
+	 * 
+	 * tsk->thread.error_code = ;
+	 */
+
+	info.si_signo = SIGSEGV;
+	info.si_errno = 0;
+	info.si_addr = (void __user *) regs->cp0_epc;
+	force_sig_info(SIGSEGV, &info, tsk);
 }
 
 static void do_trap_or_bp(struct pt_regs *regs, unsigned int code,
@@ -824,6 +882,8 @@ asmlinkage void do_ri(struct pt_regs *regs)
 
 	if (unlikely(status > 0)) {
 		regs->cp0_epc = old_epc;		/* Undo skip-over.  */
+		printk("[%s]: killing with SIGILL\"%s\"\n", __FUNCTION__, current->comm);
+		show_regs(regs);
 		force_sig(status, current);
 	}
 }
@@ -931,6 +991,7 @@ asmlinkage void do_cpu(struct pt_regs *regs)
 		local_irq_restore(flags);
 		return;
 #endif
+		break;
 	case 3:
 		break;
 	}
@@ -1255,9 +1316,10 @@ void *set_except_vector(int n, void *addr)
 
 	exception_handlers[n] = handler;
 	if (n == 0 && cpu_has_divec) {
-		*(u32 *)(ebase + 0x200) = 0x08000000 |
-					  (0x03ffffff & (handler >> 2));
-		local_flush_icache_range(ebase + 0x200, ebase + 0x204);
+		*(u32 *)(ebase + 0x200) = 0x000000c0;  /* ehb */
+		*(u32 *)(ebase + 0x204) = 0x08000000 |
+					  (0x03ffffff & (handler >> 2)); /* j handler */
+		local_flush_icache_range(ebase + 0x200, ebase + 0x208);
 	}
 	return (void *)old_handler;
 }
@@ -1468,6 +1530,9 @@ void __cpuinit per_cpu_trap_init(void)
 {
 	unsigned int cpu = smp_processor_id();
 	unsigned int status_set = ST0_CU0;
+#if defined(CONFIG_NLM_XLP) && (defined(CONFIG_64BIT) || defined(CONFIG_RAPIDIO))
+        unsigned int pagegrain;
+#endif
 #ifdef CONFIG_MIPS_MT_SMTC
 	int secondaryTC = 0;
 	int bootTC = (cpu == 0);
@@ -1483,6 +1548,12 @@ void __cpuinit per_cpu_trap_init(void)
 		secondaryTC = 1;
 #endif /* CONFIG_MIPS_MT_SMTC */
 
+#ifdef CONFIG_32BIT
+	/* Some firmware leaves the BEV flag set, clear it. */
+	clear_c0_status(ST0_CU1|ST0_CU2|ST0_CU3|ST0_BEV|ST0_KX);
+#else
+	clear_c0_status(ST0_CU1|ST0_CU2|ST0_CU3|ST0_BEV);
+#endif
 	/*
 	 * Disable coprocessors and select 32-bit or 64-bit addressing
 	 * and the 16/32 or 32/32 FPR register model.  Reset the BEV
@@ -1490,21 +1561,32 @@ void __cpuinit per_cpu_trap_init(void)
 	 * IP27).  Set XX for ISA IV code to work.
 	 */
 #ifdef CONFIG_64BIT
-	status_set |= ST0_FR|ST0_KX|ST0_SX|ST0_UX;
+	status_set |= ST0_CU0|ST0_FR|ST0_KX|ST0_SX|ST0_UX;
 #endif
 	if (current_cpu_data.isa_level == MIPS_CPU_ISA_IV)
 		status_set |= ST0_XX;
 	if (cpu_has_dsp)
 		status_set |= ST0_MX;
 
+#ifdef CONFIG_NLM_XLP
+    /*Enable Cop2 Access*/
+    status_set |= ST0_CU2;
+#endif
+
 	change_c0_status(ST0_CU|ST0_MX|ST0_RE|ST0_FR|ST0_BEV|ST0_TS|ST0_KX|ST0_SX|ST0_UX,
 			 status_set);
 
+#if defined(CONFIG_NLM_XLP) && (defined(CONFIG_64BIT) || defined(CONFIG_RAPIDIO))
+	pagegrain = read_c0_pagegrain();
+	pagegrain |= PG_ELPA;
+	write_c0_pagegrain(pagegrain);
+#endif
 	if (cpu_has_mips_r2) {
 		unsigned int enable = 0x0000000f | cpu_hwrena_impl_bits;
 
-		if (!noulri && cpu_has_userlocal)
+		if (!noulri && cpu_has_userlocal) {
 			enable |= (1 << 29);
+		}
 
 		write_c0_hwrena(enable);
 	}
@@ -1527,6 +1609,9 @@ void __cpuinit per_cpu_trap_init(void)
 			evpe(vpflags);
 		} else
 			set_c0_cause(CAUSEF_IV);
+	}
+	else {
+		clear_c0_cause(CAUSEF_IV);
 	}
 
 	/*
@@ -1560,8 +1645,10 @@ void __cpuinit per_cpu_trap_init(void)
 #ifdef CONFIG_MIPS_MT_SMTC
 	if (bootTC) {
 #endif /* CONFIG_MIPS_MT_SMTC */
-		cpu_cache_init();
-		tlb_init();
+
+	cpu_cache_init();
+	mmu_init();
+	tlb_init();
 #ifdef CONFIG_MIPS_MT_SMTC
 	} else if (!secondaryTC) {
 		/*
@@ -1616,7 +1703,10 @@ __setup("rdhwr_noopt", set_rdhwr_noopt);
 
 void __init trap_init(void)
 {
-	extern char except_vec3_generic, except_vec3_r4000;
+	extern char except_vec3_generic;
+#ifndef CONFIG_NLM_COMMON
+	extern char except_vec3_r4000;
+#endif
 	extern char except_vec4;
 	unsigned long i;
 	int rollback;
@@ -1638,6 +1728,10 @@ void __init trap_init(void)
 		if (cpu_has_mips_r2)
 			ebase += (read_c0_ebase() & 0x3ffff000);
 	}
+
+#ifdef CONFIG_NLM_COMMON
+	ebase = nlm_common_ebase;
+#endif
 
 	per_cpu_trap_init();
 
@@ -1733,6 +1827,9 @@ void __init trap_init(void)
 	if (cpu_has_fpu && !cpu_has_nofpuex)
 		set_except_vector(15, handle_fpe);
 
+	if (kernel_uses_smartmips_rixi)
+		set_except_vector(16, handle_rixi);
+
 	set_except_vector(22, handle_mdmx);
 
 	if (cpu_has_mcheck)
@@ -1743,6 +1840,7 @@ void __init trap_init(void)
 
 	set_except_vector(26, handle_dsp);
 
+#ifndef CONFIG_NLM_COMMON
 	if (cpu_has_vce)
 		/* Special exception: R4[04]00 uses also the divec space. */
 		memcpy((void *)(ebase + 0x180), &except_vec3_r4000, 0x100);
@@ -1750,6 +1848,7 @@ void __init trap_init(void)
 		memcpy((void *)(ebase + 0x180), &except_vec3_generic, 0x80);
 	else
 		memcpy((void *)(ebase + 0x080), &except_vec3_generic, 0x80);
+#endif
 
 	signal_init();
 #ifdef CONFIG_MIPS32_COMPAT

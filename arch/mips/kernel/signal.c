@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -578,12 +586,22 @@ give_sigsegv:
 	return -EFAULT;
 }
 
+static int sig_uses_siginfo(struct k_sigaction *ka)
+{
+#ifdef CONFIG_TRAD_SIGNALS
+	return ((ka)->sa.sa_flags & SA_SIGINFO);
+#else
+	return 1;
+#endif
+}
+
 struct mips_abi mips_abi = {
 #ifdef CONFIG_TRAD_SIGNALS
 	.setup_frame	= setup_frame,
 #endif
 	.setup_rt_frame	= setup_rt_frame,
-	.restart	= __NR_restart_syscall
+	.restart	= __NR_restart_syscall,
+	.uses_siginfo = sig_uses_siginfo
 };
 
 static int handle_signal(unsigned long sig, siginfo_t *info,
@@ -609,7 +627,7 @@ static int handle_signal(unsigned long sig, siginfo_t *info,
 
 	regs->regs[0] = 0;		/* Don't deal with this again.  */
 
-	if (sig_uses_siginfo(ka))
+	if (current->thread.abi->uses_siginfo(ka))
 		ret = current->thread.abi->setup_rt_frame(ka, regs, sig, oldset, info);
 	else
 		ret = current->thread.abi->setup_frame(ka, regs, sig, oldset);

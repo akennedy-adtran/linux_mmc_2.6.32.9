@@ -475,6 +475,14 @@ config MTD_NAND_SOCRATES
 	help
 	  Enables support for NAND Flash chips wired onto Socrates board.
 
+config MTD_NAND_XLS
+	tristate "Support for NAND Flash on XLS"
+	depends on MTD_NAND && NLM_COMMON
+
+config MTD_NAND_XLP
+	tristate "Support for NAND Flash on XLP"
+	depends on MTD_NAND && NLM_XLP
+
 config MTD_NAND_W90P910
 	tristate "Support for NAND on w90p910 evaluation board."
 	depends on ARCH_W90X900 && MTD_PARTITIONS

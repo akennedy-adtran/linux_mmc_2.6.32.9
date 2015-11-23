@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2007-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *  linux/drivers/mmc/core/bus.c
  *
@@ -200,7 +208,11 @@ struct mmc_card *mmc_alloc_card(struct mmc_host *host, struct device_type *type)
 {
 	struct mmc_card *card;
 
+#ifdef CONFIG_MMC_XLP
+	card = kzalloc(sizeof(struct mmc_card), GFP_KERNEL|GFP_DMA);
+#else
 	card = kzalloc(sizeof(struct mmc_card), GFP_KERNEL);
+#endif
 	if (!card)
 		return ERR_PTR(-ENOMEM);
 

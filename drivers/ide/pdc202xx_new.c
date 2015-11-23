@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2007-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *  Promise TX2/TX4/TX2000/133 IDE driver
  *
@@ -63,6 +71,11 @@ static u8 max_dma_rate(struct pci_dev *pdev)
 	return mode;
 }
 
+#ifdef CONFIG_NLM_COMMON
+extern void nlm_ide_mm_outb (u8 value, unsigned long port);
+extern u8 nlm_ide_mm_inb (unsigned long port);
+#endif
+
 /**
  * get_indexed_reg - Get indexed register
  * @hwif: for the port address
@@ -72,8 +85,13 @@ static u8 get_indexed_reg(ide_hwif_t *hwif, u8 index)
 {
 	u8 value;
 
+#ifdef CONFIG_NLM_COMMON
+	nlm_ide_mm_outb(index, hwif->dma_base + 1);
+	value = nlm_ide_mm_inb(hwif->dma_base + 3);
+#else
 	outb(index, hwif->dma_base + 1);
 	value = inb(hwif->dma_base + 3);
+#endif
 
 	DBG("index[%02X] value[%02X]\n", index, value);
 	return value;
@@ -86,8 +104,13 @@ static u8 get_indexed_reg(ide_hwif_t *hwif, u8 index)
  */
 static void set_indexed_reg(ide_hwif_t *hwif, u8 index, u8 value)
 {
+#ifdef CONFIG_NLM_COMMON
+	nlm_ide_mm_outb(index, hwif->dma_base + 1);
+	nlm_ide_mm_outb(value, hwif->dma_base + 3);
+#else
 	outb(index, hwif->dma_base + 1);
 	outb(value, hwif->dma_base + 3);
+#endif
 	DBG("index[%02X] value[%02X]\n", index, value);
 }
 
@@ -212,6 +235,16 @@ static long read_counter(u32 dma_base)
 		last = count;
 
 		/* Read the current count */
+#ifdef CONFIG_NLM_COMMON
+		nlm_ide_mm_outb(0x20, pri_dma_base + 0x01);
+		cnt0 = nlm_ide_mm_inb(pri_dma_base + 0x03);
+		nlm_ide_mm_outb(0x21, pri_dma_base + 0x01);
+		cnt1 = nlm_ide_mm_inb(pri_dma_base + 0x03);
+		nlm_ide_mm_outb(0x20, sec_dma_base + 0x01);
+		cnt2 = nlm_ide_mm_inb(sec_dma_base + 0x03);
+		nlm_ide_mm_outb(0x21, sec_dma_base + 0x01);
+		cnt3 = nlm_ide_mm_inb(sec_dma_base + 0x03);
+#else
 		outb(0x20, pri_dma_base + 0x01);
 		cnt0 = inb(pri_dma_base + 0x03);
 		outb(0x21, pri_dma_base + 0x01);
@@ -220,6 +253,7 @@ static long read_counter(u32 dma_base)
 		cnt2 = inb(sec_dma_base + 0x03);
 		outb(0x21, sec_dma_base + 0x01);
 		cnt3 = inb(sec_dma_base + 0x03);
+#endif
 
 		count = (cnt3 << 23) | (cnt2 << 15) | (cnt1 << 8) | cnt0;
 
@@ -252,10 +286,17 @@ static long detect_pll_input_clock(unsigned long dma_base)
 	do_gettimeofday(&start_time);
 
 	/* Start the test mode */
+#ifdef CONFIG_NLM_COMMON
+	nlm_ide_mm_outb(0x01, dma_base + 0x01);
+	scr1 = nlm_ide_mm_inb(dma_base + 0x03);
+	DBG("scr1[%02X]\n", scr1);
+	nlm_ide_mm_outb(scr1 | 0x40, dma_base + 0x03);
+#else
 	outb(0x01, dma_base + 0x01);
 	scr1 = inb(dma_base + 0x03);
 	DBG("scr1[%02X]\n", scr1);
 	outb(scr1 | 0x40, dma_base + 0x03);
+#endif
 
 	/* Let the counter run for 10 ms. */
 	mdelay(10);
@@ -264,10 +305,17 @@ static long detect_pll_input_clock(unsigned long dma_base)
 	do_gettimeofday(&end_time);
 
 	/* Stop the test mode */
+#ifdef CONFIG_NLM_COMMON
+	nlm_ide_mm_outb(0x01, dma_base + 0x01);
+	scr1 = nlm_ide_mm_inb(dma_base + 0x03);
+	DBG("scr1[%02X]\n", scr1);
+	nlm_ide_mm_outb(scr1 & ~0x40, dma_base + 0x03);
+#else
 	outb(0x01, dma_base + 0x01);
 	scr1 = inb(dma_base + 0x03);
 	DBG("scr1[%02X]\n", scr1);
 	outb(scr1 & ~0x40, dma_base + 0x03);
+#endif
 
 	/*
 	 * Calculate the input clock in Hz
@@ -304,7 +352,9 @@ static int init_chipset_pdcnew(struct pci_dev *dev)
 {
 	const char *name = DRV_NAME;
 	unsigned long dma_base = pci_resource_start(dev, 4);
+#ifndef CONFIG_NLM_COMMON
 	unsigned long sec_dma_base = dma_base + 0x08;
+#endif
 	long pll_input, pll_output, ratio;
 	int f, r;
 	u8 pll_ctl0, pll_ctl1;
@@ -351,10 +401,17 @@ static int init_chipset_pdcnew(struct pci_dev *dev)
 	/* Show the current clock value of PLL control register
 	 * (maybe already configured by the BIOS)
 	 */
+#ifdef CONFIG_NLM_COMMON
+	nlm_ide_mm_outb(0x02, sec_dma_base + 0x01);
+	pll_ctl0 = nlm_ide_mm_inb(sec_dma_base + 0x03);
+	nlm_ide_mm_outb(0x03, sec_dma_base + 0x01);
+	pll_ctl1 = nlm_ide_mm_inb(sec_dma_base + 0x03);
+#else
 	outb(0x02, sec_dma_base + 0x01);
 	pll_ctl0 = inb(sec_dma_base + 0x03);
 	outb(0x03, sec_dma_base + 0x01);
 	pll_ctl1 = inb(sec_dma_base + 0x03);
+#endif
 
 	DBG("pll_ctl[%02X][%02X]\n", pll_ctl0, pll_ctl1);
 #endif
@@ -398,10 +455,12 @@ static int init_chipset_pdcnew(struct pci_dev *dev)
 
 	DBG("Writing pll_ctl[%02X][%02X]\n", pll_ctl0, pll_ctl1);
 
+#ifndef CONFIG_NLM_COMMON
 	outb(0x02,     sec_dma_base + 0x01);
 	outb(pll_ctl0, sec_dma_base + 0x03);
 	outb(0x03,     sec_dma_base + 0x01);
 	outb(pll_ctl1, sec_dma_base + 0x03);
+#endif
 
 	/* Wait the PLL circuit to be stable */
 	mdelay(30);
@@ -410,10 +469,17 @@ static int init_chipset_pdcnew(struct pci_dev *dev)
 	/*
 	 *  Show the current clock value of PLL control register
 	 */
+#ifdef CONFIG_NLM_COMMON
+	nlm_ide_mm_outb(0x02, sec_dma_base + 0x01);
+	pll_ctl0 = nlm_ide_mm_inb(sec_dma_base + 0x03);
+	nlm_ide_mm_outb(0x03, sec_dma_base + 0x01);
+	pll_ctl1 = nlm_ide_mm_inb(sec_dma_base + 0x03);
+#else
 	outb(0x02, sec_dma_base + 0x01);
 	pll_ctl0 = inb(sec_dma_base + 0x03);
 	outb(0x03, sec_dma_base + 0x01);
 	pll_ctl1 = inb(sec_dma_base + 0x03);
+#endif
 
 	DBG("pll_ctl[%02X][%02X]\n", pll_ctl0, pll_ctl1);
 #endif

@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * 	NET3	Protocol independent device support routines.
  *
@@ -1641,6 +1649,20 @@ static inline int illegal_highdma(struct net_device *dev, struct sk_buff *skb)
 			return 1;
 
 #endif
+
+#if defined (CONFIG_NLM_COMMON) && defined (CONFIG_64BIT)
+	{
+		int i;
+
+		if (dev->features & NETIF_F_HIGHDMA)
+			return 0;
+		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
+			if ((page_to_phys((skb_shinfo(skb)->frags[i].page))) >=
+					dev->dev.coherent_dma_mask)
+				return 1;
+	}
+#endif
+
 	return 0;
 }
 
@@ -2825,7 +2847,7 @@ static void net_rx_action(struct softirq_action *h)
 		 * Allow this to run for 2 jiffies since which will allow
 		 * an average latency of 1.5/HZ.
 		 */
-		if (unlikely(budget <= 0 || time_after(jiffies, time_limit)))
+		if (unlikely(budget <= 0 || time_after_eq(jiffies, time_limit)))
 			goto softnet_break;
 
 		local_irq_enable();

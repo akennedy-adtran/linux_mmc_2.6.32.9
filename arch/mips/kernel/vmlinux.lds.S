@@ -1,15 +1,42 @@
+/*-
+ * Copyright 2003-2014 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 #include <asm/asm-offsets.h>
 #include <asm/page.h>
+#include <asm/thread_info.h>
 #include <asm-generic/vmlinux.lds.h>
 
 #undef mips
 #define mips mips
 OUTPUT_ARCH(mips)
-ENTRY(kernel_entry)
+
+#ifdef CONFIG_MAPPED_KERNEL
+#define AT_LOCATION
+#endif
+
 PHDRS {
-	text PT_LOAD FLAGS(7);	/* RWX */
+#ifdef CONFIG_MAPPED_KERNEL
+	text PT_LOAD AT_LOCATION FLAGS(7);	/* RWX */
+#else
+	text PT_LOAD FLAGS(7);  /* RWX */
+#endif
 	note PT_NOTE FLAGS(4);	/* R__ */
 }
+
+#ifdef CONFIG_MAPPED_KERNEL
+#ifdef PHYSADDR
+phys_entry = kernel_entry - LOADADDR_ASM + PHYSADDR_ASM;
+#endif
+ENTRY(phys_entry)
+#else
+ENTRY(kernel_entry)
+#endif
+
 
 #ifdef CONFIG_32BIT
 	#ifdef CONFIG_CPU_LITTLE_ENDIAN
@@ -38,6 +65,7 @@ SECTIONS
 	/* . = 0xa800000000300000; */
 	. = 0xffffffff80300000;
 #endif
+
 	. = VMLINUX_LOAD_ADDRESS;
 	/* read-only */
 	_text = .;	/* Text and read-only data */
@@ -70,7 +98,7 @@ SECTIONS
 	.data : {	/* Data */
 		. = . + DATAOFFSET;		/* for CONFIG_MAPPED_KERNEL */
 
-		INIT_TASK_DATA(PAGE_SIZE)
+		INIT_TASK_DATA(THREAD_SIZE)
 		NOSAVE_DATA
 		CACHELINE_ALIGNED_DATA(1 << CONFIG_MIPS_L1_CACHE_SHIFT)
 		DATA_DATA

@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *  Copyright (C) 1995, 1996, 2001  Ralf Baechle
  *  Copyright (C) 2001, 2004  MIPS Technologies, Inc.
@@ -12,6 +20,10 @@
 #include <asm/cpu-features.h>
 #include <asm/mipsregs.h>
 #include <asm/processor.h>
+#ifdef CONFIG_NLM_XLP
+#include <asm/netlogic/hal/nlm_hal.h>
+#include <asm/netlogic/xlp8xx/cpu_control_macros.h>
+#endif
 
 unsigned int vced_count, vcei_count;
 
@@ -22,6 +34,8 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	unsigned int fp_vers = cpu_data[n].fpu_id;
 	char fmt [64];
 	int i;
+        uint64_t freq;
+        const uint64_t mhz = 1000000;
 
 #ifdef CONFIG_SMP
 	if (!cpu_isset(n, cpu_online_map))
@@ -34,12 +48,29 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	if (n == 0)
 		seq_printf(m, "system type\t\t: %s\n", get_system_type());
 
+#ifdef CONFIG_NLM_XLP
 	seq_printf(m, "processor\t\t: %ld\n", n);
+	/* x86 has physical id in /proc, does not hurt to include this */
+	seq_printf(m, "physical id\t\t: %ld\n", (long int)cpu_logical_map(n));
+#else
+	seq_printf(m, "processor\t\t: %ld\n", n);
+#endif
+#ifdef CONFIG_NLM_COMMON
+	/* workaround for compiler warning */
+	version = fp_vers = 0;
+
+        freq = nlm_hal_cpu_freq();
+        do_div(freq, mhz);
+	seq_printf(m, "cpu model\t\t: %s %s @%lld MHz\n", __cpu_name[n],
+		   (cpu_data[n].options & MIPS_CPU_FPU ? "  FPU " : ""),
+		    freq);
+#else
 	sprintf(fmt, "cpu model\t\t: %%s V%%d.%%d%s\n",
 	        cpu_data[n].options & MIPS_CPU_FPU ? "  FPU V%d.%d" : "");
 	seq_printf(m, fmt, __cpu_name[n],
 	                           (version >> 4) & 0x0f, version & 0x0f,
 	                           (fp_vers >> 4) & 0x0f, fp_vers & 0x0f);
+#endif
 	seq_printf(m, "BogoMIPS\t\t: %u.%02u\n",
 	              cpu_data[n].udelay_val / (500000/HZ),
 	              (cpu_data[n].udelay_val / (5000/HZ)) % 100);

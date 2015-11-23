@@ -20,6 +20,7 @@ struct mips_abi {
 	                       struct pt_regs *regs, int signr,
 	                       sigset_t *set, siginfo_t *info);
 	const unsigned long	restart;
+	int (* uses_siginfo)(struct k_sigaction *ka);
 };
 
 #endif /* _ASM_ABI_H */

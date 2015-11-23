@@ -2,9 +2,8 @@
 # kbuild file for usr/ - including initramfs image
 #
 
-klibcdirs:;
+klibcdirs:= rootfs.xlp/tmp;
 PHONY += klibcdirs
-
 
 # Gzip
 suffix_$(CONFIG_INITRAMFS_COMPRESSION_GZIP)   = .gz

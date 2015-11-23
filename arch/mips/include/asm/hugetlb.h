@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2009-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -50,26 +58,24 @@ static inline void hugetlb_free_pgd_range(struct mmu_gather *tlb,
 	free_pgd_range(tlb, addr, end, floor, ceiling);
 }
 
-static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
-				   pte_t *ptep, pte_t pte)
-{
-	set_pte_at(mm, addr, ptep, pte);
-}
+extern void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+				pte_t *ptep, pte_t pte);
 
-static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
-					    unsigned long addr, pte_t *ptep)
-{
-	pte_t clear;
-	pte_t pte = *ptep;
-
-	pte_val(clear) = (unsigned long)invalid_pte_table;
-	set_pte_at(mm, addr, ptep, clear);
-	return pte;
-}
+extern pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+				unsigned long addr, pte_t *ptep);
 
 static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
 					 unsigned long addr, pte_t *ptep)
 {
+}
+
+static inline pte_t huge_ptep_get(pte_t *ptep)
+{
+	/* Get the pte value for the even entry */
+	unsigned long pte = pte_val(*ptep) & ~(HPAGE_SIZE >> 1);
+
+	/* for XLP hpw, clear bit 61 which is indicates hpw it is a hpage */
+	return __pte(pte & ~(1ULL << 61));
 }
 
 static inline int huge_pte_none(pte_t pte)
@@ -86,7 +92,7 @@ static inline pte_t huge_pte_wrprotect(pte_t pte)
 static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
 					   unsigned long addr, pte_t *ptep)
 {
-	ptep_set_wrprotect(mm, addr, ptep);
+	set_huge_pte_at(mm, addr, ptep, pte_wrprotect(huge_ptep_get(ptep)));
 }
 
 static inline int huge_ptep_set_access_flags(struct vm_area_struct *vma,
@@ -94,12 +100,12 @@ static inline int huge_ptep_set_access_flags(struct vm_area_struct *vma,
 					     pte_t *ptep, pte_t pte,
 					     int dirty)
 {
-	return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
-}
-
-static inline pte_t huge_ptep_get(pte_t *ptep)
-{
-	return *ptep;
+	int changed = !pte_same(*ptep, pte);
+	if (changed) {
+		set_huge_pte_at(vma->vm_mm, addr, ptep, pte);
+		flush_tlb_page(vma, addr);
+	}
+	return changed;
 }
 
 static inline int arch_prepare_hugepage(struct page *page)

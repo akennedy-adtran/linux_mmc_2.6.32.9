@@ -717,9 +717,7 @@ config BLK_DEV_INITRD
 	  If unsure say Y.
 
 if BLK_DEV_INITRD
-
 source "usr/Kconfig"
-
 endif
 
 config CC_OPTIMIZE_FOR_SIZE
@@ -1074,6 +1072,8 @@ config PROFILING
 	help
 	  Say Y here to enable the extended profiling support mechanisms used
 	  by profilers such as OProfile.
+
+source "drivers/perfctr/Kconfig"
 
 #
 # Place an empty function call at each tracepoint site. Can be

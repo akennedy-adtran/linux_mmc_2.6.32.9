@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2006-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -79,7 +88,9 @@ do {									\
 	if (cpu_has_dsp)						\
 		__save_dsp(prev);					\
 	__clear_software_ll_bit();					\
+	perfctr_suspend_thread(&(prev)->thread);                        \
 	(last) = resume(prev, next, task_thread_info(next));		\
+	perfctr_suspend_thread(&(prev)->thread);                        \
 } while (0)
 
 #define finish_arch_switch(prev)					\
@@ -142,7 +153,7 @@ static inline unsigned long __xchg_u32(volatile int * m, unsigned int val)
 	return retval;
 }
 
-#ifdef CONFIG_64BIT
+#if defined(CONFIG_64BIT) || defined(CONFIG_NLM_COMMON)
 static inline __u64 __xchg_u64(volatile __u64 * m, __u64 val)
 {
 	__u64 retval;

@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 
 /* Overhauled routines for dealing with different mmap regions of flash */
 
@@ -13,6 +21,9 @@
 #include <asm/unaligned.h>
 #include <asm/system.h>
 #include <asm/io.h>
+#ifdef CONFIG_NLM_COMMON
+#include <asm/netlogic/iomap.h>
+#endif
 
 #ifdef CONFIG_MTD_MAP_BANK_WIDTH_1
 #define map_bankwidth(map) 1
@@ -373,6 +384,12 @@ static inline map_word map_word_ff(struct map_info *map)
 static inline map_word inline_map_read(struct map_info *map, unsigned long ofs)
 {
 	map_word r;
+#ifdef CONFIG_NLM_COMMON
+	unsigned int flags=0;
+	
+	flags = nlm_br_read_lock();
+
+#endif
 
 	if (map_bankwidth_is_1(map))
 		r.x[0] = __raw_readb(map->virt + ofs);
@@ -387,11 +404,20 @@ static inline map_word inline_map_read(struct map_info *map, unsigned long ofs)
 	else if (map_bankwidth_is_large(map))
 		memcpy_fromio(r.x, map->virt+ofs, map->bankwidth);
 
+#ifdef CONFIG_NLM_COMMON
+	nlm_br_read_unlock(flags);
+#endif
 	return r;
 }
 
 static inline void inline_map_write(struct map_info *map, const map_word datum, unsigned long ofs)
 {
+#ifdef CONFIG_NLM_COMMON
+	unsigned int flags=0;
+	
+	flags = nlm_br_write_lock();
+
+#endif
 	if (map_bankwidth_is_1(map))
 		__raw_writeb(datum.x[0], map->virt + ofs);
 	else if (map_bankwidth_is_2(map))
@@ -405,19 +431,38 @@ static inline void inline_map_write(struct map_info *map, const map_word datum, 
 	else if (map_bankwidth_is_large(map))
 		memcpy_toio(map->virt+ofs, datum.x, map->bankwidth);
 	mb();
+#ifdef CONFIG_NLM_COMMON
+	nlm_br_write_unlock(flags);
+#endif
 }
 
 static inline void inline_map_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
 {
+#ifdef CONFIG_NLM_COMMON
+	unsigned int flags=0;
+	
+	flags = nlm_br_write_lock();
+#endif
 	if (map->cached)
 		memcpy(to, (char *)map->cached + from, len);
 	else
 		memcpy_fromio(to, map->virt + from, len);
+#ifdef CONFIG_NLM_COMMON
+	nlm_br_write_unlock(flags);
+#endif
 }
 
 static inline void inline_map_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
 {
+#ifdef CONFIG_NLM_COMMON
+	unsigned int flags=0;
+	
+	flags = nlm_br_write_lock();
+#endif
 	memcpy_toio(map->virt + to, from, len);
+#ifdef CONFIG_NLM_COMMON
+	nlm_br_write_unlock(flags);
+#endif
 }
 
 #ifdef CONFIG_MTD_COMPLEX_MAPPINGS

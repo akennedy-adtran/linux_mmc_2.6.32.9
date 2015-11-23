@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2009-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * Synaptics touchpad with I2C interface
  *
@@ -42,7 +50,7 @@
 #define INT_REQ_STAT_REG	0x0003
 #define DEV_COMMAND_REG		0x0004
 
-#define RMI_PROT_VER_REG	0x0200
+#define NLM_PROT_VER_REG	0x0200
 #define MANUFACT_ID_REG		0x0201
 #define PHYS_INT_VER_REG	0x0202
 #define PROD_PROPERTY_REG	0x0203

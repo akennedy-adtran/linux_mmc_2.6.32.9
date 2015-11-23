@@ -32,6 +32,7 @@
 #include <asm/irq.h>
 #include <asm/idle.h>
 #include <asm/sync_bitops.h>
+#include <asm/irq_regs.h>
 #include <asm/xen/hypercall.h>
 #include <asm/xen/hypervisor.h>
 
@@ -410,7 +411,7 @@ static int bind_ipi_to_irq(unsigned int ipi, unsigned int cpu)
 }
 
 
-static int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
+int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 {
 	struct evtchn_bind_virq bind_virq;
 	int evtchn, irq;
@@ -650,8 +651,13 @@ void xen_evtchn_do_upcall(struct pt_regs *regs)
 				int port = (word_idx * BITS_PER_LONG) + bit_idx;
 				int irq = evtchn_to_irq[port];
 
+#ifdef NETL_USE_X86_XEN_PORT
 				if (irq != -1)
 					handle_irq(irq, regs);
+#else
+				if (irq != -1)
+					generic_handle_irq(irq);
+#endif
 			}
 		}
 
@@ -927,6 +933,8 @@ static struct irq_chip xen_dynamic_chip __read_mostly = {
 	.set_affinity	= set_affinity_irq,
 	.retrigger	= retrigger_dynirq,
 };
+
+# define irq_ctx_init(cpu) do { } while (0)
 
 void __init xen_init_IRQ(void)
 {

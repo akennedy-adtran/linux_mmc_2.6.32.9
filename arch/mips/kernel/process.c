@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2006-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -24,6 +32,7 @@
 #include <linux/user.h>
 #include <linux/init.h>
 #include <linux/completion.h>
+#include <linux/perfctr.h>
 #include <linux/kallsyms.h>
 #include <linux/random.h>
 
@@ -104,6 +113,11 @@ void start_thread(struct pt_regs * regs, unsigned long pc, unsigned long sp)
 
 void exit_thread(void)
 {
+	#ifdef CONFIG_PERFCTR
+	struct task_struct *tsk = current;
+
+	perfctr_exit_thread(&tsk->thread);
+	#endif
 }
 
 void flush_thread(void)
@@ -116,8 +130,8 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 	struct thread_info *ti = task_thread_info(p);
 	struct pt_regs *childregs;
 	unsigned long childksp;
-	p->set_child_tid = p->clear_child_tid = NULL;
 
+	p->set_child_tid = p->clear_child_tid = NULL;
 	childksp = (unsigned long)task_stack_page(p) + THREAD_SIZE - 32;
 
 	preempt_disable();
@@ -174,6 +188,11 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 	if (clone_flags & CLONE_SETTLS)
 		ti->tp_value = regs->regs[7];
 
+#ifdef CONFIG_PERFCTR
+	perfctr_copy_task(p, regs);
+#endif
+
+
 	return 0;
 }
 
@@ -202,6 +221,7 @@ void elf_dump_regs(elf_greg_t *gp, struct pt_regs *regs)
 	gp[EF_CP0_BADVADDR] = regs->cp0_badvaddr;
 	gp[EF_CP0_STATUS] = regs->cp0_status;
 	gp[EF_CP0_CAUSE] = regs->cp0_cause;
+
 #ifdef EF_UNUSED0
 	gp[EF_UNUSED0] = 0;
 #endif
@@ -368,20 +388,20 @@ unsigned long thread_saved_pc(struct task_struct *tsk)
 	return ((unsigned long *)t->reg29)[schedule_mfi.pc_offset];
 }
 
-
+/* Changes for oProfile callgraph support */
 #ifdef CONFIG_KALLSYMS
-/* used by show_backtrace() */
-unsigned long unwind_stack(struct task_struct *task, unsigned long *sp,
-			   unsigned long pc, unsigned long *ra)
+/* generic stack unwinding function */
+unsigned long notrace unwind_stack_by_address(unsigned long stack_page,
+				      unsigned long *sp,
+                           	      unsigned long pc, 
+				      unsigned long *ra)
 {
-	unsigned long stack_page;
 	struct mips_frame_info info;
 	unsigned long size, ofs;
 	int leaf;
 	extern void ret_from_irq(void);
 	extern void ret_from_exception(void);
 
-	stack_page = (unsigned long)task_stack_page(task);
 	if (!stack_page)
 		return 0;
 
@@ -439,6 +459,15 @@ unsigned long unwind_stack(struct task_struct *task, unsigned long *sp,
 	*sp += info.frame_size;
 	*ra = 0;
 	return __kernel_text_address(pc) ? pc : 0;
+}
+EXPORT_SYMBOL(unwind_stack_by_address);
+
+/* used by show_backtrace() */
+unsigned long unwind_stack(struct task_struct *task, unsigned long *sp,
+			   unsigned long pc, unsigned long *ra)
+{
+	unsigned long stack_page = (unsigned long)task_stack_page(task);
+	return unwind_stack_by_address(stack_page, sp, pc, ra);
 }
 #endif
 

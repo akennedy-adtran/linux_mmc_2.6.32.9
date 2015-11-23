@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2007-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -32,6 +41,11 @@
 #include <asm/smp-ops.h>
 #include <asm/system.h>
 
+#include <asm/netlogic/sim.h>
+#include <asm/netlogic/debug.h>
+#include <asm/mach-netlogic/mmu.h>
+#include <asm/netlogic/hal/nlm_hal_xlp_dev.h>
+
 struct cpuinfo_mips cpu_data[NR_CPUS] __read_mostly;
 
 EXPORT_SYMBOL(cpu_data);
@@ -39,6 +53,13 @@ EXPORT_SYMBOL(cpu_data);
 #ifdef CONFIG_VT
 struct screen_info screen_info;
 #endif
+
+#ifdef CONFIG_NLM_VMIPS
+extern unsigned long long nlm_vmips_highmem_start;
+#undef  HIGHMEM_START
+#define        HIGHMEM_START   (nlm_vmips_highmem_start)
+#endif
+
 
 /*
  * Despite it's name this variable is even if we don't have PCI
@@ -68,13 +89,20 @@ static char command_line[CL_SIZE];
 const unsigned long mips_io_port_base __read_mostly = -1;
 EXPORT_SYMBOL(mips_io_port_base);
 
+/* A flag to indicate the chip is xlp2xx. A variable is used since later on
+ * it is used in macros.
+ */
+int is_nlm_xlp2xx_compat = 0;
+
 static struct resource code_resource = { .name = "Kernel code", };
 static struct resource data_resource = { .name = "Kernel data", };
 
-void __init add_memory_region(phys_t start, phys_t size, long type)
+void __init add_memory_region(uint64_t start, uint64_t size, long type)
 {
 	int x = boot_mem_map.nr_map;
+#ifndef CONFIG_NUMA
 	struct boot_mem_map_entry *prev = boot_mem_map.map + x - 1;
+#endif
 
 	/* Sanity check */
 	if (start + size < start) {
@@ -82,6 +110,8 @@ void __init add_memory_region(phys_t start, phys_t size, long type)
 		return;
 	}
 
+	/* For numa, we want to avoid merging memories from different nodes */
+#ifndef CONFIG_NUMA
 	/*
 	 * Try to merge with previous entry if any.  This is far less than
 	 * perfect but is sufficient for most real world cases.
@@ -90,6 +120,7 @@ void __init add_memory_region(phys_t start, phys_t size, long type)
 		prev->size += size;
 		return;
 	}
+#endif
 
 	if (x == BOOT_MEM_MAP_MAX) {
 		pr_err("Ooops! Too many entries in the memory map!\n");
@@ -106,7 +137,6 @@ static void __init print_memory_map(void)
 {
 	int i;
 	const int field = 2 * sizeof(unsigned long);
-
 	for (i = 0; i < boot_mem_map.nr_map; i++) {
 		printk(KERN_INFO " memory: %0*Lx @ %0*Lx ",
 		       field, (unsigned long long) boot_mem_map.map[i].size,
@@ -123,7 +153,8 @@ static void __init print_memory_map(void)
 			printk(KERN_CONT "(reserved)\n");
 			break;
 		default:
-			printk(KERN_CONT "type %lu\n", boot_mem_map.map[i].type);
+			printk(KERN_CONT "type %llu\n", 
+                        (unsigned long long)boot_mem_map.map[i].type);
 			break;
 		}
 	}
@@ -263,7 +294,34 @@ static void __init bootmem_init(void)
 	finalize_initrd();
 }
 
-#else  /* !CONFIG_SGI_IP27 */
+#elif defined(CONFIG_NLM_XLP) && defined(CONFIG_NUMA)
+
+static void __init bootmem_init(void)
+{
+	unsigned long reserved_end;
+
+	/*
+	 * Init any data related to initrd. It's a nop if INITRD is
+	 * not selected. Once that done we can determine the low bound
+	 * of usable memory.
+	 */
+#ifdef CONFIG_XEN
+	reserved_end = max(init_initrd(),
+			   (unsigned long) PFN_UP(__pa_symbol(&_end) + PAGE_SIZE));
+#else
+	reserved_end = max(init_initrd(),
+			   (unsigned long) PFN_UP(__pa_symbol(&_end)));
+#endif
+
+	nlm_numa_bootmem_init(reserved_end);
+
+	/*
+	 * Reserve initrd memory if needed.
+	 */
+	finalize_initrd();
+}
+
+#else  /* !CONFIG_SGI_IP27 && !(defined(CONFIG_NLM_XLP) && defined(CONFIG_NUMA)) */
 
 static void __init bootmem_init(void)
 {
@@ -277,8 +335,13 @@ static void __init bootmem_init(void)
 	 * not selected. Once that done we can determine the low bound
 	 * of usable memory.
 	 */
+#ifdef CONFIG_XEN
+	reserved_end = max(init_initrd(),
+			   (unsigned long) PFN_UP(__pa_symbol(&_end) + PAGE_SIZE));
+#else
 	reserved_end = max(init_initrd(),
 			   (unsigned long) PFN_UP(__pa_symbol(&_end)));
+#endif
 
 	/*
 	 * max_low_pfn is not a number of pages. The number of pages
@@ -296,9 +359,13 @@ static void __init bootmem_init(void)
 		if (boot_mem_map.map[i].type != BOOT_MEM_RAM)
 			continue;
 
+		/* Changing the math in several places below to add -1.  If a region
+		 * ends exactly on a boundary where there is no DRAM, the last PFN
+		 * will be incorrect (one page of memory will have no DRAM backing).
+		 * By subtracting one here, this problem is eliminated. */
 		start = PFN_UP(boot_mem_map.map[i].addr);
 		end = PFN_DOWN(boot_mem_map.map[i].addr
-				+ boot_mem_map.map[i].size);
+				+ boot_mem_map.map[i].size - 1);
 
 		if (end > max_low_pfn)
 			max_low_pfn = end;
@@ -335,6 +402,12 @@ static void __init bootmem_init(void)
 		max_low_pfn = PFN_DOWN(HIGHMEM_START);
 	}
 
+	max_low_pfn = recalculate_max_low_pfn(max_low_pfn);
+
+#ifdef DEBUG_MAPPED_KERNEL
+	printk("max_low_pfn = 0x%lx\n", max_low_pfn);
+#endif
+
 	/*
 	 * Initialize the boot-time allocator with low memory only.
 	 */
@@ -347,7 +420,7 @@ static void __init bootmem_init(void)
 
 		start = PFN_UP(boot_mem_map.map[i].addr);
 		end = PFN_DOWN(boot_mem_map.map[i].addr
-				+ boot_mem_map.map[i].size);
+				+ boot_mem_map.map[i].size - 1);
 
 		if (start <= min_low_pfn)
 			start = min_low_pfn;
@@ -382,7 +455,7 @@ static void __init bootmem_init(void)
 
 		start = PFN_UP(boot_mem_map.map[i].addr);
 		end   = PFN_DOWN(boot_mem_map.map[i].addr
-				    + boot_mem_map.map[i].size);
+				    + boot_mem_map.map[i].size - 1);
 		/*
 		 * We are rounding up the start address of usable memory
 		 * and at the end of the usable range downwards.
@@ -487,8 +560,13 @@ static void __init arch_mem_init(char **cmdline_p)
 		pr_info("User-defined physical RAM map:\n");
 		print_memory_map();
 	}
-
+    
 	bootmem_init();
+#ifndef CONFIG_NLM_16G_MEM_SUPPORT
+#ifndef CONFIG_NUMA
+	setup_mapped_kernel_tlbs(FALSE, TRUE);
+#endif
+#endif
 	sparse_init();
 	paging_init();
 }
@@ -548,9 +626,11 @@ static void __init resource_init(void)
 
 void __init setup_arch(char **cmdline_p)
 {
+	/* the variable later on will be used in macros as well */
+	is_nlm_xlp2xx_compat = is_nlm_xlp2xx();
+
 	cpu_probe();
 	prom_init();
-
 #ifdef CONFIG_EARLY_PRINTK
 	setup_early_printk();
 #endif
@@ -594,6 +674,7 @@ __setup("nodsp", dsp_disable);
 
 unsigned long kernelsp[NR_CPUS];
 unsigned long fw_arg0, fw_arg1, fw_arg2, fw_arg3;
+EXPORT_SYMBOL(fw_arg0);
 
 #ifdef CONFIG_DEBUG_FS
 struct dentry *mips_debugfs_dir;

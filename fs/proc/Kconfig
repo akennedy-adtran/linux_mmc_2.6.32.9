@@ -29,7 +29,7 @@ config PROC_FS
 	  programs depend on this, so everyone should say Y here.
 
 config PROC_KCORE
-	bool "/proc/kcore support" if !ARM
+	bool "/proc/kcore support" if !ARM && !NLM_COMMON
 	depends on PROC_FS && MMU
 
 config PROC_VMCORE

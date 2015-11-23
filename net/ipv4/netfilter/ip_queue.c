@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2005-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This is a module which is used for queueing IPv4 packets and
  * communicating with userspace via netlink.
@@ -37,12 +45,20 @@
 #define NET_IPQ_QMAX 2088
 #define NET_IPQ_QMAX_NAME "ip_queue_maxlen"
 
+#undef  NLM_IPQ_DEBUG
+
 typedef int (*ipq_cmpfn)(struct nf_queue_entry *, unsigned long);
 
 static unsigned char copy_mode __read_mostly = IPQ_COPY_NONE;
 static unsigned int queue_maxlen __read_mostly = IPQ_QMAX_DEFAULT;
 static DEFINE_RWLOCK(queue_lock);
+
+#ifdef CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY
+static int peer_pid[NR_CPUS];
+#else
 static int peer_pid __read_mostly;
+#endif /* CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY */
+
 static unsigned int copy_range __read_mostly;
 static unsigned int queue_total;
 static unsigned int queue_dropped = 0;
@@ -89,10 +105,30 @@ static void __ipq_flush(ipq_cmpfn cmpfn, unsigned long data);
 static inline void
 __ipq_reset(void)
 {
+#ifdef CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY
+	int i;
+	int total = 0;
+#ifdef NLM_IPQ_DEBUG	
+	printk(KERN_ALERT "%s: Removing PID %d from core %d\n",
+			__FUNCTION__, peer_pid[smp_processor_id()], smp_processor_id());
+#endif
+	peer_pid[smp_processor_id()] = 0;
+	
+	for (i = 0; i < NR_CPUS; i++) {
+		total |= peer_pid[i];
+	}
+	
+	if (total == 0) {
+		net_disable_timestamp();
+		__ipq_set_mode(IPQ_COPY_NONE, 0);
+		__ipq_flush(NF_DROP, 0);
+	}
+#else
 	peer_pid = 0;
 	net_disable_timestamp();
 	__ipq_set_mode(IPQ_COPY_NONE, 0);
 	__ipq_flush(NULL, 0);
+#endif /* CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY */
 }
 
 static struct nf_queue_entry *
@@ -234,6 +270,10 @@ ipq_enqueue_packet(struct nf_queue_entry *entry, unsigned int queuenum)
 {
 	int status = -EINVAL;
 	struct sk_buff *nskb;
+#ifdef CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY
+	int dst_cpu;
+	struct sk_buff *skb = entry->skb;
+#endif /* CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY */
 
 	if (copy_mode == IPQ_COPY_NONE)
 		return -EAGAIN;
@@ -244,7 +284,12 @@ ipq_enqueue_packet(struct nf_queue_entry *entry, unsigned int queuenum)
 
 	write_lock_bh(&queue_lock);
 
+#ifdef CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY
+	dst_cpu = smp_processor_id() + (skb->cb[sizeof(skb->cb) - 1] & 3);
+	if (!peer_pid[dst_cpu])
+#else
 	if (!peer_pid)
+#endif /* CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY */
 		goto err_out_free_nskb;
 
 	if (queue_total >= queue_maxlen) {
@@ -258,7 +303,17 @@ ipq_enqueue_packet(struct nf_queue_entry *entry, unsigned int queuenum)
 	}
 
 	/* netlink_unicast will either free the nskb or attach it to a socket */
+
+#ifdef CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY
+#ifdef NLM_IPQ_DEBUG
+	printk(KERN_ALERT "%s: Sending packet from bucket: %d\n",
+			__FUNCTION__, skb->cb[sizeof(skb->cb) - 1]);
+#endif
+	status = netlink_unicast(ipqnl, nskb, peer_pid[dst_cpu], MSG_DONTWAIT);
+#else
 	status = netlink_unicast(ipqnl, nskb, peer_pid, MSG_DONTWAIT);
+#endif  /* CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY */
+
 	if (status < 0) {
 		queue_user_dropped++;
 		goto err_out_unlock;
@@ -442,6 +497,25 @@ __ipq_rcv_skb(struct sk_buff *skb)
 
 	write_lock_bh(&queue_lock);
 
+#ifdef CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY
+#ifdef NLM_IPQ_DEBUG
+	if (current->pid != pid)
+	{
+		printk(KERN_ALERT "%s: PID mismatch: current: %d, PID: %d, core %d\n",
+				__FUNCTION__, current->pid, pid, smp_processor_id());
+	}
+#endif /* NLM_IPQ_DEBUG */
+
+	if (!peer_pid[smp_processor_id()])
+	{
+		net_enable_timestamp();
+		peer_pid[smp_processor_id()] = pid;
+#ifdef  NLM_IPQ_DEBUG
+		printk(KERN_ALERT "%s: Setting PID %d for core %d\n",
+				__FUNCTION__, pid, smp_processor_id());
+#endif
+	}
+#else
 	if (peer_pid) {
 		if (peer_pid != pid) {
 			write_unlock_bh(&queue_lock);
@@ -451,6 +525,7 @@ __ipq_rcv_skb(struct sk_buff *skb)
 		net_enable_timestamp();
 		peer_pid = pid;
 	}
+#endif  /* CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY */
 
 	write_unlock_bh(&queue_lock);
 
@@ -500,7 +575,12 @@ ipq_rcv_nl_event(struct notifier_block *this,
 	if (event == NETLINK_URELEASE &&
 	    n->protocol == NETLINK_FIREWALL && n->pid) {
 		write_lock_bh(&queue_lock);
+
+#ifdef CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY
+		if ((n->net == &init_net) && (n->pid == peer_pid[smp_processor_id()]))
+#else
 		if ((n->net == &init_net) && (n->pid == peer_pid))
+#endif
 			__ipq_reset();
 		write_unlock_bh(&queue_lock);
 	}
@@ -530,8 +610,32 @@ static ctl_table ipq_table[] = {
 #ifdef CONFIG_PROC_FS
 static int ip_queue_show(struct seq_file *m, void *v)
 {
+#ifdef CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY
+	int i;
+#endif /* CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY */
+
 	read_lock_bh(&queue_lock);
 
+#ifdef CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY
+	seq_printf(m, "Peer PIDs: \n");
+	for (i = 0; i < NR_CPUS; i++)
+		seq_printf(m, "%d", peer_pid[i]);
+
+	seq_printf(m, "\n");
+	seq_printf(m,
+		      "Copy mode         : %hu\n"
+		      "Copy range        : %u\n"
+		      "Queue length      : %u\n"
+		      "Queue max. length : %u\n"
+		      "Queue dropped     : %u\n"
+		      "Netlink dropped   : %u\n",
+		      copy_mode,
+		      copy_range,
+		      queue_total,
+		      queue_maxlen,
+		      queue_dropped,
+		      queue_user_dropped);
+#else
 	seq_printf(m,
 		      "Peer PID          : %d\n"
 		      "Copy mode         : %hu\n"
@@ -547,6 +651,7 @@ static int ip_queue_show(struct seq_file *m, void *v)
 		      queue_maxlen,
 		      queue_dropped,
 		      queue_user_dropped);
+#endif  /* CONFIG_NLMCOMMON_IP_QUEUE_AFFINITY */
 
 	read_unlock_bh(&queue_lock);
 	return 0;

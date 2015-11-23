@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
@@ -437,8 +445,13 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 		goto drop;
 	}
 
+#ifdef CONFIG_NLM_NET_OPTS
+	*(uint64_t *)(unsigned long)IPCB(skb) = 0;
+	*(uint64_t *)((unsigned long)IPCB(skb)+8) = 0;
+#else
 	/* Remove any debris in the socket control block */
 	memset(IPCB(skb), 0, sizeof(struct inet_skb_parm));
+#endif
 
 	/* Must drop socket now because of tproxy. */
 	skb_orphan(skb);

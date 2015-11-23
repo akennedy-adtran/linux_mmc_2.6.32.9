@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2014 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /* thread_info.h: MIPS low-level thread information
  *
  * Copyright (C) 2002  David Howells (dhowells@redhat.com)
@@ -60,6 +68,8 @@ struct thread_info {
 register struct thread_info *__current_thread_info __asm__("$28");
 #define current_thread_info()  __current_thread_info
 
+#endif /* !__ASSEMBLY__ */
+
 /* thread information allocation */
 #if defined(CONFIG_PAGE_SIZE_4KB) && defined(CONFIG_32BIT)
 #define THREAD_SIZE_ORDER (1)
@@ -86,14 +96,20 @@ register struct thread_info *__current_thread_info __asm__("$28");
 #define __HAVE_ARCH_THREAD_INFO_ALLOCATOR
 
 #ifdef CONFIG_DEBUG_STACK_USAGE
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+#define alloc_thread_info(tsk) kzalloc(THREAD_SIZE, GFP_KERNEL|GFP_DMA)
+#else
 #define alloc_thread_info(tsk) kzalloc(THREAD_SIZE, GFP_KERNEL)
+#endif
+#else
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+#define alloc_thread_info(tsk) kmalloc(THREAD_SIZE, GFP_KERNEL|GFP_DMA)
 #else
 #define alloc_thread_info(tsk) kmalloc(THREAD_SIZE, GFP_KERNEL)
 #endif
+#endif
 
 #define free_thread_info(info) kfree(info)
-
-#endif /* !__ASSEMBLY__ */
 
 #define PREEMPT_ACTIVE		0x10000000
 

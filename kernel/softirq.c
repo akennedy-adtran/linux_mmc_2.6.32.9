@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *	linux/kernel/softirq.c
  *
@@ -178,21 +186,21 @@ void local_bh_enable_ip(unsigned long ip)
 EXPORT_SYMBOL(local_bh_enable_ip);
 
 /*
- * We restart softirq processing MAX_SOFTIRQ_RESTART times,
- * and we fall back to softirqd after that.
+ * We restart softirq processing for at most 2 ms,
+ * and if need_resched() is not set.
  *
- * This number has been established via experimentation.
+ * These limits have been established via experimentation.
  * The two things to balance is latency against fairness -
  * we want to handle softirqs as soon as possible, but they
  * should not be able to lock up the box.
  */
-#define MAX_SOFTIRQ_RESTART 10
+#define MAX_SOFTIRQ_TIME  msecs_to_jiffies(2)
 
 asmlinkage void __do_softirq(void)
 {
 	struct softirq_action *h;
 	__u32 pending;
-	int max_restart = MAX_SOFTIRQ_RESTART;
+	unsigned long end = jiffies + MAX_SOFTIRQ_TIME;
 	int cpu;
 
 	pending = local_softirq_pending();
@@ -236,11 +244,12 @@ restart:
 	local_irq_disable();
 
 	pending = local_softirq_pending();
-	if (pending && --max_restart)
-		goto restart;
+	if (pending) {
+		if (time_before(jiffies, end) && !need_resched())
+			goto restart;
 
-	if (pending)
 		wakeup_softirqd();
+	}
 
 	lockdep_softirq_exit();
 
@@ -415,6 +424,11 @@ static void tasklet_action(struct softirq_action *a)
 			if (!atomic_read(&t->count)) {
 				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
 					BUG();
+				if (!t->func) {
+				  printk("state=%lx, count=%d, func=%p, data=%lx\n",
+					 t->state, t->count.counter, t->func, t->data);
+				  while(1);
+				}
 				t->func(t->data);
 				tasklet_unlock(t);
 				continue;
@@ -869,12 +883,13 @@ early_initcall(spawn_ksoftirqd);
 int on_each_cpu(void (*func) (void *info), void *info, int wait)
 {
 	int ret = 0;
+	unsigned long flags;
 
 	preempt_disable();
 	ret = smp_call_function(func, info, wait);
-	local_irq_disable();
+	local_irq_save(flags);
 	func(info);
-	local_irq_enable();
+	local_irq_restore(flags);
 	preempt_enable();
 	return ret;
 }

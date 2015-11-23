@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -134,7 +142,11 @@
  * the region, 3 bits for the CCA mode.  This leaves 59 bits of which the
  * R8000 implements most with its 48-bit physical address space.
  */
+#if defined(CONFIG_CPU_XLR) || defined(CONFIG_CPU_XLP)
+#define TO_PHYS_MASK	_CONST64_(0x000000ffffffffff)	/* 2^^40 - 1 */
+#else
 #define TO_PHYS_MASK	_CONST64_(0x07ffffffffffffff)	/* 2^^59 - 1 */
+#endif
 
 #ifndef CONFIG_CPU_R8000
 

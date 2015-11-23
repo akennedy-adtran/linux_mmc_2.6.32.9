@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /* natsemi.c: A Linux PCI Ethernet driver for the NatSemi DP8381x series. */
 /*
 	Written/copyright 1999-2001 by Donald Becker.
@@ -65,8 +73,6 @@
    These may be modified when a driver module is loaded.*/
 
 #define NATSEMI_DEF_MSG		(NETIF_MSG_DRV		| \
-				 NETIF_MSG_LINK		| \
-				 NETIF_MSG_WOL		| \
 				 NETIF_MSG_RX_ERR	| \
 				 NETIF_MSG_TX_ERR)
 static int debug = -1;
@@ -2069,7 +2075,6 @@ static void reinit_ring(struct net_device *dev)
 {
 	struct netdev_private *np = netdev_priv(dev);
 	int i;
-
 	/* drain TX ring */
 	drain_tx(dev);
 	np->dirty_tx = np->cur_tx = 0;
@@ -2089,6 +2094,7 @@ static netdev_tx_t start_tx(struct sk_buff *skb, struct net_device *dev)
 	/* Note: Ordering is important here, set the field with the
 	   "ownership" bit last, and only then increment cur_tx. */
 
+	spin_lock_irqsave(&np->lock, flags);
 	/* Calculate the next Tx descriptor entry. */
 	entry = np->cur_tx % TX_RING_SIZE;
 
@@ -2098,7 +2104,6 @@ static netdev_tx_t start_tx(struct sk_buff *skb, struct net_device *dev)
 
 	np->tx_ring[entry].addr = cpu_to_le32(np->tx_dma[entry]);
 
-	spin_lock_irqsave(&np->lock, flags);
 
 	if (!np->hands_off) {
 		np->tx_ring[entry].cmd_status = cpu_to_le32(DescOwn | skb->len);

@@ -1001,7 +1001,7 @@ config SMC911X
 
 config SMSC911X
 	tristate "SMSC LAN911x/LAN921x families embedded ethernet support"
-	depends on ARM || SUPERH || BLACKFIN
+	depends on ARM || SUPERH || BLACKFIN || MIPS
 	select CRC32
 	select MII
 	select PHYLIB
@@ -2409,6 +2409,13 @@ config MV643XX_ETH
 	  Some boards that use the Discovery chipset are the Momenco
 	  Ocelot C and Jaguar ATX and Pegasos II.
 
+config TITAN_GE
+	bool "PMC-Sierra TITAN Gigabit Ethernet Support"
+	depends on PMC_YOSEMITE
+	help
+	  This enables support for the the integrated ethernet of
+	  PMC-Sierra's Titan SoC.
+
 config XILINX_LL_TEMAC
 	tristate "Xilinx LL TEMAC (LocalLink Tri-mode Ethernet MAC) driver"
 	select PHYLIB
@@ -2812,7 +2819,7 @@ config RIONET_TX_SIZE
 config RIONET_RX_SIZE
 	int "Number of inbound queue entries"
 	depends on RIONET
-	default "128"
+	default "128" 
 
 config FDDI
 	tristate "FDDI driver support"
@@ -3205,6 +3212,12 @@ config NETCONSOLE
 	If you want to log kernel messages over the network, enable this.
 	See <file:Documentation/networking/netconsole.txt> for details.
 
+config NLM_VNET
+	bool "Virtual Networking for CRF"
+	---help---
+	This enables internal network for CRF domains using shared memory and
+	event queues.
+
 config NETCONSOLE_DYNAMIC
 	bool "Dynamic reconfiguration of logging targets (EXPERIMENTAL)"
 	depends on NETCONSOLE && SYSFS && EXPERIMENTAL
@@ -3242,3 +3255,4 @@ config VMXNET3
          module will be called vmxnet3.
 
 endif # NETDEVICES
+

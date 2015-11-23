@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2005-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * MTD SPI driver for ST M25Pxx (and similar) serial flash chips
  *
@@ -86,6 +95,7 @@ static inline struct m25p *mtd_to_m25p(struct mtd_info *mtd)
 {
 	return container_of(mtd, struct m25p, mtd);
 }
+
 
 /****************************************************************************/
 
@@ -326,6 +336,7 @@ static int m25p80_read(struct mtd_info *mtd, loff_t from, size_t len,
 	 */
 	t[0].tx_buf = flash->command;
 	t[0].len = CMD_SIZE + FAST_READ_DUMMY_BYTE;
+	t[0].spi_cont_cmd = 0x1;
 	spi_message_add_tail(&t[0], &m);
 
 	t[1].rx_buf = buf;
@@ -397,6 +408,7 @@ static int m25p80_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 	t[0].tx_buf = flash->command;
 	t[0].len = CMD_SIZE;
+	t[0].spi_cont_cmd = 0x1;
 	spi_message_add_tail(&t[0], &m);
 
 	t[1].tx_buf = buf;
@@ -426,7 +438,6 @@ static int m25p80_write(struct mtd_info *mtd, loff_t to, size_t len,
 		t[1].len = len;
 
 		spi_sync(flash->spi, &m);
-
 		*retlen = m.actual_length - CMD_SIZE;
 	} else {
 		u32 i;
@@ -717,6 +728,70 @@ static struct flash_info *__devinit jedec_probe(struct spi_device *spi)
 	return NULL;
 }
 
+#ifdef CONFIG_NLM_XLP
+static struct mtd_partition xlp_spi_parti[] = {
+        {
+                .name = "SPI NOR FLASH",
+                .offset = 0x00000000,
+                .size = MTDPART_SIZ_FULL,
+        }
+};
+static void m25p_test(struct m25p * flash)
+{
+	int i, j, xfer_len;
+	unsigned char buf[4096];
+	size_t retlen;
+	memset(buf, 0, 4096);
+	retlen 		= 0;
+	xfer_len 	= 370;
+
+	j = flash->mtd.size / flash->mtd.erasesize;
+        for( i = 0; i < 5; i++)
+        {
+
+		printk("\n######################### erase_sector\n");
+		erase_sector(flash, 0);
+	}
+	printk("\n######################### read\n");
+	printk("\nFlash read back %d\n",xfer_len);
+
+        for(j = 0; j < 1; j++)
+        {
+		m25p80_read(&flash->mtd, 0x0, xfer_len, &retlen, buf);
+		for( i = 0; i < xfer_len; i++) {
+			printk("%02x",buf[i]);
+			if((i % 16) == 0xf)
+				printk("\n");
+		}
+	}
+
+	/* fill buf with number */
+        for(j = 0; j < 5; j++)
+        {
+		for(i = 0; i < xfer_len; i++){
+			buf[i] = i % 0x100;
+		}
+		retlen = xfer_len;
+
+		printk("\n######################### write\n");
+		printk("\nFlash write %d test\n",xfer_len);
+
+		m25p80_write(&flash->mtd, 0, xfer_len, &retlen, buf);
+	}
+	printk("\n######################### read\n");
+
+       for(j = 0; j < 5; j++)
+        {
+		printk("\n\nFlash read back %d\n",xfer_len);
+		m25p80_read(&flash->mtd, 0x0, xfer_len, &retlen, buf);
+		for( i = 0; i < xfer_len; i++) {
+			printk("%02x",buf[i]);
+			if((i % 16) == 0xf)
+			printk("\n");
+		}
+	}
+}
+#endif
 
 /*
  * board specific setup should have ensured the SPI clock used here
@@ -856,7 +931,12 @@ static int __devinit m25p_probe(struct spi_device *spi)
 			parts = data->parts;
 			nr_parts = data->nr_parts;
 		}
-
+#ifdef CONFIG_NLM_XLP
+		if((nr_parts == 0) && (data == 0)) {
+			parts	 = xlp_spi_parti;
+			nr_parts = ARRAY_SIZE(xlp_spi_parti);
+		}
+#endif
 		if (nr_parts > 0) {
 			for (i = 0; i < nr_parts; i++) {
 				DEBUG(MTD_DEBUG_LEVEL2, "partitions[%d] = "

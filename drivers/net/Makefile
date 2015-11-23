@@ -98,7 +98,12 @@ obj-$(CONFIG_KS8851_MLL)	+= ks8851_mll.o
 obj-$(CONFIG_VIA_RHINE) += via-rhine.o
 obj-$(CONFIG_VIA_VELOCITY) += via-velocity.o
 obj-$(CONFIG_ADAPTEC_STARFIRE) += starfire.o
-obj-$(CONFIG_RIONET) += rionet.o
+ifdef CONFIG_NLM_COMMON
+    obj-$(CONFIG_RIONET) += nlm_rionet.o
+else
+    obj-$(CONFIG_RIONET) += rionet.o
+endif
+obj-$(CONFIG_NLMCOMMON_PTP_SUPPORT) += nlm_ptp1588/
 obj-$(CONFIG_SH_ETH) += sh_eth.o
 obj-$(CONFIG_STMMAC_ETH) += stmmac/
 
@@ -136,6 +141,15 @@ obj-$(CONFIG_ES3210) += es3210.o 8390.o
 obj-$(CONFIG_LNE390) += lne390.o 8390.o
 obj-$(CONFIG_NE3210) += ne3210.o 8390.o
 obj-$(CONFIG_SB1250_MAC) += sb1250-mac.o
+obj-$(CONFIG_NLMCOMMON_SPI4) += nlm_spi4/
+#obj-$(CONFIG_NLMCOMMON_MAC) += xlr_mac.o xlr_user_mac.o xlr_rmik.o
+obj-$(CONFIG_NLMCOMMON_MAC) += xlr_mac.o xlr_user_mac.o
+CFLAGS_nlm_common_rmik.o = -I$(srctree)/arch/mips/include/asm/netlogic
+obj-$(CONFIG_NLMCOMMON_IP_OVER_PCI) += xlr_ip_over_pci_dev.o 
+obj-$(CONFIG_NLMCOMMON_IP_OVER_PCI) += xlr_ip_over_pci_host.o 
+obj-$(CONFIG_NLMCOMMON_BOOT_OVER_PCI) += xlr_pcix_boot.o 
+#obj-$(CONFIG_NLM_VNET) += nlm_vnet.o
+CFLAGS_nlm_vnet.o = -I$(srctree)/arch/mips/include/asm/netlogic
 obj-$(CONFIG_B44) += b44.o
 obj-$(CONFIG_FORCEDETH) += forcedeth.o
 obj-$(CONFIG_NE_H8300) += ne-h8300.o 8390.o
@@ -149,6 +163,8 @@ obj-$(CONFIG_XILINX_LL_TEMAC) += ll_temac.o
 obj-$(CONFIG_XILINX_EMACLITE) += xilinx_emaclite.o
 obj-$(CONFIG_QLA3XXX) += qla3xxx.o
 obj-$(CONFIG_QLGE) += qlge/
+
+obj-$(CONFIG_TITAN_GE) += titan_mdio.o titan_ge.o
 
 obj-$(CONFIG_PPP) += ppp_generic.o
 obj-$(CONFIG_PPP_ASYNC) += ppp_async.o
@@ -276,6 +292,7 @@ obj-$(CONFIG_ETRAX_ETHERNET) += cris/
 obj-$(CONFIG_ENP2611_MSF_NET) += ixp2000/
 
 obj-$(CONFIG_NETCONSOLE) += netconsole.o
+obj-$(CONFIG_KGDBOE) += kgdboe.o
 
 obj-$(CONFIG_FS_ENET) += fs_enet/
 

@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2008-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * include/linux/synaptics_i2c_rmi.h - platform data structure for f75375s sensor
  *
@@ -14,10 +22,10 @@
  *
  */
 
-#ifndef _LINUX_SYNAPTICS_I2C_RMI_H
-#define _LINUX_SYNAPTICS_I2C_RMI_H
+#ifndef _LINUX_SYNAPTICS_I2C_NLM_H
+#define _LINUX_SYNAPTICS_I2C_NLM_H
 
-#define SYNAPTICS_I2C_RMI_NAME "synaptics-rmi-ts"
+#define SYNAPTICS_I2C_NLM_NAME "synaptics-rmi-ts"
 
 enum {
 	SYNAPTICS_FLIP_X = 1UL << 0,
@@ -26,7 +34,7 @@ enum {
 	SYNAPTICS_SNAP_TO_INACTIVE_EDGE = 1UL << 3,
 };
 
-struct synaptics_i2c_rmi_platform_data {
+struct synaptics_i2c_nlm_platform_data {
 	uint32_t version;	/* Use this entry for panels with */
 				/* (major << 8 | minor) version or above. */
 				/* If non-zero another array entry follows */
@@ -50,4 +58,4 @@ struct synaptics_i2c_rmi_platform_data {
 	int fuzz_w;
 };
 
-#endif /* _LINUX_SYNAPTICS_I2C_RMI_H */
+#endif /* _LINUX_SYNAPTICS_I2C_NLM_H */

@@ -427,6 +427,11 @@ struct spi_transfer {
 	dma_addr_t	rx_dma;
 
 	unsigned	cs_change:1;
+        
+	#ifdef CONFIG_SPI_XLP
+	u8              spi_cont_cmd;
+	#endif 
+
 	u8		bits_per_word;
 	u16		delay_usecs;
 	u32		speed_hz;

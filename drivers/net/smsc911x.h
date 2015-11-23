@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2008-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /***************************************************************************
  *
  * Copyright (C) 2004-2008 SMSC
@@ -31,7 +39,7 @@
 
 /* implements a PHY loopback test at initialisation time, to ensure a packet
  * can be succesfully looped back */
-#define USE_PHY_WORK_AROUND
+//#define USE_PHY_WORK_AROUND
 
 #define DPRINTK(nlevel, klevel, fmt, args...) \
 	((void)((NETIF_MSG_##nlevel & pdata->msg_enable) && \

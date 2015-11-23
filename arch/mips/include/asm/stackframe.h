@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2007-2014 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -194,6 +202,16 @@
 		LONG_S	$31, PT_R31(sp)
 		ori	$28, sp, _THREAD_MASK
 		xori	$28, _THREAD_MASK
+
+#ifdef CONFIG_NLM_XLP
+		.set    mips64
+		dla k0, nlm_cop2_save
+		jalr k0
+		nop
+		LONG_L  ra, PT_R31(sp)
+		LONG_L	k0, PT_R29(sp)
+#endif
+
 #ifdef CONFIG_CPU_CAVIUM_OCTEON
 		.set    mips64
 		pref    0, 0($28)       /* Prefetch the current pointer */
@@ -345,7 +363,14 @@
 		ori	a0, STATMASK
 		xori	a0, STATMASK
 		mtc0	a0, CP0_STATUS
-		li	v1, 0xff00
+
+#ifdef CONFIG_NLM_XLP
+		dla v1, nlm_cop2_restore
+		jalr v1
+		nop
+#endif
+
+		li	v1, 0x4000ff00
 		and	a0, v1
 		LONG_L	v0, PT_STATUS(sp)
 		nor	v1, $0, v1

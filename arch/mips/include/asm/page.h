@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -34,7 +43,25 @@
 #define PAGE_MASK       (~((1 << PAGE_SHIFT) - 1))
 
 #ifdef CONFIG_HUGETLB_PAGE
-#define HPAGE_SHIFT	(PAGE_SHIFT + PAGE_SHIFT - 3)
+
+#ifdef CONFIG_HUGE_PAGE_SIZE_128K
+#define HPAGE_SHIFT	(PL_64K + 1)
+#elif defined(CONFIG_HUGE_PAGE_SIZE_512K)
+#define HPAGE_SHIFT	(PL_256 + 1)
+#elif defined(CONFIG_HUGE_PAGE_SIZE_2M)
+#define HPAGE_SHIFT	(PL_1M + 1)
+#elif defined(CONFIG_HUGE_PAGE_SIZE_8M)
+#define HPAGE_SHIFT	(PL_4M + 1)
+#elif defined(CONFIG_HUGE_PAGE_SIZE_32M)
+#define HPAGE_SHIFT	(PL_16M + 1)
+#elif defined(CONFIG_HUGE_PAGE_SIZE_128M)
+#define HPAGE_SHIFT	(PL_64M + 1)
+#elif defined(CONFIG_HUGE_PAGE_SIZE_512M)
+#define HPAGE_SHIFT	(PL_256M + 1)
+#else
+#error no proper huge page size defined!
+#endif
+
 #define HPAGE_SIZE	(_AC(1,UL) << HPAGE_SHIFT)
 #define HPAGE_MASK	(~(HPAGE_SIZE - 1))
 #define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
@@ -71,15 +98,35 @@ struct page;
 static inline void clear_user_page(void *addr, unsigned long vaddr,
 	struct page *page)
 {
+#ifdef CONFIG_NLM_COMMON
+	extern void nlm_common_flush_dcache_page(struct page *page);
+#else
 	extern void (*flush_data_cache_page)(unsigned long addr);
+#endif
 
 	clear_page(addr);
+#ifdef CONFIG_NLM_COMMON
+	nlm_common_flush_dcache_page(page);
+#else
 	if (pages_do_alias((unsigned long) addr, vaddr & PAGE_MASK))
 		flush_data_cache_page((unsigned long)addr);
+#endif
 }
 
+#ifdef CONFIG_NLM_COMMON
+static inline void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
+		    struct page *to)
+{
+	extern void nlm_common_flush_dcache_page(struct page *page);
+
+	copy_page(vto, vfrom);
+	nlm_common_flush_dcache_page(to);
+}
+#else
 extern void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
 	struct page *to);
+#endif
+
 struct vm_area_struct;
 extern void copy_user_highpage(struct page *to, struct page *from,
 	unsigned long vaddr, struct vm_area_struct *vma);
@@ -162,7 +209,14 @@ typedef struct { unsigned long pgprot; } pgprot_t;
     ((unsigned long)(x) - PAGE_OFFSET + PHYS_OFFSET)
 #endif
 #define __va(x)		((void *)((unsigned long)(x) + PAGE_OFFSET - PHYS_OFFSET))
-#define __pa_symbol(x)	__pa(RELOC_HIDE((unsigned long)(x), 0))
+
+#ifndef __ASSEMBLY__
+#ifdef CONFIG_MAPPED_KERNEL
+#define __pa_symbol(x) (RELOC_HIDE((unsigned long)(x), 0) - (unsigned long)LOADADDR + ((unsigned long)PHYSADDR & 0x7fffffffUL))
+#else
+#define __pa_symbol(x) __pa(RELOC_HIDE((unsigned long)(x), 0))
+#endif
+#endif
 
 #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
 
@@ -197,8 +251,9 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define virt_to_page(kaddr)	pfn_to_page(PFN_DOWN(virt_to_phys(kaddr)))
 #define virt_addr_valid(kaddr)	pfn_valid(PFN_DOWN(virt_to_phys(kaddr)))
 
-#define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
-				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
+#define VM_DATA_DEFAULT_FLAGS (VM_READ | VM_WRITE | \
+    ((current->personality & READ_IMPLIES_EXEC) ? VM_EXEC : 0 ) | \
+         VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
 
 #define UNCAC_ADDR(addr)	((addr) - PAGE_OFFSET + UNCAC_BASE)
 #define CAC_ADDR(addr)		((addr) - UNCAC_BASE + PAGE_OFFSET)

@@ -11,6 +11,15 @@ config I2C_ALGOBIT
 config I2C_ALGOPCF
 	tristate "I2C PCF 8584 interfaces"
 
+config I2C_ALGOPALM
+        tristate "PalmChip's I2C interfaces"
+        depends on I2C
+        help
+          This allows you to use the BK3220 I2C Host Adapter on the RMI Phoenix.
+
+          This support is also available as a module.  If so, the module
+          will be called i2c-algo-palm.
+
 config I2C_ALGOPCA
 	tristate "I2C PCA 9564 interfaces"
 

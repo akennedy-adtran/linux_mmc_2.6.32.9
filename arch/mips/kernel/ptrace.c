@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -38,6 +47,7 @@
 #include <asm/uaccess.h>
 #include <asm/bootinfo.h>
 #include <asm/reg.h>
+#include <asm/cacheflush.h>
 
 /*
  * Called by kernel/ptrace.c when detaching..
@@ -261,7 +271,12 @@ long arch_ptrace(struct task_struct *child, long request, long addr, long data)
 
 	switch (request) {
 	/* when I and D space are separate, these will need to be fixed. */
-	case PTRACE_PEEKTEXT: /* read word at location addr. */
+        case PTRACE_PEEKTEXT: /* read word at location addr. */
+#ifdef CONFIG_NLM_COMMON
+            __flush_cache_all();
+            /* Fall through */
+#endif
+
 	case PTRACE_PEEKDATA:
 		ret = generic_ptrace_peekdata(child, addr, data);
 		break;
@@ -392,6 +407,10 @@ long arch_ptrace(struct task_struct *child, long request, long addr, long data)
 
 	/* when I and D space are separate, this will have to be fixed. */
 	case PTRACE_POKETEXT: /* write the word at location addr. */
+#ifdef CONFIG_NLM_COMMON
+        __flush_cache_all();
+        /* Fall through */
+#endif
 	case PTRACE_POKEDATA:
 		ret = generic_ptrace_pokedata(child, addr, data);
 		break;

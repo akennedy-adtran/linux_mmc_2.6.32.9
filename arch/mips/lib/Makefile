@@ -1,7 +1,6 @@
 #
 # Makefile for MIPS-specific library files..
 #
-
 lib-y	+= csum_partial.o delay.o memcpy.o memcpy-inatomic.o memset.o \
 	   strlen_user.o strncpy_user.o strnlen_user.o uncached.o
 
@@ -27,6 +26,8 @@ obj-$(CONFIG_CPU_SB1)		+= dump_tlb.o
 obj-$(CONFIG_CPU_TX39XX)	+= r3k_dump_tlb.o
 obj-$(CONFIG_CPU_TX49XX)	+= dump_tlb.o
 obj-$(CONFIG_CPU_VR41XX)	+= dump_tlb.o
+obj-$(CONFIG_CPU_XLR)	+= dump_tlb.o
+obj-$(CONFIG_CPU_XLP)	+= dump_tlb.o
 obj-$(CONFIG_CPU_CAVIUM_OCTEON)	+= dump_tlb.o
 
 # libgcc-style stuff needed in the kernel

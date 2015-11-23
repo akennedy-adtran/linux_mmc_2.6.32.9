@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * Copyright (C) 2003 Broadcom Corporation
  *
@@ -233,7 +241,13 @@ give_sigsegv:
 	return -EFAULT;
 }
 
+static int sig_uses_siginfo(struct k_sigaction *ka)
+{
+	return 1;
+}
+
 struct mips_abi mips_abi_n32 = {
 	.setup_rt_frame	= setup_rt_frame_n32,
-	.restart	= __NR_N32_restart_syscall
+	.restart	= __NR_N32_restart_syscall,
+	.uses_siginfo   = sig_uses_siginfo
 };

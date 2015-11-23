@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -19,6 +28,16 @@
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
+
+#ifdef CONFIG_NLM_COMMON
+#include <asm/netlogic/mips-exts.h>
+#include <asm/mach-netlogic/mmu.h>
+#endif
+
+#ifdef CONFIG_HUGETLB_PAGE
+/* To work around the RAM TLB issue */
+#define XLP_TLB_WORKAROUND
+#endif
 
 extern void build_tlb_refill_handler(void);
 
@@ -66,13 +85,19 @@ extern void build_tlb_refill_handler(void);
 
 #endif
 
+#ifdef CONFIG_NLM_VMIPS
+#define UNIQUE_VMIPS_ENTRYHI(idx)  ((1ULL << 63) + (1ULL << 40) + ((idx) << (PAGE_SHIFT + 1)) + ( 1 << 8))
+extern int nlm_vmips_max_wired_entries;
+#endif
+
 void local_flush_tlb_all(void)
 {
-	unsigned long flags;
+	unsigned long flags, config6_flags;
 	unsigned long old_ctx;
 	int entry;
 
 	ENTER_CRITICAL(flags);
+	disable_pgwalker(config6_flags);
 	/* Save old context and create impossible VPN2 value */
 	old_ctx = read_c0_entryhi();
 	write_c0_entrylo0(0);
@@ -80,10 +105,18 @@ void local_flush_tlb_all(void)
 
 	entry = read_c0_wired();
 
+#if defined(CONFIG_MAPPED_KERNEL)
+	if (!entry) printk("[%s] flushing entry=%d in MAPPED_KERNEL mode!\n",
+			   __FUNCTION__, entry);
+#endif
 	/* Blast 'em all away. */
 	while (entry < current_cpu_data.tlbsize) {
 		/* Make sure all entries differ. */
+#ifndef CONFIG_NLM_VMIPS
 		write_c0_entryhi(UNIQUE_ENTRYHI(entry));
+#else
+        __write_64bit_c0_register($10, 0, (UNIQUE_VMIPS_ENTRYHI(entry)));
+#endif
 		write_c0_index(entry);
 		mtc0_tlbw_hazard();
 		tlb_write_indexed();
@@ -92,6 +125,7 @@ void local_flush_tlb_all(void)
 	tlbw_use_hazard();
 	write_c0_entryhi(old_ctx);
 	FLUSH_ITLB;
+	enable_pgwalker(config6_flags);
 	EXIT_CRITICAL(flags);
 }
 
@@ -100,15 +134,17 @@ void local_flush_tlb_all(void)
 void local_flush_tlb_mm(struct mm_struct *mm)
 {
 	int cpu;
+	unsigned long config6_flags;
 
 	preempt_disable();
 
 	cpu = smp_processor_id();
 
+	disable_pgwalker(config6_flags);
 	if (cpu_context(cpu, mm) != 0) {
 		drop_mmu_context(mm, cpu);
 	}
-
+	enable_pgwalker(config6_flags);
 	preempt_enable();
 }
 
@@ -120,8 +156,10 @@ void local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 
 	if (cpu_context(cpu, mm) != 0) {
 		unsigned long size, flags;
+		unsigned long config6_flags;
 
 		ENTER_CRITICAL(flags);
+		disable_pgwalker(config6_flags);
 		size = (end - start + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
 		size = (size + 1) >> 1;
 		if (size <= current_cpu_data.tlbsize/2) {
@@ -145,7 +183,11 @@ void local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 				if (idx < 0)
 					continue;
 				/* Make sure all entries differ. */
+#ifndef CONFIG_NLM_VMIPS
 				write_c0_entryhi(UNIQUE_ENTRYHI(idx));
+#else
+				__write_64bit_c0_register($10, 0, (UNIQUE_VMIPS_ENTRYHI(idx)));
+#endif
 				mtc0_tlbw_hazard();
 				tlb_write_indexed();
 			}
@@ -155,6 +197,7 @@ void local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 			drop_mmu_context(mm, cpu);
 		}
 		FLUSH_ITLB;
+		enable_pgwalker(config6_flags);
 		EXIT_CRITICAL(flags);
 	}
 }
@@ -162,8 +205,10 @@ void local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 void local_flush_tlb_kernel_range(unsigned long start, unsigned long end)
 {
 	unsigned long size, flags;
+	unsigned long config6_flags;
 
 	ENTER_CRITICAL(flags);
+	disable_pgwalker(config6_flags);
 	size = (end - start + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
 	size = (size + 1) >> 1;
 	if (size <= current_cpu_data.tlbsize / 2) {
@@ -187,7 +232,11 @@ void local_flush_tlb_kernel_range(unsigned long start, unsigned long end)
 			if (idx < 0)
 				continue;
 			/* Make sure all entries differ. */
+#ifndef CONFIG_NLM_VMIPS
 			write_c0_entryhi(UNIQUE_ENTRYHI(idx));
+#else
+			__write_64bit_c0_register($10, 0, (UNIQUE_VMIPS_ENTRYHI(idx)));
+#endif
 			mtc0_tlbw_hazard();
 			tlb_write_indexed();
 		}
@@ -197,6 +246,7 @@ void local_flush_tlb_kernel_range(unsigned long start, unsigned long end)
 		local_flush_tlb_all();
 	}
 	FLUSH_ITLB;
+	enable_pgwalker(config6_flags);
 	EXIT_CRITICAL(flags);
 }
 
@@ -205,12 +255,13 @@ void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 	int cpu = smp_processor_id();
 
 	if (cpu_context(cpu, vma->vm_mm) != 0) {
-		unsigned long flags;
+		unsigned long flags, config6_flags;
 		int oldpid, newpid, idx;
 
 		newpid = cpu_asid(cpu, vma->vm_mm);
 		page &= (PAGE_MASK << 1);
 		ENTER_CRITICAL(flags);
+		disable_pgwalker(config6_flags);
 		oldpid = read_c0_entryhi();
 		write_c0_entryhi(page | newpid);
 		mtc0_tlbw_hazard();
@@ -222,7 +273,11 @@ void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 		if (idx < 0)
 			goto finish;
 		/* Make sure all entries differ. */
+#ifndef CONFIG_NLM_VMIPS
 		write_c0_entryhi(UNIQUE_ENTRYHI(idx));
+#else
+		__write_64bit_c0_register($10, 0, (UNIQUE_VMIPS_ENTRYHI(idx)));
+#endif
 		mtc0_tlbw_hazard();
 		tlb_write_indexed();
 		tlbw_use_hazard();
@@ -230,9 +285,36 @@ void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 	finish:
 		write_c0_entryhi(oldpid);
 		FLUSH_ITLB_VM(vma);
+		enable_pgwalker(config6_flags);
 		EXIT_CRITICAL(flags);
 	}
 }
+
+#ifdef CONFIG_HUGETLB_PAGE
+asmlinkage void do_hugetlb_invalidate(void)
+{
+	int oldpid, idx;
+
+	oldpid = read_c0_entryhi();
+	tlb_probe();
+	tlb_probe_hazard();
+	idx = read_c0_index();
+	if (idx > 0) {
+		int ridx = idx & 0x1fff;
+
+		if (ridx > ((read_c0_config6() >> 6) & 0x3ff)) {
+			/* Make sure all entries differ. */
+			write_c0_entrylo0(0);
+			write_c0_entrylo1(0);
+			write_c0_entryhi(UNIQUE_ENTRYHI(idx & 0x1fff));
+			mtc0_tlbw_hazard();
+			tlb_write_indexed();
+			tlbw_use_hazard();
+			write_c0_entryhi(oldpid);
+		}
+	}
+}
+#endif
 
 /*
  * This one is only used for pages with the global bit set so we don't care
@@ -240,10 +322,11 @@ void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
  */
 void local_flush_tlb_one(unsigned long page)
 {
-	unsigned long flags;
+	unsigned long flags, config6_flags;
 	int oldpid, idx;
 
 	ENTER_CRITICAL(flags);
+	disable_pgwalker(config6_flags);
 	oldpid = read_c0_entryhi();
 	page &= (PAGE_MASK << 1);
 	write_c0_entryhi(page);
@@ -255,13 +338,18 @@ void local_flush_tlb_one(unsigned long page)
 	write_c0_entrylo1(0);
 	if (idx >= 0) {
 		/* Make sure all entries differ. */
+#ifndef CONFIG_NLM_VMIPS
 		write_c0_entryhi(UNIQUE_ENTRYHI(idx));
+#else
+		__write_64bit_c0_register($10, 0, (UNIQUE_VMIPS_ENTRYHI(idx)));
+#endif
 		mtc0_tlbw_hazard();
 		tlb_write_indexed();
 		tlbw_use_hazard();
 	}
 	write_c0_entryhi(oldpid);
 	FLUSH_ITLB;
+	enable_pgwalker(config6_flags);
 	EXIT_CRITICAL(flags);
 }
 
@@ -278,6 +366,7 @@ void __update_tlb(struct vm_area_struct * vma, unsigned long address, pte_t pte)
 	pmd_t *pmdp;
 	pte_t *ptep;
 	int idx, pid;
+	unsigned long config6_flags;
 
 	/*
 	 * Handle debugger faulting in for debugee.
@@ -286,6 +375,7 @@ void __update_tlb(struct vm_area_struct * vma, unsigned long address, pte_t pte)
 		return;
 
 	ENTER_CRITICAL(flags);
+	disable_pgwalker(config6_flags);
 
 	pid = read_c0_entryhi() & ASID_MASK;
 	address &= (PAGE_MASK << 1);
@@ -299,19 +389,27 @@ void __update_tlb(struct vm_area_struct * vma, unsigned long address, pte_t pte)
 	idx = read_c0_index();
 #ifdef CONFIG_HUGETLB_PAGE
 	/* this could be a huge page  */
-	if (pmd_huge(*pmdp)) {
-		unsigned long lo;
+	if (is_vm_hugetlb_page(vma)) {
 		write_c0_pagemask(PM_HUGE_MASK);
-		ptep = (pte_t *)pmdp;
-		lo = pte_val(*ptep) >> 6;
-		write_c0_entrylo0(lo);
-		write_c0_entrylo1(lo + (HPAGE_SIZE >> 7));
+		ptep = pte_offset_map(pmdp, address);
+		write_c0_entrylo0(pte_to_entrylo(pte_val(*ptep++)));
+		write_c0_entrylo1(pte_to_entrylo(pte_val(*ptep)));
 
 		mtc0_tlbw_hazard();
 		if (idx < 0)
 			tlb_write_random();
-		else
+		else {
+#ifndef XLP_TLB_WORKAROUND
 			tlb_write_indexed();
+#else
+			int ridx = idx & 0x1fff;
+			if (ridx > ((read_c0_config6() >> 6) & 0x3ff)) {
+				tlb_write_random();
+			}
+			else
+				tlb_write_indexed();
+#endif
+		}
 		write_c0_pagemask(PM_DEFAULT_MASK);
 	} else
 #endif
@@ -323,8 +421,8 @@ void __update_tlb(struct vm_area_struct * vma, unsigned long address, pte_t pte)
 		ptep++;
 		write_c0_entrylo1(ptep->pte_high);
 #else
-		write_c0_entrylo0(pte_val(*ptep++) >> 6);
-		write_c0_entrylo1(pte_val(*ptep) >> 6);
+		write_c0_entrylo0(pte_to_entrylo(pte_val(*ptep++)));
+		write_c0_entrylo1(pte_to_entrylo(pte_val(*ptep)));
 #endif
 		mtc0_tlbw_hazard();
 		if (idx < 0)
@@ -334,6 +432,7 @@ void __update_tlb(struct vm_area_struct * vma, unsigned long address, pte_t pte)
 	}
 	tlbw_use_hazard();
 	FLUSH_ITLB_VM(vma);
+	enable_pgwalker(config6_flags);
 	EXIT_CRITICAL(flags);
 }
 
@@ -378,8 +477,10 @@ void __init add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
 	unsigned long wired;
 	unsigned long old_pagemask;
 	unsigned long old_ctx;
+	unsigned long config6_flags;
 
 	ENTER_CRITICAL(flags);
+	disable_pgwalker(config6_flags);
 	/* Save old context and create impossible VPN2 value */
 	old_ctx = read_c0_entryhi();
 	old_pagemask = read_c0_pagemask();
@@ -399,6 +500,7 @@ void __init add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
 	tlbw_use_hazard();	/* What is the hazard here? */
 	write_c0_pagemask(old_pagemask);
 	local_flush_tlb_all();
+	enable_pgwalker(config6_flags);
 	EXIT_CRITICAL(flags);
 }
 
@@ -418,8 +520,10 @@ __init int add_temporary_entry(unsigned long entrylo0, unsigned long entrylo1,
 	unsigned long wired;
 	unsigned long old_pagemask;
 	unsigned long old_ctx;
+	unsigned long config6_flags;
 
 	ENTER_CRITICAL(flags);
+	disable_pgwalker(config6_flags);
 	/* Save old context and create impossible VPN2 value */
 	old_ctx = read_c0_entryhi();
 	old_pagemask = read_c0_pagemask();
@@ -443,6 +547,7 @@ __init int add_temporary_entry(unsigned long entrylo0, unsigned long entrylo1,
 	write_c0_entryhi(old_ctx);
 	write_c0_pagemask(old_pagemask);
 out:
+	enable_pgwalker(config6_flags);
 	EXIT_CRITICAL(flags);
 	return ret;
 }
@@ -450,7 +555,7 @@ out:
 static void __cpuinit probe_tlb(unsigned long config)
 {
 	struct cpuinfo_mips *c = &current_cpu_data;
-	unsigned int reg;
+	unsigned int reg __attribute__((unused));
 
 	/*
 	 * If this isn't a MIPS32 / MIPS64 compliant CPU.  Config 1 register
@@ -469,10 +574,15 @@ static void __cpuinit probe_tlb(unsigned long config)
 #endif /* CONFIG_MIPS_MT_SMTC */
 
 	reg = read_c0_config1();
-	if (!((config >> 7) & 3))
+	if (!((config >> 7) & 7))
 		panic("No TLB present");
 
+#if defined(CONFIG_NLM_XLP)
+	c->tlbsize = ((read_c0_config6() >> 16 ) & 0xffff) + 1;
+#else
 	c->tlbsize = ((reg >> 25) & 0x3f) + 1;
+#endif
+
 }
 
 static int __cpuinitdata ntlb;
@@ -483,6 +593,15 @@ static int __init set_ntlb(char *str)
 }
 
 __setup("ntlb=", set_ntlb);
+
+#ifdef CONFIG_NLM_COMMON
+extern void nlm_common_tlb_init(void);
+
+void nlm_tlb_stats_init(void)
+{
+	nlm_write_os_scratch_2(0ULL);
+}
+#endif
 
 void __cpuinit tlb_init(void)
 {
@@ -497,11 +616,34 @@ void __cpuinit tlb_init(void)
 	 */
 	probe_tlb(config);
 	write_c0_pagemask(PM_DEFAULT_MASK);
-	write_c0_wired(0);
+
+#if defined(CONFIG_NLM_VMIPS)
+	if(ntlb && ((current_cpu_data.tlbsize-ntlb) < nlm_vmips_max_wired_entries))
+		ntlb = current_cpu_data.tlbsize - nlm_vmips_max_wired_entries;
+#endif
+
 	if (current_cpu_type() == CPU_R10000 ||
 	    current_cpu_type() == CPU_R12000 ||
 	    current_cpu_type() == CPU_R14000)
 		write_c0_framemask(0);
+
+#if !defined(CONFIG_MAPPED_KERNEL)
+	write_c0_wired(0);
+	write_c0_framemask(0);
+#endif
+
+   if (kernel_uses_smartmips_rixi) {
+       /*
+        * Enable the no read, no exec bits, and enable large virtual
+        * address.
+        */
+       u32 pg = PG_RIE | PG_XIE;
+#ifdef CONFIG_64BIT
+       pg |= PG_ELPA;
+#endif
+       write_c0_pagegrain(pg);
+   }
+
 	temp_tlb_entry = current_cpu_data.tlbsize - 1;
 
         /* From this point on the ARC firmware is dead.  */
@@ -519,5 +661,9 @@ void __cpuinit tlb_init(void)
 			printk("Ignoring invalid argument ntlb=%d\n", ntlb);
 	}
 
-	build_tlb_refill_handler();
+#ifdef CONFIG_NLM_COMMON
+	nlm_tlb_stats_init();
+#endif
+
+    build_tlb_refill_handler();
 }

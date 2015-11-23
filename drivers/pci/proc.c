@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  *	Procfs interface for the PCI bus.
  *
@@ -403,12 +411,20 @@ int pci_proc_attach_device(struct pci_dev *dev)
 		return -EACCES;
 
 	if (!bus->procdir) {
+#ifdef CONFIG_NLM_COMMON
+		/* 
+		   create /proc entries in "%02x" format at all times.
+		   Otherwise, for HT, it will be created in "%04x:%02x" format
+		   */
+		sprintf(name, "%02x", bus->number);
+#else
 		if (pci_proc_domain(bus)) {
 			sprintf(name, "%04x:%02x", pci_domain_nr(bus),
 					bus->number);
 		} else {
 			sprintf(name, "%02x", bus->number);
 		}
+#endif
 		bus->procdir = proc_mkdir(name, proc_bus_pci_dir);
 		if (!bus->procdir)
 			return -ENOMEM;

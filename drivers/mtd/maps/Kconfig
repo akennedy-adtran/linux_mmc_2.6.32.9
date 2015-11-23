@@ -259,6 +259,18 @@ config MTD_ALCHEMY
 	help
 	  Flash memory access on AMD Alchemy Pb/Db/RDK Reference Boards
 
+config MTD_XLR
+   	tristate "XLR Flash MTD support"
+	depends on NLM_COMMON
+   	help
+     	  Flash memory access on XLR/XLS Reference Boards
+
+config MTD_XLP
+   	tristate "XLP Flash MTD support"
+	depends on NLM_XLP
+   	help
+     	  Flash memory access on XLP Reference Boards
+
 config MTD_DILNETPC
 	tristate "CFI Flash device mapped on DIL/Net PC"
 	depends on X86 && MTD_CONCAT && MTD_PARTITIONS && MTD_CFI_INTELEXT && BROKEN

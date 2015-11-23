@@ -1,6 +1,9 @@
 #
 # linux/drivers/maps/Makefile
 #
+ifeq ($(CONFIG_NLM_XLP),y)
+        EXTRA_CFLAGS := $(CFLAGS) -DNLM_HAL_LINUX_KERNEL
+endif
 
 ifeq ($(CONFIG_MTD_COMPLEX_MAPPINGS),y)
 obj-$(CONFIG_MTD)		+= map_funcs.o
@@ -60,4 +63,6 @@ obj-$(CONFIG_MTD_INTEL_VR_NOR)	+= intel_vr_nor.o
 obj-$(CONFIG_MTD_BFIN_ASYNC)	+= bfin-async-flash.o
 obj-$(CONFIG_MTD_RBTX4939)	+= rbtx4939-flash.o
 obj-$(CONFIG_MTD_VMU)		+= vmu-flash.o
+obj-$(CONFIG_MTD_XLR)           += xlr-flash.o
 obj-$(CONFIG_MTD_GPIO_ADDR)	+= gpio-addr-flash.o
+obj-$(CONFIG_MTD_XLP)           += xlp-flash.o

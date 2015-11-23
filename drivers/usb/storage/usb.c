@@ -74,7 +74,7 @@ MODULE_AUTHOR("Matthew Dharm <mdharm-usb@one-eyed-alien.net>");
 MODULE_DESCRIPTION("USB Mass Storage driver for Linux");
 MODULE_LICENSE("GPL");
 
-static unsigned int delay_use = 5;
+static unsigned int delay_use = 1;
 module_param(delay_use, uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(delay_use, "seconds to delay before using a new device");
 
@@ -845,6 +845,15 @@ static int usb_stor_scan_thread(void * __us)
 	complete_and_exit(&us->scanning_done, 0);
 }
 
+static unsigned int usb_stor_sg_tablesize(struct usb_interface *intf)
+{
+	struct usb_device *usb_dev = interface_to_usbdev(intf);
+
+	if (usb_dev->bus->sg_tablesize) {
+		return usb_dev->bus->sg_tablesize;
+	}
+	return SG_ALL;
+}
 
 /* First part of general USB mass-storage probing */
 int usb_stor_probe1(struct us_data **pus,
@@ -873,6 +882,7 @@ int usb_stor_probe1(struct us_data **pus,
 	 * Allow 16-byte CDBs and thus > 2TB
 	 */
 	host->max_cmd_len = 16;
+	host->sg_tablesize = usb_stor_sg_tablesize(intf);
 	*pus = us = host_to_us(host);
 	memset(us, 0, sizeof(struct us_data));
 	mutex_init(&(us->dev_mutex));

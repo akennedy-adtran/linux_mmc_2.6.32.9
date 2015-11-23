@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2007-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * Support for synaptics touchscreen.
  *
@@ -265,7 +273,7 @@ static int detect(struct synaptics_ts_data *ts, u32 *panel_version)
 }
 
 static void compute_areas(struct synaptics_ts_data *ts,
-			  struct synaptics_i2c_rmi_platform_data *pdata,
+			  struct synaptics_i2c_nlm_platform_data *pdata,
 			  u16 max_x, u16 max_y)
 {
 	int inactive_area_left;
@@ -353,7 +361,7 @@ static void compute_areas(struct synaptics_ts_data *ts,
 			     max_y + inactive_area_bottom, fuzz_y, 0);
 }
 
-static struct synaptics_i2c_rmi_platform_data fake_pdata;
+static struct synaptics_i2c_nlm_platform_data fake_pdata;
 
 static int __devinit synaptics_ts_probe(
 	struct i2c_client *client, const struct i2c_device_id *id)
@@ -363,7 +371,7 @@ static int __devinit synaptics_ts_probe(
 	u8 buf1[8];
 	struct i2c_msg msg[2];
 	int ret = 0;
-	struct synaptics_i2c_rmi_platform_data *pdata;
+	struct synaptics_i2c_nlm_platform_data *pdata;
 	u32 panel_version = 0;
 	u16 max_x, max_y;
 
@@ -618,7 +626,7 @@ static void synaptics_ts_late_resume(struct early_suspend *h)
 
 
 static const struct i2c_device_id synaptics_ts_id[] = {
-	{ SYNAPTICS_I2C_RMI_NAME, 0 },
+	{ SYNAPTICS_I2C_NLM_NAME, 0 },
 	{ }
 };
 
@@ -631,7 +639,7 @@ static struct i2c_driver synaptics_ts_driver = {
 #endif
 	.id_table	= synaptics_ts_id,
 	.driver = {
-		.name	= SYNAPTICS_I2C_RMI_NAME,
+		.name	= SYNAPTICS_I2C_NLM_NAME,
 	},
 };
 

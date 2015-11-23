@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2009-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * linux/mm/percpu.c - percpu memory allocator
  *
@@ -719,7 +727,11 @@ static int pcpu_alloc_pages(struct pcpu_chunk *chunk,
 		for (i = page_start; i < page_end; i++) {
 			struct page **pagep = &pages[pcpu_page_idx(cpu, i)];
 
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+			*pagep = alloc_pages_node(cpu_to_node(cpu), gfp | GFP_DMA, 0);
+#else
 			*pagep = alloc_pages_node(cpu_to_node(cpu), gfp, 0);
+#endif
 			if (!*pagep) {
 				pcpu_free_pages(chunk, pages, populated,
 						page_start, page_end);

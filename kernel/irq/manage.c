@@ -399,6 +399,10 @@ int can_request_irq(unsigned int irq, unsigned long irqflags)
 
 void compat_irq_chip_set_default_handler(struct irq_desc *desc)
 {
+#if defined(XLP_MERGE_TODO)
+/* 	printk("[%s]: Caller=%p, zapping handler for irq=%d desc=%p\n", */
+/* 	       __FUNCTION__, return_address(), desc->irq, desc); */
+#endif
 	/*
 	 * If the architecture still has not overriden
 	 * the flow handler then zap the default. This
@@ -609,7 +613,7 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 {
 	struct irqaction *old, **old_ptr;
 	const char *old_name = NULL;
-	unsigned long flags;
+	unsigned long flags = 0;
 	int nested, shared = 0;
 	int ret;
 
@@ -679,7 +683,11 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 	/*
 	 * The following block of code has to be executed atomically
 	 */
-	spin_lock_irqsave(&desc->lock, flags);
+	/* For XLP, if setting up a watchdog IRQ, don't disable interrupts here */
+	if (new->flags & IRQF_WATCHDOG)
+		spin_lock(&desc->lock);
+	else
+		spin_lock_irqsave(&desc->lock, flags);
 	old_ptr = &desc->action;
 	old = *old_ptr;
 	if (old) {
@@ -775,7 +783,10 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 		__enable_irq(desc, irq, false);
 	}
 
-	spin_unlock_irqrestore(&desc->lock, flags);
+	if (new->flags & IRQF_WATCHDOG)
+		spin_unlock(&desc->lock);
+	else
+		spin_unlock_irqrestore(&desc->lock, flags);
 
 	/*
 	 * Strictly no need to wake it up, but hung_task complains

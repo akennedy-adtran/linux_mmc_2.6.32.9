@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /**
  * @file oprofile_files.c
  *
@@ -180,7 +188,9 @@ void oprofile_create_files(struct super_block *sb, struct dentry *root)
 	oprofilefs_create_ulong(sb, root, "buffer_watershed", &oprofile_buffer_watershed);
 	oprofilefs_create_ulong(sb, root, "cpu_buffer_size", &oprofile_cpu_buffer_size);
 	oprofilefs_create_file(sb, root, "cpu_type", &cpu_type_fops);
-	oprofilefs_create_file(sb, root, "backtrace_depth", &depth_fops);
+	if (oprofile_ops.backtrace)
+		oprofilefs_create_file(sb, root, "backtrace_depth", 
+							&depth_fops);
 	oprofilefs_create_file(sb, root, "pointer_size", &pointer_size_fops);
 #ifdef CONFIG_OPROFILE_EVENT_MULTIPLEX
 	oprofilefs_create_file(sb, root, "time_slice", &timeout_fops);

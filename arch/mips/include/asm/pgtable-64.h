@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -107,16 +115,43 @@
 #endif
 #define FIRST_USER_ADDRESS	0UL
 
+#if defined(CONFIG_MAPPED_KERNEL) && defined(CONFIG_KSEG2_LOWMEM)
+extern unsigned long __vmalloc_start;
+#define VMALLOC_START		__vmalloc_start
+#else
 #define VMALLOC_START		MAP_BASE
-#define VMALLOC_END	\
-	(VMALLOC_START + \
-	 PTRS_PER_PGD * PTRS_PER_PMD * PTRS_PER_PTE * PAGE_SIZE - (1UL << 32))
+#endif
+
+#ifndef CONFIG_MAPPED_KERNEL
+
 #if defined(CONFIG_MODULES) && defined(KBUILD_64BIT_SYM32) && \
 	VMALLOC_START != CKSSEG
 /* Load modules into 32bit-compatible segment. */
 #define MODULE_START	CKSSEG
 #define MODULE_END	(FIXADDR_START-2*PAGE_SIZE)
 #endif
+
+#define VMALLOC_END	\
+	(VMALLOC_START + \
+	 min(PTRS_PER_PGD * PTRS_PER_PMD * PTRS_PER_PTE * PAGE_SIZE, \
+	     (1UL << cpu_vmbits)) - (1UL << 32))
+
+#else /* CONFIG_MAPPED_KERNEL */
+
+#define MODULE_START    0xffffffffe0000000
+#define MODULE_END      (FIXADDR_START-2*PAGE_SIZE)
+
+	/* Since module and vmalloc shares the same page table, make sure their
+	 * pgd index does not overlap.
+	 */
+#define VMALLOC_END	\
+	(VMALLOC_START + \
+	 min( min(PTRS_PER_PGD * PTRS_PER_PMD * PTRS_PER_PTE * PAGE_SIZE, \
+	         (1UL << cpu_vmbits)), \
+	      (((MODULE_START >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1)) - 1) << PGDIR_SHIFT) \
+	 - (1UL << 32))
+
+#endif /* CONFIG_MAPPED_KERNEL */
 
 #define pte_ERROR(e) \
 	printk("%s:%d: bad pte %016lx.\n", __FILE__, __LINE__, pte_val(e))
@@ -179,8 +214,12 @@ static inline void pud_clear(pud_t *pudp)
 #define pte_pfn(x)		((unsigned long)((x).pte >> (PAGE_SHIFT + 2)))
 #define pfn_pte(pfn, prot)	__pte(((pfn) << (PAGE_SHIFT + 2)) | pgprot_val(prot))
 #else
-#define pte_pfn(x)		((unsigned long)((x).pte >> PAGE_SHIFT))
-#define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
+#ifdef CONFIG_NLM_XLP
+#define pte_pfn(x)     ((unsigned long)(((x).pte & ~((1ULL<<_PAGE_NO_READ_SHIFT)|(1ULL<<_PAGE_NO_EXEC_SHIFT))) >> _PFN_SHIFT))
+#else
+#define pte_pfn(x)     ((unsigned long)((x).pte >> _PFN_SHIFT))
+#endif
+#define pfn_pte(pfn, prot) __pte(((pfn) << _PFN_SHIFT) | pgprot_val(prot))
 #endif
 
 #define __pgd_offset(address)	pgd_index(address)

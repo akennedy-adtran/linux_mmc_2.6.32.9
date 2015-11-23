@@ -711,8 +711,11 @@ void __init mtrr_bp_init(void)
 		}
 	}
 
+	/* Let Xen code override the above if it wants */
+	xen_init_mtrr();
+
 	if (mtrr_if) {
-		set_num_var_ranges();
+		num_var_ranges = mtrr_if->num_var_ranges();
 		init_table();
 		if (use_intel()) {
 			get_mtrr_state();

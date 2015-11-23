@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2007-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -82,6 +90,14 @@ extern void __cmpxchg_called_with_bad_pointer(void);
 	barrier;							\
 									\
 	switch (sizeof(*(__ptr))) {					\
+        case 2: {                                                       \
+               unsigned long __flags;                                   \
+		raw_local_irq_save(__flags);				\
+		__res = *__ptr;						\
+		if (__res == __old)					\
+			*__ptr = __new;					\
+		raw_local_irq_restore(__flags);				\
+                }break;                                                  \
 	case 4:								\
 		__res = __cmpxchg_asm("ll", "sc", __ptr, __old, __new);	\
 		break;							\

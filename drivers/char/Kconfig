@@ -1118,5 +1118,41 @@ config DEVPORT
 
 source "drivers/s390/char/Kconfig"
 
-endmenu
+config NLM_XLP_DMA
+	depends on NLM_XLP && NLM_XLP_DEVMODE
+	tristate "Enable netlogic XLP DMA driver"
+	default n
+	help
+	  Netlogic XLP PCIe DMA driver. When target is device mode,
+	  this driver is required for PCI DMAs
 
+	  If you want this as a module, choose M here. The driver
+	  will be called nlm_xlp_dma.ko
+
+config XLP_MSGRING
+	depends on NLM_XLP && NLM_COMMON
+	bool "XLP Fast Message Network driver"
+	default y
+	help
+	  Provides a character special driver to enable userspace applications
+	  to wait on fast message network messages using wait queues.
+
+config XLP_VUART
+	depends on NLM_XLP && NLM_COMMON
+	bool "XLP Virtual UART (for use with XEN Hypervisor)"
+	default n
+	help
+	  Provides a mechanism to capture the serial console output from
+	  a guest operating system.
+
+config XLP_CMEM
+	depends on NLM_XLP && NLM_COMMON
+	bool "XLP Contiguous Memory Allocator"
+	default y
+	help
+	  Provides allocation of guaranteed contiguous memory (guaranteed
+	  contiguous in both virtual and physical space).
+
+	  If unsure, say Y.
+
+endmenu

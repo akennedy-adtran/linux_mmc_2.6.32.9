@@ -33,6 +33,18 @@ struct ethtool_cmd {
 	__u8	eth_tp_mdix;
 	__u8	reserved2;
 	__u32	lp_advertising;	/* Features the link partner advertises */
+/* MAC SEC related params */
+	__u8   	node; 
+	__u8	port_enable;
+	__u8	index;
+	__u8	tci;
+	__u16	preamble_len;
+	__u32	packet_num;
+	__u32	win_size_thrshld;
+	__u64 	sci;
+	__u64	sci_mask;
+	unsigned char key[16];
+/* End MAC SEC */
 	__u32	reserved[2];
 };
 
@@ -454,6 +466,10 @@ int ethtool_op_set_flags(struct net_device *dev, u32 data);
  *	or zero.
  */
 struct ethtool_ops {
+	int	(*msec_tx_config)(struct net_device *, struct ethtool_cmd *);
+	int	(*msec_tx_mem_config)(struct net_device *, struct ethtool_cmd *);
+	int	(*msec_rx_config)(struct net_device *, struct ethtool_cmd *);
+	int	(*msec_rx_mem_config)(struct net_device *, struct ethtool_cmd *);
 	int	(*get_settings)(struct net_device *, struct ethtool_cmd *);
 	int	(*set_settings)(struct net_device *, struct ethtool_cmd *);
 	void	(*get_drvinfo)(struct net_device *, struct ethtool_drvinfo *);
@@ -559,6 +575,10 @@ struct ethtool_ops {
 #define	ETHTOOL_SRXCLSRLDEL	0x00000031 /* Delete RX classification rule */
 #define	ETHTOOL_SRXCLSRLINS	0x00000032 /* Insert RX classification rule */
 #define	ETHTOOL_FLASHDEV	0x00000033 /* Flash firmware to device */
+#define	ETHTOOL_MAC_SEC_TX	0x00000044 /* MACSec TX config to device */
+#define	ETHTOOL_MAC_SEC_TX_MEM	0x00000045 /* MACSec TX mem config to device */
+#define	ETHTOOL_MAC_SEC_RX	0x00000046 /* MACSec RX config to device */
+#define	ETHTOOL_MAC_SEC_RX_MEM	0x00000047 /* MACSec RX mem config to device */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET

@@ -196,8 +196,8 @@ static int do_video_stillpicture(unsigned int fd, unsigned int cmd, unsigned lon
 {
 	struct compat_video_still_picture __user *up;
 	struct video_still_picture __user *up_native;
-	compat_uptr_t fp;
-	int32_t size;
+	compat_uptr_t fp = 0;
+	int32_t size = 0;
 	int err;
 
 	up = (struct compat_video_still_picture __user *) arg;
@@ -228,8 +228,8 @@ static int do_video_set_spu_palette(unsigned int fd, unsigned int cmd, unsigned 
 {
 	struct compat_video_spu_palette __user *up;
 	struct video_spu_palette __user *up_native;
-	compat_uptr_t palp;
-	int length, err;
+	compat_uptr_t palp = 0;
+	int length =0, err;
 
 	up = (struct compat_video_spu_palette __user *) arg;
 	err  = get_user(palp, &up->palette);

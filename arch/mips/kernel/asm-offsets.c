@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2014 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * offset.c: Calculate pt_regs and task_struct offsets.
  *
@@ -69,6 +77,23 @@ void output_ptreg_defines(void)
 	OFFSET(PT_MPL, pt_regs, mpl);
 	OFFSET(PT_MTP, pt_regs, mtp);
 #endif /* CONFIG_CPU_CAVIUM_OCTEON */
+#ifdef CONFIG_NLM_XLP
+	OFFSET(NLM_COP2_TX_BUF, pt_regs, tx_buf);
+	OFFSET(NLM_COP2_RX_BUF, pt_regs, rx_buf);
+	OFFSET(NLM_COP2_TX_MSG_STATUS, pt_regs, tx_msg_status);
+	OFFSET(NLM_COP2_RX_MSG_STATUS, pt_regs, rx_msg_status);
+	OFFSET(NLM_COP2_MISC_STATUS, pt_regs, misc_status);
+	OFFSET(NLM_COP2_MSG_CONFIG, pt_regs, msg_config);
+	OFFSET(NLM_COP2_MSG_ERR, pt_regs, msg_err);
+#endif
+
+#ifdef XLP_MERGE_TODO /*CONFIG_NLM_XLP_SIM*/
+	OFFSET("#define PT_CRC_POLY_0 ", pt_regs, crc_poly_0);
+	OFFSET("#define PT_CRC_POLY_1 ", pt_regs, crc_poly_1);
+	OFFSET("#define PT_CRC_POLY_2 ", pt_regs, crc_poly_2);
+	OFFSET("#define PT_CRC_POLY_3 ", pt_regs, crc_poly_3);
+#endif /* CONFIG_NLM_XLP_SIM */
+
 	DEFINE(PT_SIZE, sizeof(struct pt_regs));
 	BLANK();
 }
@@ -202,6 +227,9 @@ void output_mm_defines(void)
 	DEFINE(_PTRS_PER_PMD, PTRS_PER_PMD);
 	DEFINE(_PTRS_PER_PTE, PTRS_PER_PTE);
 	BLANK();
+	DEFINE(PAGE_SIZE_asm, PAGE_SIZE);
+	DEFINE(PAGE_SHIFT_asm, PAGE_SHIFT);
+	BLANK();
 }
 
 #ifdef CONFIG_32BIT
@@ -324,6 +352,16 @@ void output_octeon_cop2_state_defines(void)
 	BLANK();
 }
 #endif
+
+#if defined(CONFIG_NLM_COMMON) && defined(CONFIG_CPU_XLR)
+#include <asm/netlogic/sim.h>
+void output_psb_info_defines(void)
+{
+        COMMENT("RMI struct psb_info structure offsets");
+        OFFSET(PSB_CPU_FREQUENCY, psb_info, cpu_frequency);
+	BLANK();
+}
+#endif /* CONFIG_NLM_COMMON */
 
 #ifdef CONFIG_HIBERNATION
 void output_pbe_defines(void)

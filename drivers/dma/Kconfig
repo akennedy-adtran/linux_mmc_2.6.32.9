@@ -36,6 +36,12 @@ config INTEL_IOATDMA
 
 	  If unsure, say N.
 
+config NLM_ADMA
+	bool "NLM_ADMA support"
+	select DMA_ENGINE
+	help
+		Enable support for NLM ADMA RAID
+
 config INTEL_IOP_ADMA
 	tristate "Intel IOP ADMA support"
 	depends on ARCH_IOP32X || ARCH_IOP33X || ARCH_IOP13XX

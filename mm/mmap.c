@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * mm/mmap.c
  *
@@ -1157,7 +1165,11 @@ munmap_back:
 	 * specific mapper. the address has already been validated, but
 	 * not unmapped, but the maps are removed from the list.
 	 */
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+	vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL | GFP_DMA);
+#else
 	vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL);
+#endif
 	if (!vma) {
 		error = -ENOMEM;
 		goto unacct_error;
@@ -1831,7 +1843,11 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	if (mm->map_count >= sysctl_max_map_count)
 		return -ENOMEM;
 
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+	new = kmem_cache_alloc(vm_area_cachep, GFP_KERNEL | GFP_DMA);
+#else
 	new = kmem_cache_alloc(vm_area_cachep, GFP_KERNEL);
+#endif
 	if (!new)
 		return -ENOMEM;
 
@@ -2048,7 +2064,11 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	/*
 	 * create a vma struct for an anonymous mapping
 	 */
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+	vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL | GFP_DMA);
+#else
 	vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL);
+#endif
 	if (!vma) {
 		vm_unacct_memory(len >> PAGE_SHIFT);
 		return -ENOMEM;
@@ -2116,7 +2136,9 @@ void exit_mmap(struct mm_struct *mm)
 	while (vma)
 		vma = remove_vma(vma);
 
-	BUG_ON(mm->nr_ptes > (FIRST_USER_ADDRESS+PMD_SIZE-1)>>PMD_SHIFT);
+	if (mm->nr_ptes > (FIRST_USER_ADDRESS+PMD_SIZE-1)>>PMD_SHIFT)
+		printk("nr_ptes (%lx) > %lx\n",mm->nr_ptes,
+			(FIRST_USER_ADDRESS+PMD_SIZE-1)>>PMD_SHIFT);
 }
 
 /* Insert vm structure into process list sorted by address
@@ -2186,7 +2208,11 @@ struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 		    vma_start < new_vma->vm_end)
 			*vmap = new_vma;
 	} else {
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
+		new_vma = kmem_cache_alloc(vm_area_cachep, GFP_KERNEL | GFP_DMA);
+#else
 		new_vma = kmem_cache_alloc(vm_area_cachep, GFP_KERNEL);
+#endif
 		if (new_vma) {
 			*new_vma = *vma;
 			pol = mpol_dup(vma_policy(vma));
@@ -2282,7 +2308,11 @@ int install_special_mapping(struct mm_struct *mm,
 {
 	struct vm_area_struct *vma;
 
+#ifdef CONFIG_NLM_16G_MEM_SUPPORT
 	vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL);
+#else
+	vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL | GFP_DMA);
+#endif
 	if (unlikely(vma == NULL))
 		return -ENOMEM;
 

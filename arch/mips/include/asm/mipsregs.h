@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2004-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -16,6 +25,7 @@
 #include <linux/linkage.h>
 #include <asm/hazards.h>
 #include <asm/war.h>
+#include <asm/netlogic/mips-exts.h>
 
 /*
  * The following macros are especially useful for __asm__
@@ -220,21 +230,28 @@
 #error Bad page size configuration!
 #endif
 
+#ifdef CONFIG_HUGETLB_PAGE
 /*
  * Default huge tlb size for a given kernel configuration
  */
-#ifdef CONFIG_PAGE_SIZE_4KB
+#ifdef CONFIG_HUGE_PAGE_SIZE_128K
+#define PM_HUGE_MASK	PM_64K
+#elif defined(CONFIG_HUGE_PAGE_SIZE_512K)
+#define PM_HUGE_MASK	PM_256K
+#elif defined(CONFIG_HUGE_PAGE_SIZE_2M)
 #define PM_HUGE_MASK	PM_1M
-#elif defined(CONFIG_PAGE_SIZE_8KB)
+#elif defined(CONFIG_HUGE_PAGE_SIZE_8M)
 #define PM_HUGE_MASK	PM_4M
-#elif defined(CONFIG_PAGE_SIZE_16KB)
+#elif defined(CONFIG_HUGE_PAGE_SIZE_32M)
 #define PM_HUGE_MASK	PM_16M
-#elif defined(CONFIG_PAGE_SIZE_32KB)
+#elif defined(CONFIG_HUGE_PAGE_SIZE_128M)
 #define PM_HUGE_MASK	PM_64M
-#elif defined(CONFIG_PAGE_SIZE_64KB)
+#elif defined(CONFIG_HUGE_PAGE_SIZE_512M)
 #define PM_HUGE_MASK	PM_256M
-#elif defined(CONFIG_HUGETLB_PAGE)
-#error Bad page size configuration for hugetlbfs!
+#else
+#error Bad huge page size configuration!
+#endif
+
 #endif
 
 /*
@@ -249,6 +266,15 @@
 #define PL_16M		24
 #define PL_64M		26
 #define PL_256M		28
+
+/*
+ * PageGrain bits
+ */
+#define PG_RIE     (_ULCAST_(1) <<  31)
+#define PG_XIE     (_ULCAST_(1) <<  30)
+#define PG_ELPA        (_ULCAST_(1) <<  29)
+#define PG_ESP     (_ULCAST_(1) <<  28)
+
 
 /*
  * R4x00 interrupt enable / cause bits
@@ -814,6 +840,9 @@ do {									\
 #define read_c0_pagemask()	__read_32bit_c0_register($5, 0)
 #define write_c0_pagemask(val)	__write_32bit_c0_register($5, 0, val)
 
+#define read_c0_pagegrain()    __read_32bit_c0_register($5, 1)
+#define write_c0_pagegrain(val)    __write_32bit_c0_register($5, 1, val)
+
 #define read_c0_wired()		__read_32bit_c0_register($6, 0)
 #define write_c0_wired(val)	__write_32bit_c0_register($6, 0, val)
 
@@ -835,7 +864,18 @@ do {									\
 #define write_c0_count3(val)	__write_32bit_c0_register($9, 7, val)
 
 #define read_c0_entryhi()	__read_ulong_c0_register($10, 0)
+#if defined(CONFIG_NLMCOMMON_GLOBAL_TLB_SPLIT_ASID)
+extern unsigned int nlm_shtlb;
+#define write_c0_entryhi(val)   \
+	if(nlm_shtlb) \
+		__write_ulong_c0_register($10, 0, (((val) & ~0xc0)|(netlogic_thr_id()<<6))); \
+	else \
+		__write_ulong_c0_register($10, 0, val);
+#elif defined(CONFIG_NLMCOMMON_GLOBAL_TLB_GLOBAL_ASID)
+#define write_c0_entryhi(val)   __write_ulong_c0_register($10, 0, (((val) & ~0xc0)|(netlogic_thr_id()<<6)))
+#else
 #define write_c0_entryhi(val)	__write_ulong_c0_register($10, 0, val)
+#endif
 
 #define read_c0_compare()	__read_32bit_c0_register($11, 0)
 #define write_c0_compare(val)	__write_32bit_c0_register($11, 0, val)
@@ -1046,6 +1086,21 @@ do {									\
 
 #define read_octeon_c0_dcacheerr()	__read_64bit_c0_register($27, 1)
 #define write_octeon_c0_dcacheerr(val)	__write_64bit_c0_register($27, 1, val)
+
+/*
+ * xlp2xx pagewalker PW registers
+ */
+#define read_c0_pwbase()	__read_64bit_c0_register($5, 5)
+#define write_c0_pwbase(val)	__write_64bit_c0_register($5, 5, val)
+
+#define read_c0_pwfield()	__read_64bit_c0_register($5, 6)
+#define write_c0_pwfield(val)	__write_64bit_c0_register($5, 6, val)
+
+#define read_c0_pwsize()	__read_64bit_c0_register($5, 7)
+#define write_c0_pwsize(val)	__write_64bit_c0_register($5, 7, val)
+
+#define read_c0_pwctl()	__read_32bit_c0_register($6, 6)
+#define write_c0_pwctl(val)	__write_32bit_c0_register($6, 6, val)
 
 /*
  * Macros to access the floating point coprocessor control registers

@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2014 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * Handle unaligned accesses by emulation.
  *
@@ -73,17 +81,16 @@
  *       Undo the partial store in this case.
  */
 #include <linux/mm.h>
-#include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/smp.h>
 #include <linux/sched.h>
 #include <linux/debugfs.h>
+
 #include <asm/asm.h>
 #include <asm/branch.h>
 #include <asm/byteorder.h>
 #include <asm/inst.h>
 #include <asm/uaccess.h>
-#include <asm/system.h>
 
 #define STR(x)  __STR(x)
 #define __STR(x)  #x
@@ -93,12 +100,21 @@ enum {
 	UNALIGNED_ACTION_SIGNAL,
 	UNALIGNED_ACTION_SHOW,
 };
+
 #ifdef CONFIG_DEBUG_FS
 static u32 unaligned_instructions;
 static u32 unaligned_action;
 #else
+
 #define unaligned_action UNALIGNED_ACTION_QUIET
+
+/* Uncomment to show (and kill) a process using unaligned
+ * accesses instead of handling the exception
+ */
+//#define unaligned_action UNALIGNED_ACTION_SHOW
+
 #endif
+
 extern void show_registers(struct pt_regs *regs);
 
 static void emulate_load_store_insn(struct pt_regs *regs,
@@ -107,8 +123,6 @@ static void emulate_load_store_insn(struct pt_regs *regs,
 	union mips_instruction insn;
 	unsigned long value;
 	unsigned int res;
-
-	regs->regs[0] = 0;
 
 	/*
 	 * This load never faults.
@@ -514,8 +528,12 @@ asmlinkage void do_ade(struct pt_regs *regs)
 		goto sigbus;
 	if (unaligned_action == UNALIGNED_ACTION_SIGNAL)
 		goto sigbus;
-	else if (unaligned_action == UNALIGNED_ACTION_SHOW)
+	else if (unaligned_action == UNALIGNED_ACTION_SHOW) {
+		printk("[%s]: Killing process (%s) which is using unaligned accesses!\n",
+		       __FUNCTION__, current->comm);
 		show_registers(regs);
+		goto sigbus;
+	}
 
 	/*
 	 * Do branch emulation only if we didn't forward the exception.

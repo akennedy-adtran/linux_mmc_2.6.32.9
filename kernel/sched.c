@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2007-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  *  kernel/sched.c
  *
@@ -55,6 +64,7 @@
 #include <linux/cpu.h>
 #include <linux/cpuset.h>
 #include <linux/percpu.h>
+#include <linux/perfctr.h>
 #include <linux/kthread.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
@@ -2940,6 +2950,18 @@ unsigned long long nr_context_switches(void)
 
 	return sum;
 }
+
+#ifdef CONFIG_NLM_COMMON
+unsigned long long nr_cpu_context_switches(int cpu)
+{
+	unsigned long long sum = 0;
+
+	sum = cpu_rq(cpu)->nr_switches;
+
+	return sum;
+}
+#endif
+
 
 unsigned long nr_iowait(void)
 {
@@ -6575,6 +6597,8 @@ out_put_task:
 	return retval;
 }
 
+EXPORT_SYMBOL(sched_setaffinity);
+
 static int get_user_cpu_mask(unsigned long __user *user_mask_ptr, unsigned len,
 			     struct cpumask *new_mask)
 {
@@ -6633,6 +6657,7 @@ out_unlock:
 
 	return retval;
 }
+EXPORT_SYMBOL(sched_getaffinity);
 
 /**
  * sys_sched_getaffinity - get the cpu affinity of a process

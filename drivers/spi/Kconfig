@@ -244,6 +244,13 @@ config SPI_XILINX
 	  See the "OPB Serial Peripheral Interface (SPI) (v1.00e)"
 	  Product Specification document (DS464) for hardware details.
 
+config SPI_XLP
+	tristate "Netlogic XLP SPI controller"
+	depends on NLM_XLP
+	select SPI_BITBANG
+	help
+	  SPI driver for Netlogic XLP MIPS SoCs
+
 #
 # Add new SPI master controllers in alphabetical order above this line
 #

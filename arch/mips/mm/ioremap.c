@@ -1,3 +1,12 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -110,7 +119,11 @@ static int remap_area_pages(unsigned long address, phys_t phys_addr,
  * caller shouldn't need to know that small detail.
  */
 
-#define IS_LOW512(addr) (!((phys_t)(addr) & (phys_t) ~0x1fffffffULL))
+#ifdef CONFIG_64BIT_PHYS_ADDR
+#define IS_LOW512(addr) (!((phys_t)(addr) & ~0x1fffffffULL))
+#else
+#define IS_LOW512(addr) (!((phys_t)(addr) & ~0x1fffffffUL))
+#endif
 
 void __iomem * __ioremap(phys_t phys_addr, phys_t size, unsigned long flags)
 {

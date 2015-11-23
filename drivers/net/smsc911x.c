@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2008-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /***************************************************************************
  *
  * Copyright (C) 2004-2008 SMSC
@@ -42,7 +50,6 @@
 #include <linux/platform_device.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/timer.h>
 #include <linux/bug.h>
 #include <linux/bitops.h>
 #include <linux/irq.h>
@@ -52,6 +59,37 @@
 #include <linux/smsc911x.h>
 #include <linux/device.h>
 #include "smsc911x.h"
+
+#include <asm/netlogic/hal/nlm_hal.h>
+#include <hal/nlm_hal_xlp_dev.h>
+#include <asm/gpio.h>
+
+
+static __inline__ int32_t gpio_reg_read(int node, int regidx)
+{
+        volatile uint64_t mmio;
+        mmio = nlm_hal_get_dev_base(node, 0, XLP_PCIE_GIO_DEV, XLP_GIO_GPIO_FUNC);
+        return nlm_hal_read_32bit_reg(mmio, regidx);
+}
+
+static __inline__ void gpio_reg_write(int node, int regidx, int32_t val)
+{
+        volatile uint64_t mmio;
+        mmio = nlm_hal_get_dev_base(node, 0, XLP_PCIE_GIO_DEV, XLP_GIO_GPIO_FUNC);
+        nlm_hal_write_32bit_reg(mmio, regidx, val);
+}
+
+#if USE_DEBUG
+static void gpio_reg_dump (void)
+{
+	uint32_t val;
+
+	val = gpio_reg_read(0, XLP_GPIO_INT_STAT1);
+	printk(" reg XLP_GPIO_INT_STAT1, val: %#x.\n", val);
+        printk("GPIO 39 value %#x \n", gpio_get_value(39));
+	printk("** eirr 0x%llx.\n", read_64bit_cp0_eirr());
+}
+#endif
 
 #define SMSC_CHIPNAME		"smsc911x"
 #define SMSC_MDIONAME		"smsc911x-mdio"
@@ -124,21 +162,30 @@ struct smsc911x_data {
  * (in response to a single 32-bit operation from software), you should use
  * the 32-bit access functions instead. */
 
+#define readw_local(x) 		swab16(readw(x))
+#define writew_local(x,y)	writew(swab16(x),y)
+
+#ifdef __BIG_ENDIAN
+#define local_swab32    swab32
+#else
+#define local_swab32
+#endif
+
 static inline u32 smsc911x_reg_read(struct smsc911x_data *pdata, u32 reg)
 {
 	if (pdata->config.flags & SMSC911X_USE_32BIT)
-		return readl(pdata->ioaddr + reg);
+                return local_swab32(readl(pdata->ioaddr + reg));
+		// return readl(pdata->ioaddr + reg);
 
 	if (pdata->config.flags & SMSC911X_USE_16BIT) {
 		u32 data;
 		unsigned long flags;
-
 		/* these two 16-bit reads must be performed consecutively, so
 		 * must not be interrupted by our own ISR (which would start
 		 * another read operation) */
 		spin_lock_irqsave(&pdata->dev_lock, flags);
-		data = ((readw(pdata->ioaddr + reg) & 0xFFFF) |
-			((readw(pdata->ioaddr + reg + 2) & 0xFFFF) << 16));
+		data = ((readw_local(pdata->ioaddr + reg) & 0xFFFF) |
+			((readw_local(pdata->ioaddr + reg + 2) & 0xFFFF) << 16));
 		spin_unlock_irqrestore(&pdata->dev_lock, flags);
 
 		return data;
@@ -152,7 +199,7 @@ static inline void smsc911x_reg_write(struct smsc911x_data *pdata, u32 reg,
 				      u32 val)
 {
 	if (pdata->config.flags & SMSC911X_USE_32BIT) {
-		writel(val, pdata->ioaddr + reg);
+                writel(local_swab32(val), pdata->ioaddr + reg);
 		return;
 	}
 
@@ -163,8 +210,8 @@ static inline void smsc911x_reg_write(struct smsc911x_data *pdata, u32 reg,
 		 * must not be interrupted by our own ISR (which would start
 		 * another read operation) */
 		spin_lock_irqsave(&pdata->dev_lock, flags);
-		writew(val & 0xFFFF, pdata->ioaddr + reg);
-		writew((val >> 16) & 0xFFFF, pdata->ioaddr + reg + 2);
+		writew_local(val & 0xFFFF, pdata->ioaddr + reg);
+		writew_local((val >> 16) & 0xFFFF, pdata->ioaddr + reg + 2);
 		spin_unlock_irqrestore(&pdata->dev_lock, flags);
 		return;
 	}
@@ -179,7 +226,7 @@ smsc911x_tx_writefifo(struct smsc911x_data *pdata, unsigned int *buf,
 {
 	if (pdata->config.flags & SMSC911X_SWAP_FIFO) {
 		while (wordcount--)
-			smsc911x_reg_write(pdata, TX_DATA_FIFO, swab32(*buf++));
+                        smsc911x_reg_write(pdata, TX_DATA_FIFO, local_swab32(*buf++));
 		return;
 	}
 
@@ -190,9 +237,13 @@ smsc911x_tx_writefifo(struct smsc911x_data *pdata, unsigned int *buf,
 
 	if (pdata->config.flags & SMSC911X_USE_16BIT) {
 		while (wordcount--)
-			smsc911x_reg_write(pdata, TX_DATA_FIFO, *buf++);
+		{
+                    smsc911x_reg_write(pdata, TX_DATA_FIFO, local_swab32(*buf++));
+		}
 		return;
 	}
+
+	return;
 
 	BUG();
 }
@@ -215,7 +266,9 @@ smsc911x_rx_readfifo(struct smsc911x_data *pdata, unsigned int *buf,
 
 	if (pdata->config.flags & SMSC911X_USE_16BIT) {
 		while (wordcount--)
-			*buf++ = smsc911x_reg_read(pdata, RX_DATA_FIFO);
+		{
+                    *buf++ = local_swab32(smsc911x_reg_read(pdata, RX_DATA_FIFO));
+		}
 		return;
 	}
 
@@ -870,6 +923,7 @@ static int __devinit smsc911x_mii_init(struct platform_device *pdev,
 
 	if (smsc911x_mii_probe(dev) < 0) {
 		SMSC_WARNING(PROBE, "Error registering mii bus");
+		printk(" ** INIT failed during mii probe.\n");
 		goto err_out_unregister_bus_3;
 	}
 
@@ -1216,9 +1270,11 @@ static int smsc911x_open(struct net_device *dev)
 	pdata->software_irq_signal = 0;
 	smp_wmb();
 
+	temp = smsc911x_reg_read(pdata, INT_STS);
 	temp = smsc911x_reg_read(pdata, INT_EN);
 	temp |= INT_EN_SW_INT_EN_;
 	smsc911x_reg_write(pdata, INT_EN, temp);
+	temp = smsc911x_reg_read(pdata, INT_STS);
 
 	timeout = 1000;
 	while (timeout--) {
@@ -1232,10 +1288,8 @@ static int smsc911x_open(struct net_device *dev)
 			 dev->irq);
 		return -ENODEV;
 	}
-	SMSC_TRACE(IFUP, "IRQ handler passed test using IRQ %d", dev->irq);
 
-	dev_info(&dev->dev, "SMSC911x/921x identified at %#08lx, IRQ: %d\n",
-		 (unsigned long)pdata->ioaddr, dev->irq);
+	SMSC_TRACE(IFUP, "IRQ handler passed test using IRQ %d", dev->irq);
 
 	/* Reset the last known duplex and carrier */
 	pdata->last_duplex = -1;
@@ -1449,6 +1503,12 @@ static void smsc911x_set_multicast_list(struct net_device *dev)
 	spin_unlock_irqrestore(&pdata->mac_lock, flags);
 }
 
+static void nlm_gpio_reg_ack(int irq)
+{
+	gpio_reg_write(0, XLP_GPIO_INT_STAT1,
+			gpio_reg_read(0, XLP_GPIO_INT_STAT1) & 0x80 );
+}
+
 static irqreturn_t smsc911x_irqhandler(int irq, void *dev_id)
 {
 	struct net_device *dev = dev_id;
@@ -1457,6 +1517,10 @@ static irqreturn_t smsc911x_irqhandler(int irq, void *dev_id)
 	u32 inten = smsc911x_reg_read(pdata, INT_EN);
 	int serviced = IRQ_NONE;
 	u32 temp;
+
+	//printk("** ISR smsc911x_irqhandler ...\n");
+	/* clear the gpio reg */
+	nlm_gpio_reg_ack(irq);
 
 	if (unlikely(intsts & inten & INT_STS_SW_INT_)) {
 		temp = smsc911x_reg_read(pdata, INT_EN);
@@ -1948,6 +2012,20 @@ static int __devexit smsc911x_drv_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void nlm_smsc_gpio_setup(void)
+{
+	gpio_reg_write(0, XLP_GPIO_INTEN11,
+			gpio_reg_read(0, XLP_GPIO_INTEN11) | 0x80);
+	gpio_reg_write(0, XLP_GPIO_INT_POLAR1,
+			gpio_reg_read(0, XLP_GPIO_INT_POLAR1) | 0x80);
+	gpio_reg_write(0, XLP_GPIO_INT_TYPE1,
+			gpio_reg_read(0, XLP_GPIO_INT_TYPE1) & ~(0x80));
+
+	/* clear all interrupts */
+	gpio_reg_write(0, XLP_GPIO_INT_STAT1, 0xffffffff);
+
+}
+
 static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
 {
 	struct net_device *dev;
@@ -1959,6 +2037,12 @@ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
 	int retval;
 
 	pr_info("%s: Driver version %s.\n", SMSC_CHIPNAME, SMSC_DRV_VERSION);
+
+        if( !(is_nlm_xlp3xx() || is_nlm_xlp2xx()) ) {
+		pr_warning("%s: Disabling SMSC interface\n", SMSC_CHIPNAME);
+		retval = -ENODEV;
+		goto out_0;
+	}
 
 	/* platform data specifies irq & dynamic bus configuration */
 	if (!pdev->dev.platform_data) {
@@ -2037,8 +2121,11 @@ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
 	smsc911x_reg_write(pdata, INT_EN, 0);
 	smsc911x_reg_write(pdata, INT_STS, 0xFFFFFFFF);
 
+	nlm_smsc_gpio_setup();
+
+
 	retval = request_irq(dev->irq, smsc911x_irqhandler,
-			     irq_flags | IRQF_SHARED, dev->name, dev);
+			     IRQF_SHARED, dev->name, dev);
 	if (retval) {
 		SMSC_WARNING(PROBE,
 			"Unable to claim requested irq: %d", dev->irq);
@@ -2175,7 +2262,9 @@ static struct platform_driver smsc911x_driver = {
 /* Entry point for loading the module */
 static int __init smsc911x_init_module(void)
 {
-	return platform_driver_register(&smsc911x_driver);
+	int rc;
+	rc = platform_driver_register(&smsc911x_driver);
+	return rc;
 }
 
 /* entry point for unloading the module */
@@ -2186,3 +2275,54 @@ static void __exit smsc911x_cleanup_module(void)
 
 module_init(smsc911x_init_module);
 module_exit(smsc911x_cleanup_module);
+
+
+#if 0
+#define BDF2OFFSET(bus, dev, func)  (((bus) << 20) | ((dev) << 15) | ((func) << 12))
+#define GBU BDF2OFFSET(0, 7, 0)
+#define HDR_OFFSET 0x000
+#define NLM_OFFSET (0xb8000000 + GBU + HDR_OFFSET)
+#endif
+// #define NLM_OFFSET (0xffffffffb7200000ULL)
+#define NLM_OFFSET (0x17200000)
+
+static struct resource nlm_smc911x_resources[] = {
+	{
+		.start  = NLM_OFFSET,
+		.end    = NLM_OFFSET + 0x100000 - 1, /* 1 MB */
+		.flags  = IORESOURCE_MEM,
+	}, {
+		.start  = 21,
+		.end    = 21,
+		.flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL | IORESOURCE_IRQ_SHAREABLE,
+	},
+};
+
+static struct smsc911x_platform_config nlm_smsc911x_info = {
+	.phy_interface  = PHY_INTERFACE_MODE_MII,
+	.irq_polarity   = SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+	.irq_type       = SMSC911X_IRQ_TYPE_PUSH_PULL,
+	.flags          = SMSC911X_USE_16BIT | SMSC911X_SAVE_MAC_ADDRESS,
+};
+
+static struct platform_device nlm_smc911x_device = {
+	.name           = SMSC_CHIPNAME,
+	.id             = -1,
+	.num_resources  = ARRAY_SIZE(nlm_smc911x_resources),
+	.resource       = nlm_smc911x_resources,
+	.dev 		= {
+		.platform_data = &nlm_smsc911x_info,
+	},
+};
+
+static struct platform_device *devices[] __initdata = {
+	&nlm_smc911x_device,
+};
+
+static __init int nlm_add_smsc_dev(void)
+{
+	platform_add_devices(devices, ARRAY_SIZE(devices));
+	return 0;
+}
+device_initcall(nlm_add_smsc_dev);
+

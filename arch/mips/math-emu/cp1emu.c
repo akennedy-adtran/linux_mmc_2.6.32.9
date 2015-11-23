@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * cp1emu.c: a MIPS coprocessor 1 (fpu) instruction emulator
  *
@@ -605,6 +613,10 @@ static int fpux_emu(struct pt_regs *xcp, struct mips_fpu_struct *ctx,
 		u32 __user *va;
 		u32 val;
 
+#ifdef CONFIG_PROFILE_MATHEMU
+		fpuemuprivate.stats.s_format.total++;
+		fpuemuprivate.stats.s_format.ops[MIPSInst_FUNC(ir)]++;
+#endif
 		switch (MIPSInst_FUNC(ir)) {
 		case lwxc1_op:
 			va = (void __user *) (xcp->regs[MIPSInst_FR(ir)] +
@@ -682,6 +694,10 @@ static int fpux_emu(struct pt_regs *xcp, struct mips_fpu_struct *ctx,
 		u64 __user *va;
 		u64 val;
 
+#ifdef CONFIG_PROFILE_MATHEMU
+		fpuemuprivate.stats.d_format.total++;
+		fpuemuprivate.stats.d_format.ops[MIPSInst_FUNC(ir)]++;
+#endif
 		switch (MIPSInst_FUNC(ir)) {
 		case ldxc1_op:
 			va = (void __user *) (xcp->regs[MIPSInst_FR(ir)] +
@@ -777,6 +793,10 @@ static int fpu_emu(struct pt_regs *xcp, struct mips_fpu_struct *ctx,
 			ieee754sp(*u) (ieee754sp);
 		} handler;
 
+#ifdef CONFIG_PROFILE_MATHEMU
+		fpuemuprivate.stats.s_format.total++;
+		fpuemuprivate.stats.s_format.ops[MIPSInst_FUNC(ir)]++;
+#endif
 		switch (MIPSInst_FUNC(ir)) {
 			/* binary ops */
 		case fadd_op:
@@ -962,6 +982,10 @@ static int fpu_emu(struct pt_regs *xcp, struct mips_fpu_struct *ctx,
 			ieee754dp(*u) (ieee754dp);
 		} handler;
 
+#ifdef CONFIG_PROFILE_MATHEMU
+		fpuemuprivate.stats.d_format.total++;
+		fpuemuprivate.stats.d_format.ops[MIPSInst_FUNC(ir)]++;
+#endif
 		switch (MIPSInst_FUNC(ir)) {
 			/* binary ops */
 		case fadd_op:
@@ -1134,7 +1158,10 @@ static int fpu_emu(struct pt_regs *xcp, struct mips_fpu_struct *ctx,
 
 	case w_fmt:{
 		ieee754sp fs;
-
+#ifdef CONFIG_PROFILE_MATHEMU
+		fpuemuprivate.stats.w_format.total++;
+		fpuemuprivate.stats.w_format.ops[MIPSInst_FUNC(ir)]++;
+#endif
 		switch (MIPSInst_FUNC(ir)) {
 		case fcvts_op:
 			/* convert word to single precision real */
@@ -1156,6 +1183,10 @@ static int fpu_emu(struct pt_regs *xcp, struct mips_fpu_struct *ctx,
 
 #if defined(__mips64)
 	case l_fmt:{
+#ifdef CONFIG_PROFILE_MATHEMU
+		fpuemuprivate.stats.l_format.total++;
+		fpuemuprivate.stats.l_format.ops[MIPSInst_FUNC(ir)]++;
+#endif
 		switch (MIPSInst_FUNC(ir)) {
 		case fcvts_op:
 			/* convert long to single precision real */

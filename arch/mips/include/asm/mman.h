@@ -1,3 +1,11 @@
+/*-
+ * Copyright 2003-2012 Broadcom Corporation
+ *
+ * This is a derived work from software originally provided by the entity or
+ * entities identified below. The licensing terms, warranty terms and other
+ * terms specified in the header of the original work apply to this derived work
+ *
+ * #BRCM_1# */
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -79,5 +87,11 @@
 
 /* compatibility flags */
 #define MAP_FILE	0
+
+#if defined(CONFIG_NLM_COMMON) && defined(CONFIG_64BIT)
+#define arch_mmap_check(addr,len,flags)	mips_mmap_check(addr,len,flags)
+int mips_mmap_check(unsigned long addr, unsigned long len,
+		unsigned long flags);
+#endif
 
 #endif /* _ASM_MMAN_H */
