@@ -83,8 +83,9 @@ static int pcf857x_get8(struct gpio_chip *chip, unsigned offset)
 {
 	struct pcf857x	*gpio = container_of(chip, struct pcf857x, chip);
 	s32		value;
+	u8      command = 0xFF;
 
-	value = i2c_smbus_read_byte(gpio->client);
+	value = i2c_smbus_read_byte_data(gpio->client, command);
 	return (value < 0) ? 0 : (value & (1 << offset));
 }
 
