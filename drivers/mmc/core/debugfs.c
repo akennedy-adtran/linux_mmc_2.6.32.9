@@ -8,7 +8,8 @@
  * published by the Free Software Foundation.
  */
 #include <linux/moduleparam.h>
-#include <linux/export.h>
+//#include <linux/export.h>  //ADTRAN
+#include <linux/module.h>
 #include <linux/debugfs.h>
 #include <linux/fs.h>
 #include <linux/seq_file.h>

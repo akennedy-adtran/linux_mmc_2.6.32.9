@@ -36,6 +36,11 @@
 #endif
 #include "sdhci-pltfm.h"
 
+inline unsigned long clk_get_rate(struct clk *clk)
+{
+	return 0;
+}
+
 unsigned int sdhci_pltfm_clk_get_max_clock(struct sdhci_host *host)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
@@ -219,6 +224,11 @@ int sdhci_pltfm_register(struct platform_device *pdev,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(sdhci_pltfm_register);
+
+inline void clk_disable_unprepare(struct clk *clk)
+{
+	return ;
+}
 
 int sdhci_pltfm_unregister(struct platform_device *pdev)
 {

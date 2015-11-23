@@ -11,6 +11,7 @@
  */
 
 #include <linux/err.h>
+//#include <asm/sizes.h>  ADTRAN
 #include <linux/sizes.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
@@ -1121,7 +1122,6 @@ static int mmc_sd_resume(struct mmc_host *host)
 	if (!(host->caps & MMC_CAP_RUNTIME_RESUME)) {
 		err = _mmc_sd_resume(host);
 		pm_runtime_set_active(&host->card->dev);
-		pm_runtime_mark_last_busy(&host->card->dev);
 	}
 	pm_runtime_enable(&host->card->dev);
 

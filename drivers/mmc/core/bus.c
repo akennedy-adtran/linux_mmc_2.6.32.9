@@ -11,7 +11,8 @@
  *  MMC card bus driver model
  */
 
-#include <linux/export.h>
+//#include <linux/export.h>  //ADTRAN
+#include <linux/module.h>
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/slab.h>
@@ -190,22 +191,26 @@ static int mmc_runtime_resume(struct device *dev)
 
 	return host->bus_ops->runtime_resume(host);
 }
-#endif /* !CONFIG_PM */
 
 static const struct dev_pm_ops mmc_bus_pm_ops = {
 	SET_RUNTIME_PM_OPS(mmc_runtime_suspend, mmc_runtime_resume, NULL)
 	SET_SYSTEM_SLEEP_PM_OPS(mmc_bus_suspend, mmc_bus_resume)
 };
+#endif /* !CONFIG_PM */
 
 static struct bus_type mmc_bus_type = {
 	.name		= "mmc",
+#ifdef CONFIG_PM_SLEEP  // ADTRAN
 	.dev_groups	= mmc_dev_groups,
+#endif
 	.match		= mmc_bus_match,
 	.uevent		= mmc_bus_uevent,
 	.probe		= mmc_bus_probe,
 	.remove		= mmc_bus_remove,
 	.shutdown	= mmc_bus_shutdown,
+#ifdef CONFIG_PM  // ADTRAN
 	.pm		= &mmc_bus_pm_ops,
+#endif
 };
 
 int mmc_register_bus(void)
@@ -377,7 +382,7 @@ void mmc_remove_card(struct mmc_card *card)
 				mmc_hostname(card->host), card->rca);
 		}
 		device_del(&card->dev);
-		of_node_put(card->dev.of_node);
+//ADTRAN		of_node_put(card->dev.of_node);
 	}
 
 	put_device(&card->dev);

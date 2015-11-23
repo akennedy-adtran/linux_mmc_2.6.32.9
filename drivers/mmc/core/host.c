@@ -18,7 +18,8 @@
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/pagemap.h>
-#include <linux/export.h>
+//#include <linux/export.h>  //ADTRAN
+#include <linux/module.h>
 #include <linux/leds.h>
 #include <linux/slab.h>
 #include <linux/suspend.h>
@@ -31,6 +32,7 @@
 #include "host.h"
 #include "slot-gpio.h"
 #include "pwrseq.h"
+#include <linux/andy.h>
 
 #define cls_dev_to_mmc_host(d)	container_of(d, struct mmc_host, class_dev)
 
@@ -40,9 +42,11 @@ static DEFINE_SPINLOCK(mmc_host_lock);
 static void mmc_host_classdev_release(struct device *dev)
 {
 	struct mmc_host *host = cls_dev_to_mmc_host(dev);
+#if 0 // ADTRAN
 	spin_lock(&mmc_host_lock);
 	idr_remove(&mmc_host_idr, host->index);
 	spin_unlock(&mmc_host_lock);
+#endif
 	kfree(host);
 }
 
@@ -75,12 +79,14 @@ static ssize_t clkgate_delay_store(struct device *dev,
 	struct mmc_host *host = cls_dev_to_mmc_host(dev);
 	unsigned long flags, value;
 
+if (kstrtoul(buf, 0, &value)) printb(-EINVAL);
 	if (kstrtoul(buf, 0, &value))
 		return -EINVAL;
 
 	spin_lock_irqsave(&host->clk_lock, flags);
 	host->clkgate_delay = value;
 	spin_unlock_irqrestore(&host->clk_lock, flags);
+printv(count);
 	return count;
 }
 
@@ -97,10 +103,12 @@ static void mmc_host_clk_gate_delayed(struct mmc_host *host)
 	unsigned long freq = host->ios.clock;
 	unsigned long flags;
 
+printm();
 	if (!freq) {
 		pr_debug("%s: frequency set to 0 in disable function, "
 			 "this means the clock is already disabled.\n",
 			 mmc_hostname(host));
+prints("Clock already disabled");
 		return;
 	}
 	/*
@@ -122,6 +130,7 @@ static void mmc_host_clk_gate_delayed(struct mmc_host *host)
 	} else {
 		/* New users appeared while waiting for this work */
 		spin_unlock_irqrestore(&host->clk_lock, flags);
+prints("New users appeare while waiting for this work");
 		return;
 	}
 	mutex_lock(&host->clk_gate_mutex);
@@ -182,6 +191,7 @@ void mmc_host_clk_hold(struct mmc_host *host)
 static bool mmc_host_may_gate_card(struct mmc_card *card)
 {
 	/* If there is no card we may gate it */
+if (!card) printv(true);
 	if (!card)
 		return true;
 	/*
@@ -192,6 +202,7 @@ static bool mmc_host_may_gate_card(struct mmc_card *card)
 	 * gate the clock, because there is somebody out there that may still
 	 * be using it.
 	 */
+printv(!(card->quirks & MMC_QUIRK_BROKEN_CLK_GATING));
 	return !(card->quirks & MMC_QUIRK_BROKEN_CLK_GATING);
 }
 
@@ -233,6 +244,7 @@ unsigned int mmc_host_clk_rate(struct mmc_host *host)
 	else
 		freq = host->ios.clock;
 	spin_unlock_irqrestore(&host->clk_lock, flags);
+printv(freq);
 	return freq;
 }
 
@@ -343,11 +355,13 @@ int mmc_retune(struct mmc_host *host)
 	bool return_to_hs400 = false;
 	int err;
 
+if (!host->retune_now) printv(host->retune_now);
 	if (host->retune_now)
 		host->retune_now = 0;
 	else
 		return 0;
 
+if (!host->need_retune || host->doing_retune || !host->card) prints("host->{need_retune,doing_retune,card}");
 	if (!host->need_retune || host->doing_retune || !host->card)
 		return 0;
 
@@ -375,6 +389,7 @@ int mmc_retune(struct mmc_host *host)
 out:
 	host->doing_retune = 0;
 
+printv(err);
 	return err;
 }
 
@@ -402,6 +417,8 @@ int mmc_of_parse(struct mmc_host *host)
 	bool cd_cap_invert, cd_gpio_invert = false;
 	bool ro_cap_invert, ro_gpio_invert = false;
 
+prints("Parse host's device-tree node");
+if (!host->parent || !host->parent->of_node) printb(0);
 	if (!host->parent || !host->parent->of_node)
 		return 0;
 
@@ -426,6 +443,7 @@ int mmc_of_parse(struct mmc_host *host)
 	default:
 		dev_err(host->parent,
 			"Invalid \"bus-width\" value %u!\n", bus_width);
+printb(-EINVAL);
 		return -EINVAL;
 	}
 
@@ -455,6 +473,7 @@ int mmc_of_parse(struct mmc_host *host)
 
 		ret = mmc_gpiod_request_cd(host, "cd", 0, true,
 					   0, &cd_gpio_invert);
+if (ret) printv(ret);
 		if (!ret)
 			dev_info(host->parent, "Got CD GPIO\n");
 		else if (ret != -ENOENT && ret != -ENOSYS)
@@ -479,6 +498,7 @@ int mmc_of_parse(struct mmc_host *host)
 	ro_cap_invert = of_property_read_bool(np, "wp-inverted");
 
 	ret = mmc_gpiod_request_ro(host, "wp", 0, false, 0, &ro_gpio_invert);
+if (ret) printv(ret);
 	if (!ret)
 		dev_info(host->parent, "Got WP GPIO\n");
 	else if (ret != -ENOENT && ret != -ENOSYS)
@@ -536,6 +556,7 @@ int mmc_of_parse(struct mmc_host *host)
 		host->dsr_req = 0;
 	}
 
+prints("mmc_pwrseq_alloc(host) -- unknown return value");
 	return mmc_pwrseq_alloc(host);
 }
 
@@ -553,19 +574,19 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	int err;
 	struct mmc_host *host;
 
+printm();
+	if (!idr_pre_get(&mmc_host_idr, GFP_KERNEL))  //ADTRAN
+		return NULL;
+
+printm();
 	host = kzalloc(sizeof(struct mmc_host) + extra, GFP_KERNEL);
 	if (!host)
 		return NULL;
 
-	/* scanning will be enabled when we're ready */
-	host->rescan_disable = 1;
-	idr_preload(GFP_KERNEL);
+printm();
 	spin_lock(&mmc_host_lock);
-	err = idr_alloc(&mmc_host_idr, host, 0, 0, GFP_NOWAIT);
-	if (err >= 0)
-		host->index = err;
+	err = idr_get_new(&mmc_host_idr, host, &host->index);
 	spin_unlock(&mmc_host_lock);
-	idr_preload_end();
 	if (err < 0) {
 		kfree(host);
 		return NULL;
@@ -604,6 +625,7 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	host->max_blk_size = 512;
 	host->max_blk_count = PAGE_CACHE_SIZE / 512;
 
+printg();
 	return host;
 }
 
@@ -621,10 +643,12 @@ int mmc_add_host(struct mmc_host *host)
 {
 	int err;
 
+printm();
 	WARN_ON((host->caps & MMC_CAP_SDIO_IRQ) &&
 		!host->ops->enable_sdio_irq);
 
 	err = device_add(&host->class_dev);
+if (err) printb(err);
 	if (err)
 		return err;
 
@@ -638,6 +662,7 @@ int mmc_add_host(struct mmc_host *host)
 	mmc_start_host(host);
 	register_pm_notifier(&host->pm_notify);
 
+printg();
 	return 0;
 }
 

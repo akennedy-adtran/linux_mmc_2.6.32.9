@@ -16,7 +16,8 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/kthread.h>
-#include <linux/export.h>
+//#include <linux/export.h>  //ADTRAN
+#include <linux/module.h>
 #include <linux/wait.h>
 #include <linux/delay.h>
 

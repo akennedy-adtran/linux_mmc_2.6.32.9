@@ -36,7 +36,7 @@
 #include <linux/compat.h>
 #include <linux/pm_runtime.h>
 
-#include <linux/mmc/ioctl.h>
+#include <uapi/linux/mmc/ioctl.h>  //ADTRAN
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/mmc.h>
@@ -383,6 +383,31 @@ idata_err:
 out:
 	return ERR_PTR(err);
 }
+
+#if 1 // ADTRAN
+static void __sched do_usleep_range(unsigned long min, unsigned long max)
+{
+	ktime_t kmin;
+	unsigned long delta;
+
+	kmin = ktime_set(0, min * NSEC_PER_USEC);
+	delta = (max - min) * NSEC_PER_USEC;
+	schedule_hrtimeout_range(&kmin, delta, HRTIMER_MODE_REL);
+}
+
+/**
+ * usleep_range - Drop in replacement for udelay where wakeup is flexible
+ * @min: Minimum time in usecs to sleep
+ * @max: Maximum time in usecs to sleep
+ */
+void __sched usleep_range(unsigned long min, unsigned long max)
+{
+	__set_current_state(TASK_UNINTERRUPTIBLE);
+	do_usleep_range(min, max);
+}
+
+EXPORT_SYMBOL(usleep_range);
+#endif
 
 static int ioctl_rpmb_card_status_poll(struct mmc_card *card, u32 *status,
 				       u32 retries_max)
@@ -2197,7 +2222,7 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 	    ((card->ext_csd.rel_param & EXT_CSD_WR_REL_PARAM_EN) ||
 	     card->ext_csd.rel_sectors)) {
 		md->flags |= MMC_BLK_REL_WR;
-		blk_queue_flush(md->queue.queue, REQ_FLUSH | REQ_FUA);
+// ADTRAN		blk_queue_flush(md->queue.queue, REQ_FLUSH | REQ_FUA);
 	}
 
 	if (mmc_card_mmc(card) &&
@@ -2259,7 +2284,7 @@ static int mmc_blk_alloc_part(struct mmc_card *card,
 	part_md->part_type = part_type;
 	list_add(&part_md->part, &md->part);
 
-	string_get_size((u64)get_capacity(part_md->disk), 512, STRING_UNITS_2,
+	string_get_size((u64)get_capacity(part_md->disk), STRING_UNITS_2,
 			cap_str, sizeof(cap_str));
 	pr_info("%s: %s %s partition %u %s\n",
 	       part_md->disk->disk_name, mmc_card_id(card),
@@ -2345,7 +2370,7 @@ static int mmc_add_disk(struct mmc_blk_data *md)
 	add_disk(md->disk);
 	md->force_ro.show = force_ro_show;
 	md->force_ro.store = force_ro_store;
-	sysfs_attr_init(&md->force_ro.attr);
+//ADTRAN	sysfs_attr_init(&md->force_ro.attr);
 	md->force_ro.attr.name = "force_ro";
 	md->force_ro.attr.mode = S_IRUGO | S_IWUSR;
 	ret = device_create_file(disk_to_dev(md->disk), &md->force_ro);
@@ -2363,7 +2388,7 @@ static int mmc_add_disk(struct mmc_blk_data *md)
 
 		md->power_ro_lock.show = power_ro_lock_show;
 		md->power_ro_lock.store = power_ro_lock_store;
-		sysfs_attr_init(&md->power_ro_lock.attr);
+//ADTRAN		sysfs_attr_init(&md->power_ro_lock.attr);
 		md->power_ro_lock.attr.mode = mode;
 		md->power_ro_lock.attr.name =
 					"ro_lock_until_next_power_on";
@@ -2464,7 +2489,7 @@ static int mmc_blk_probe(struct mmc_card *card)
 	if (IS_ERR(md))
 		return PTR_ERR(md);
 
-	string_get_size((u64)get_capacity(md->disk), 512, STRING_UNITS_2,
+	string_get_size((u64)get_capacity(md->disk), STRING_UNITS_2,
 			cap_str, sizeof(cap_str));
 	pr_info("%s: %s %s %s %s\n",
 		md->disk->disk_name, mmc_card_id(card), mmc_card_name(card),
@@ -2483,8 +2508,10 @@ static int mmc_blk_probe(struct mmc_card *card)
 			goto out;
 	}
 
+#if CONFIG_PM  //ADTRAN
 	pm_runtime_set_autosuspend_delay(&card->dev, 3000);
 	pm_runtime_use_autosuspend(&card->dev);
+#endif
 
 	/*
 	 * Don't enable runtime PM for SD-combo cards here. Leave that
@@ -2564,14 +2591,16 @@ static int mmc_blk_resume(struct device *dev)
 	}
 	return 0;
 }
-#endif
 
 static SIMPLE_DEV_PM_OPS(mmc_blk_pm_ops, mmc_blk_suspend, mmc_blk_resume);
+#endif
 
 static struct mmc_driver mmc_driver = {
 	.drv		= {
 		.name	= "mmcblk",
+#ifdef CONFIG_PM_SLEEP  //ADTRAN
 		.pm	= &mmc_blk_pm_ops,
+#endif
 	},
 	.probe		= mmc_blk_probe,
 	.remove		= mmc_blk_remove,

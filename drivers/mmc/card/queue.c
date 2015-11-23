@@ -176,6 +176,14 @@ static void mmc_queue_setup_discard(struct request_queue *q,
 		queue_flag_set_unlocked(QUEUE_FLAG_SECDISCARD, q);
 }
 
+#ifndef dma_max_pfn  //ADTRAN
+static inline unsigned long dma_max_pfn(struct device *dev)
+{
+	return *dev->dma_mask >> PAGE_SHIFT;
+}
+#endif
+
+
 /**
  * mmc_init_queue - initialise a queue structure.
  * @mq: mmc queue
@@ -245,7 +253,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 		if (mqrq_cur->bounce_buf && mqrq_prev->bounce_buf) {
 			blk_queue_bounce_limit(mq->queue, BLK_BOUNCE_ANY);
 			blk_queue_max_hw_sectors(mq->queue, bouncesz / 512);
-			blk_queue_max_segments(mq->queue, bouncesz / 512);
+			blk_queue_max_phys_segments(mq->queue, bouncesz / 512);
 			blk_queue_max_segment_size(mq->queue, bouncesz);
 
 			mqrq_cur->sg = mmc_alloc_sg(1, &ret);
@@ -273,7 +281,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 		blk_queue_bounce_limit(mq->queue, limit);
 		blk_queue_max_hw_sectors(mq->queue,
 			min(host->max_blk_count, host->max_req_size / 512));
-		blk_queue_max_segments(mq->queue, host->max_segs);
+		blk_queue_max_phys_segments(mq->queue, host->max_segs);
 		blk_queue_max_segment_size(mq->queue, host->max_seg_size);
 
 		mqrq_cur->sg = mmc_alloc_sg(host->max_segs, &ret);

@@ -62,6 +62,19 @@ struct attribute_group {
 
 struct vm_area_struct;
 
+#define __ATTRIBUTE_GROUPS(_name)\
+static const struct attribute_group *_name##_groups[] = {	\
+	&_name##_group,						\
+	NULL,							\
+}
+
+#define ATTRIBUTE_GROUPS(_name)					\
+static const struct attribute_group _name##_group = {		\
+	.attrs = _name##_attrs,					\
+};								\
+__ATTRIBUTE_GROUPS(_name)
+
+
 struct bin_attribute {
 	struct attribute	attr;
 	size_t			size;

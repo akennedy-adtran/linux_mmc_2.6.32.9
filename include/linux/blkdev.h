@@ -93,11 +93,15 @@ enum rq_flag_bits {
 	__REQ_FAILFAST_TRANSPORT, /* no driver retries of transport errors */
 	__REQ_FAILFAST_DRIVER,	/* no driver retries of driver errors */
 	/* above flags must match BIO_RW_* */
+	__REQ_META,		/* metadata io request */
 	__REQ_DISCARD,		/* request to discard sectors */
+	__REQ_SECURE,		/* secure discard (used with __REQ_DISCARD) */
 	__REQ_SORTED,		/* elevator knows about this request */
 	__REQ_SOFTBARRIER,	/* may not be passed by ioscheduler */
 	__REQ_HARDBARRIER,	/* may not be passed by drive either */
 	__REQ_FUA,		/* forced unit access */
+	__REQ_FLUSH,		/* request for cache flush */
+
 	__REQ_NOMERGE,		/* don't touch this for merging */
 	__REQ_STARTED,		/* drive already may have started this one */
 	__REQ_DONTPREP,		/* don't call prep for this one */
@@ -122,7 +126,9 @@ enum rq_flag_bits {
 #define REQ_FAILFAST_DEV	(1 << __REQ_FAILFAST_DEV)
 #define REQ_FAILFAST_TRANSPORT	(1 << __REQ_FAILFAST_TRANSPORT)
 #define REQ_FAILFAST_DRIVER	(1 << __REQ_FAILFAST_DRIVER)
+#define REQ_META	(1 << __REQ_META)
 #define REQ_DISCARD	(1 << __REQ_DISCARD)
+#define REQ_SECURE	(1 << __REQ_SECURE)
 #define REQ_SORTED	(1 << __REQ_SORTED)
 #define REQ_SOFTBARRIER	(1 << __REQ_SOFTBARRIER)
 #define REQ_HARDBARRIER	(1 << __REQ_HARDBARRIER)
@@ -140,6 +146,7 @@ enum rq_flag_bits {
 #define REQ_ALLOCED	(1 << __REQ_ALLOCED)
 #define REQ_RW_META	(1 << __REQ_RW_META)
 #define REQ_COPY_USER	(1 << __REQ_COPY_USER)
+#define REQ_FLUSH	(1 << __REQ_FLUSH)
 #define REQ_INTEGRITY	(1 << __REQ_INTEGRITY)
 #define REQ_NOIDLE	(1 << __REQ_NOIDLE)
 #define REQ_IO_STAT	(1 << __REQ_IO_STAT)
@@ -312,6 +319,8 @@ struct queue_limits {
 	unsigned int		io_min;
 	unsigned int		io_opt;
 	unsigned int		max_discard_sectors;
+	unsigned int		discard_granularity;
+
 
 	unsigned short		logical_block_size;
 	unsigned short		max_hw_segments;
@@ -319,6 +328,7 @@ struct queue_limits {
 
 	unsigned char		misaligned;
 	unsigned char		no_cluster;
+	unsigned char		discard_zeroes_data;
 };
 
 struct request_queue
@@ -459,6 +469,9 @@ struct request_queue
 #define QUEUE_FLAG_IO_STAT     15	/* do IO stats */
 #define QUEUE_FLAG_CQ	       16	/* hardware does queuing */
 #define QUEUE_FLAG_DISCARD     17	/* supports DISCARD */
+#define QUEUE_FLAG_ADD_RANDOM  18	/* Contributes to random pool */
+#define QUEUE_FLAG_SECDISCARD  19	/* supports SECDISCARD */
+
 
 #define QUEUE_FLAG_DEFAULT	((1 << QUEUE_FLAG_IO_STAT) |		\
 				 (1 << QUEUE_FLAG_CLUSTER) |		\
@@ -1052,6 +1065,8 @@ static inline unsigned short queue_max_hw_segments(struct request_queue *q)
 {
 	return q->limits.max_hw_segments;
 }
+
+#define queue_max_segments queue_max_hw_segments
 
 static inline unsigned short queue_max_phys_segments(struct request_queue *q)
 {

@@ -24,6 +24,8 @@
 #include "sdio_cis.h"
 #include "sdio_ops.h"
 
+#include <linux/andy.h>
+
 static int cistpl_vers_1(struct mmc_card *card, struct sdio_func *func,
 			 const unsigned char *buf, unsigned size)
 {
@@ -42,12 +44,14 @@ static int cistpl_vers_1(struct mmc_card *card, struct sdio_func *func,
 		if (buf[i] == 0)
 			nr_strings++;
 	}
+if (nr_strings == 0) printb(0);
 	if (nr_strings == 0)
 		return 0;
 
 	size = i;
 
 	buffer = kzalloc(sizeof(char*) * nr_strings + size, GFP_KERNEL);
+if (!buffer) printb(-ENOMEM);
 	if (!buffer)
 		return -ENOMEM;
 
@@ -68,6 +72,7 @@ static int cistpl_vers_1(struct mmc_card *card, struct sdio_func *func,
 		card->info = (const char**)buffer;
 	}
 
+printg();
 	return 0;
 }
 
@@ -90,6 +95,7 @@ static int cistpl_manfid(struct mmc_card *card, struct sdio_func *func,
 		card->cis.device = device;
 	}
 
+printg();
 	return 0;
 }
 
@@ -140,6 +146,7 @@ static int cis_tpl_parse(struct mmc_card *card, struct sdio_func *func,
 		ret = -ENOENT;
 	}
 
+printv(ret);
 	return ret;
 }
 
@@ -147,6 +154,7 @@ static int cistpl_funce_common(struct mmc_card *card, struct sdio_func *func,
 			       const unsigned char *buf, unsigned size)
 {
 	/* Only valid for the common CIS (function 0) */
+if (func) printb(-EINVAL);
 	if (func)
 		return -EINVAL;
 
@@ -157,6 +165,7 @@ static int cistpl_funce_common(struct mmc_card *card, struct sdio_func *func,
 	card->cis.max_dtr = speed_val[(buf[3] >> 3) & 15] *
 			    speed_unit[buf[3] & 7];
 
+printg();
 	return 0;
 }
 
@@ -167,6 +176,7 @@ static int cistpl_funce_func(struct mmc_card *card, struct sdio_func *func,
 	unsigned min_size;
 
 	/* Only valid for the individual function's CIS (1-7) */
+if (func) printb(-EINVAL);
 	if (!func)
 		return -EINVAL;
 
@@ -177,6 +187,7 @@ static int cistpl_funce_func(struct mmc_card *card, struct sdio_func *func,
 	vsn = func->card->cccr.sdio_vsn;
 	min_size = (vsn == SDIO_SDIO_REV_1_00) ? 28 : 42;
 
+if (size < min_size) printb(-EINVAL);
 	if (size < min_size)
 		return -EINVAL;
 
@@ -189,6 +200,7 @@ static int cistpl_funce_func(struct mmc_card *card, struct sdio_func *func,
 	else
 		func->enable_timeout = jiffies_to_msecs(HZ);
 
+printg();
 	return 0;
 }
 
@@ -208,9 +220,11 @@ static const struct cis_tpl cis_tpl_funce_list[] = {
 static int cistpl_funce(struct mmc_card *card, struct sdio_func *func,
 			const unsigned char *buf, unsigned size)
 {
+if (size < 1) printb(-EINVAL);
 	if (size < 1)
 		return -EINVAL;
 
+printv(cis_tpl_parse(card, func, "CISTPL_FUNCE", cis_tpl_funce_list, ARRAY_SIZE(cis_tpl_funce_list), buf[0], buf, size));
 	return cis_tpl_parse(card, func, "CISTPL_FUNCE",
 			     cis_tpl_funce_list,
 			     ARRAY_SIZE(cis_tpl_funce_list),
@@ -246,6 +260,7 @@ static int sdio_read_cis(struct mmc_card *card, struct sdio_func *func)
 
 		ret = mmc_io_rw_direct(card, 0, 0,
 			SDIO_FBR_BASE(fn) + SDIO_FBR_CIS + i, 0, &x);
+if (ret) printb(ret);
 		if (ret)
 			return ret;
 		ptr |= x << (i * 8);
@@ -282,6 +297,7 @@ static int sdio_read_cis(struct mmc_card *card, struct sdio_func *func)
 			break;
 
 		this = kmalloc(sizeof(*this) + tpl_link, GFP_KERNEL);
+if (!this) printb(-ENOMEM);
 		if (!this)
 			return -ENOMEM;
 
@@ -313,7 +329,7 @@ static int sdio_read_cis(struct mmc_card *card, struct sdio_func *func)
 
 			if (ret == -ENOENT) {
 				/* warn about unknown tuples */
-				pr_warn_ratelimited("%s: queuing unknown"
+				pr_warn("%s: queuing unknown"
 				       " CIS tuple 0x%02x (%u bytes)\n",
 				       mmc_hostname(card->host),
 				       tpl_code, tpl_link);
@@ -340,6 +356,7 @@ static int sdio_read_cis(struct mmc_card *card, struct sdio_func *func)
 	if (func)
 		*prev = card->tuples;
 
+printv(ret);
 	return ret;
 }
 
@@ -368,6 +385,7 @@ int sdio_read_func_cis(struct sdio_func *func)
 	int ret;
 
 	ret = sdio_read_cis(func->card, func);
+if (ret) printb(ret);
 	if (ret)
 		return ret;
 
@@ -386,6 +404,7 @@ int sdio_read_func_cis(struct sdio_func *func)
 		func->device = func->card->cis.device;
 	}
 
+printg();
 	return 0;
 }
 

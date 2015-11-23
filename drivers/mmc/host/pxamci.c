@@ -34,7 +34,8 @@
 #include <linux/of_gpio.h>
 #include <linux/of_device.h>
 
-#include <asm/sizes.h>
+//#include <asm/sizes.h>  ADTRAN
+#include <linux/sizes.h>
 
 #include <mach/hardware.h>
 #include <mach/dma.h>
