@@ -19,6 +19,10 @@ config ZONE_DMA
 config N511
 	bool
 
+config DTC
+	bool
+	default y
+
 choice
 	prompt "System type"
 	default SGI_IP22
