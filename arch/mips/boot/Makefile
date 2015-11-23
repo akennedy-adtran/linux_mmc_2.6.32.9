@@ -47,3 +47,9 @@ clean-files += addinitrd \
 	       vmlinux.bin \
 	       vmlinux.ecoff \
 	       vmlinux.srec
+
+DTC = $(objtree)/scripts/dtc/dtc
+DTS_FLAGS	?= -p 1024
+
+$(obj)/%.dtb: $(obj)/dts/%.dts
+	$(DTC) -O dtb -o $(obj)/$*.dtb -b 0 $(DTS_FLAGS) $(obj)/dts/$*.dts

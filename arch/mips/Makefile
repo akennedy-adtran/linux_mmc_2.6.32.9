@@ -810,3 +810,8 @@ endef
 CLEAN_FILES += vmlinux.32 \
 	       vmlinux.64 \
 	       vmlinux.ecoff
+
+boot := arch/$(ARCH)/boot
+
+%.dtb:
+	$(Q)$(MAKE) ARCH=mips $(build)=$(boot) $(patsubst %,$(boot)/%,$@)
