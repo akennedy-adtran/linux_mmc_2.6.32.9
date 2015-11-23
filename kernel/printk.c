@@ -660,7 +660,7 @@ static const char recursion_bug_msg [] =
 		KERN_CRIT "BUG: recent printk recursion!\n";
 static int recursion_bug;
 static int new_text_line = 1;
-static char printk_buf[1024] __cacheline_aligned;
+static char printk_buf[1024];
 
 int printk_delay_msec __read_mostly;
 
