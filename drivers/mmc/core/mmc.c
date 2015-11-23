@@ -121,11 +121,15 @@ static int mmc_decode_csd(struct mmc_card *card)
 	 * v1.2 has extra information in bits 15, 11 and 10.
 	 */
 	csd_struct = UNSTUFF_BITS(resp, 126, 2);
+
+	// Assume all changes to CSD are backwards compatible
+	#if 0
 	if (csd_struct != 1 && csd_struct != 2) {
 		printk(KERN_ERR "%s: unrecognised CSD structure version %d\n",
 			mmc_hostname(card->host), csd_struct);
 		return -EINVAL;
 	}
+	#endif
 
 	csd->mmca_vsn	 = UNSTUFF_BITS(resp, 122, 4);
 	m = UNSTUFF_BITS(resp, 115, 4);
@@ -207,13 +211,17 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 	}
 
 	card->ext_csd.rev = ext_csd[EXT_CSD_REV];
+	// Assume all changes are backwards compatible
+	#if 0
 	if (card->ext_csd.rev > 3) {
+
 		printk(KERN_ERR "%s: unrecognised EXT_CSD structure "
 			"version %d\n", mmc_hostname(card->host),
 			card->ext_csd.rev);
 		err = -EINVAL;
 		goto out;
 	}
+	#endif
 
 	if (card->ext_csd.rev >= 2) {
 		card->ext_csd.sectors =
