@@ -14,13 +14,23 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/device.h>
+#include <linux/slab.h>
+#include <linux/irq.h>
 #include <linux/gpio.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
+#include <linux/of_irq.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/mmc_spi.h>
 #include <linux/mmc/core.h>
 #include <linux/mmc/host.h>
+
+/* For archs that don't support NO_IRQ (such as mips), provide a dummy value */
+#ifndef NO_IRQ
+#define NO_IRQ 0
+#endif
+
+MODULE_LICENSE("GPL");
 
 enum {
 	CD_GPIO = 0,
@@ -31,6 +41,7 @@ enum {
 struct of_mmc_spi {
 	int gpios[NUM_GPIOS];
 	bool alow_gpios[NUM_GPIOS];
+	int detect_irq;
 	struct mmc_spi_platform_data pdata;
 };
 
@@ -39,29 +50,26 @@ static struct of_mmc_spi *to_of_mmc_spi(struct device *dev)
 	return container_of(dev->platform_data, struct of_mmc_spi, pdata);
 }
 
-static int of_mmc_spi_read_gpio(struct device *dev, int gpio_num)
+static int of_mmc_spi_init(struct device *dev,
+			   irqreturn_t (*irqhandler)(int, void *), void *mmc)
 {
 	struct of_mmc_spi *oms = to_of_mmc_spi(dev);
-	bool active_low = oms->alow_gpios[gpio_num];
-	bool value = gpio_get_value(oms->gpios[gpio_num]);
 
-	return active_low ^ value;
+	return request_threaded_irq(oms->detect_irq, NULL, irqhandler, 0,
+				    dev_name(dev), mmc);
 }
 
-static int of_mmc_spi_get_cd(struct device *dev)
+static void of_mmc_spi_exit(struct device *dev, void *mmc)
 {
-	return of_mmc_spi_read_gpio(dev, CD_GPIO);
-}
+	struct of_mmc_spi *oms = to_of_mmc_spi(dev);
 
-static int of_mmc_spi_get_ro(struct device *dev)
-{
-	return of_mmc_spi_read_gpio(dev, WP_GPIO);
+	free_irq(oms->detect_irq, mmc);
 }
 
 struct mmc_spi_platform_data *mmc_spi_get_pdata(struct spi_device *spi)
 {
 	struct device *dev = &spi->dev;
-	struct device_node *np = dev_archdata_get_node(&dev->archdata);
+	struct device_node *np = dev->of_node;
 	struct of_mmc_spi *oms;
 	const u32 *voltage_ranges;
 	int num_ranges;
@@ -86,8 +94,8 @@ struct mmc_spi_platform_data *mmc_spi_get_pdata(struct spi_device *spi)
 		const int j = i * 2;
 		u32 mask;
 
-		mask = mmc_vddrange_to_ocrmask(voltage_ranges[j],
-					       voltage_ranges[j + 1]);
+		mask = mmc_vddrange_to_ocrmask(be32_to_cpu(voltage_ranges[j]),
+					       be32_to_cpu(voltage_ranges[j + 1]));
 		if (!mask) {
 			ret = -EINVAL;
 			dev_err(dev, "OF: voltage-range #%d is invalid\n", i);
@@ -103,23 +111,30 @@ struct mmc_spi_platform_data *mmc_spi_get_pdata(struct spi_device *spi)
 		if (!gpio_is_valid(oms->gpios[i]))
 			continue;
 
-		ret = gpio_request(oms->gpios[i], dev_name(dev));
-		if (ret < 0) {
-			oms->gpios[i] = -EINVAL;
-			continue;
-		}
-
 		if (gpio_flags & OF_GPIO_ACTIVE_LOW)
 			oms->alow_gpios[i] = true;
 	}
 
-	if (gpio_is_valid(oms->gpios[CD_GPIO]))
-		oms->pdata.get_cd = of_mmc_spi_get_cd;
-	if (gpio_is_valid(oms->gpios[WP_GPIO]))
-		oms->pdata.get_ro = of_mmc_spi_get_ro;
+	if (gpio_is_valid(oms->gpios[CD_GPIO])) {
+		oms->pdata.cd_gpio = oms->gpios[CD_GPIO];
+		oms->pdata.flags |= MMC_SPI_USE_CD_GPIO;
+		if (!oms->alow_gpios[CD_GPIO])
+			oms->pdata.caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+	}
+	if (gpio_is_valid(oms->gpios[WP_GPIO])) {
+		oms->pdata.ro_gpio = oms->gpios[WP_GPIO];
+		oms->pdata.flags |= MMC_SPI_USE_RO_GPIO;
+		if (!oms->alow_gpios[WP_GPIO])
+			oms->pdata.caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
+	}
 
-	/* We don't support interrupts yet, let's poll. */
-	oms->pdata.caps |= MMC_CAP_NEEDS_POLL;
+	oms->detect_irq = irq_of_parse_and_map(np, 0);
+	if (oms->detect_irq != 0) {
+		oms->pdata.init = of_mmc_spi_init;
+		oms->pdata.exit = of_mmc_spi_exit;
+	} else {
+		oms->pdata.caps |= MMC_CAP_NEEDS_POLL;
+	}
 
 	dev->platform_data = &oms->pdata;
 	return dev->platform_data;
@@ -132,17 +147,12 @@ EXPORT_SYMBOL(mmc_spi_get_pdata);
 void mmc_spi_put_pdata(struct spi_device *spi)
 {
 	struct device *dev = &spi->dev;
-	struct device_node *np = dev_archdata_get_node(&dev->archdata);
+	struct device_node *np = dev->of_node;
 	struct of_mmc_spi *oms = to_of_mmc_spi(dev);
-	int i;
 
 	if (!dev->platform_data || !np)
 		return;
 
-	for (i = 0; i < ARRAY_SIZE(oms->gpios); i++) {
-		if (gpio_is_valid(oms->gpios[i]))
-			gpio_free(oms->gpios[i]);
-	}
 	kfree(oms);
 	dev->platform_data = NULL;
 }
