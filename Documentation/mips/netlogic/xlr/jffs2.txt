@@ -1,0 +1,75 @@
+Nand and nor flash mtd jffs2 support is enabled by default.
+
+Linux sees the NOR flash as a single partitions:
+0M-8M - used by bootloader. Linux should not touch.
+8M-end of the flash(16M) - partition 0.
+
+Linux sees the NAND flash as two partitions:
+0M-8M - used by bootloader. Linux should not touch.
+8M-62M - partition 1.
+62M-end of the flash - partition 2.
+
+Nor flash jffs2 partition 0 is named as "User FS". 
+Nand flash jffs2 partition 0 is named as "Root Filesystem" and 
+Nand flash jffs2 partition 1 is named as "Home Filesystem".
+
+Nand and Nor can be mounted as follows:
+Major block number of mtd(nand and nor) block devices is  31.
+It can be confirmed by issuing the command: ls -l /dev/mtdblock* 
+
+If NOR flash is present minor number 0 is alloted to nor jffs2 partition 0.
+Nand flash partitions will have minor numbers 1 and 2.
+In case of only Nand flash minor numbers 0 and 1 will be alloted to nand jffs2
+parittions.
+
+By default only /dev/mtdblock0 is created.
+Create additional devices(if needed) by issuing the command:
+mknod /dev/mtdblock1 b 31 1
+mknod /dev/mtdblock2 b 31 2
+
+Information about the minor numbers of the mtd partitions can be obtained by
+issuing the command: cat /proc/mtd
+
+Linux can write boot images into one of these partitions once it is mounted as 
+a jffs2 file system.
+
+mount -t jffs2 /dev/mtdblock0 <mount point>
+mount -t jffs2 /dev/mtdblock1 <mount point>
+mount -t jffs2 /dev/mtdblock2 <mount point>
+
+Writing image into this partition is the only way to create jffs2 files into the
+nand/nor flash partition. jffs2 present in bootloader is readonly.
+
+2. jffs2 and nand/nor mtd support in bootloader:
+============================================
+
+nand mtd and jffs2 are ported from u-boot code. Added support for micron in the 
+mtd. 
+
+Nor is statically divided into many partitions as follows:
+
+0M-(4MB-128k): primary bootloader
+(4M-128K)-(4M+128K): env
+(4M+128K)-(8M): backup bootloader
+8M-end of the flash(16M): jffs2 nor partition 0(user FS)
+
+Nand is statically divided into many partitions as follows:
+
+0M-(4MB-128k): primary bootloader
+(4M-128K)-(4M+128K): env
+(4M+128K)-(8M): backup bootloader(only boot2 in case of nand)
+8M-62M: jffs2 nand partition 0 (Root Filesystem)
+62M-end of flash: jffs2 nand partition 1 (Home Filesystem)
+
+         Files are written into jffs2 partitions by linux. Same configuration in
+         terms of size and location of partition needs to be maintained 
+         between linux and bootloader. This is a readonly partition in case of 
+         bootloader.
+
+Commands like
+
+    dls nor0 0 <filename>
+    dls nand0 0 <filename>
+    dload nand0 0 <filename>
+
+can be used by bootloader to list/load files from nand flash.

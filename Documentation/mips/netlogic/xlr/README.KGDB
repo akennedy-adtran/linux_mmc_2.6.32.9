@@ -1,0 +1,73 @@
+		Remote Kernel debugging with KGDB
+
+A. Introduction
+
+KGDB is a source level debugger for Linux kernel. It is used along with gdb to 
+debug Linux kernel. Kernel developers can debug a kernel similar to application 
+programs with use of KGDB. It makes it possible to place breakpoints in kernel 
+code, step through the code and observe variables.
+
+Two machines are required for using KGDB. One of these machines is a 
+development machine and the other is a test machine. The machines are connected 
+through a serial line, a null-modem cable which connects their serial ports.  
+The kernel to be debugged runs on the test machine. Gdb runs on the development 
+machine. The serial line is used by gdb to communicate to the kernel being 
+debugged. 
+
+Current release of RMI Linux includes support for KGDB. The main KGDB
+patch was taken from kgdb.sourceforge.net (KGDB 2.3) and ported to RMI Linux 
+with lot of bugs fixes for handling breakpoints in SMP kernel and breakpoints 
+in interrupt mode.
+
+This release supports remote debugging only through a serial line.
+
+
+B. Building debug support in Kernel
+	1. Run 'make menuconfig' and select the following options:
+		Kernel hacking ->
+				Kernel debugging
+				De-select Debug preemptible kernel
+				KGDB: kernel debugging with remote gdb
+				Method for KGDB communication -> KGDB: On 
+						generic serial port (8250)
+				Simple selection of KGDB serial port
+				(38400) Debug serial port baud rate
+				(1) Serial port number for KGDB
+
+	Change the baud rate and serial port number above if required.
+
+	2. Save the configuration and build the kernel by running
+		'make vmlinux'
+
+	3. Pass 'kgdbwait' option to the Kernel boot arguments if you want KGDB
+	to stop on boot and wait for connection from remote GDB. If this option
+	is not provided, Kernel will boot normally and host gdb can connect to
+	target later (as explained in section D).
+
+
+C. Building host GDB
+	1. Download the latest GDB sources from 
+			http://www.gnu.org/software/gdb/
+	This release has been tested with gdb version 6.4
+
+	2. cd gdb-6.4
+	3. ./configure --target=mips-linux
+	4. Run 'make' to build the gdb binary (under gdb directory).
+	
+
+D. Connecting to target from host GDB
+	After booting the Kernel with KGDB support, as explained in section B,
+	host gdb can be used to connect to the target as explained below:
+
+	1. Run gdb on the host as follows
+		gdb/gdb vmlinux
+	Here vmlinux should be unstripped kernel image.
+
+	2. set architecture mips:isa32 
+		(for 64bit linux image, set architecture mips:isa64)
+	3. set remotebaud 38400
+	4. target remote /dev/ttyS0
+
+E. Limitation
+	KGDB is currently supported only over on board serial ports.
+

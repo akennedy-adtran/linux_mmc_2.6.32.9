@@ -1,0 +1,18 @@
+NetLogic's XLP processor provides support for inhibit reading and executing 
+of portions of applications address space. In the absence of read and exec 
+inhibit semantics, the address space could only be write-protected while the 
+whole address space is readable and executable, a security hole. The 
+archiectural support/enhancement now allows the application of all the three 
+permission modes (read, write, execution) in all combinations to the address 
+space of application.
+
+Read and Exec inhibit semantics can be configured indepedently in Linux 
+during compile time as follows:
+
+> make menuconfig
+
+    Machine selection  --->
+        ...
+        [*] Enable Read Inhibit Semantics
+        [*] Enable Exec Inhibit Semantics
+

@@ -1,0 +1,37 @@
+I.
+
+=====================================================
+PCI-based Serial ATA Support on the XLR
+=====================================================
+
+For PCI-based Serial ATA support, the developer 
+is advised to enable and use SATA over IDE from 
+drivers/ide/Kconfig:98, BLK_DEV_IDE_SATA, instead 
+of SATA over SCSI as enabled by CONFIG_SCSI_SATA 
+from drivers/scsi/Kconfig:464. The SATA controllers 
+that have been enabled and tested for the XLR, use 
+the BLK_DEV_IDE_SATA code.
+
+Eventhough the BLK_DEV_IDE_SATA support is listed 
+as deprecated, reliability issues have been observed
+during MIPS bringup of the SATA layer over SCSI; 
+(e.g., the Silicon Image Drivers).
+
+II.
+
+=====================================================
+Application note for the SX8 8-port SATA driver
+in the Linux Kernel :-
+=====================================================
+
+1. The driver code defaults to a value of 1 for the
+   'max_queue' variable in drivers/block/sx8.c.
+   For better performance bandwidth numbers, the user
+   will be able to change this value to a maximum
+   of '30' either by compiling this in or through
+   an insmod of sx8.ko (insmod sx8.ko max_queue=30).
+
+   This produces an average of 55MB/s per disk upto
+   a maximum of 8 disks for the XLR, using the SX8.
+
+=====================================================

@@ -1,0 +1,2399 @@
+/*-
+ * Copyright (c) 2003-2014 Broadcom Corporation
+ * All Rights Reserved
+ *
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * http://www.gnu.org/licenses/gpl-2.0.txt
+ * or the Broadcom license below:
+
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *	notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *	notice, this list of conditions and the following disclaimer in
+ *	the documentation and/or other materials provided with the
+ *	distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY BROADCOM ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL BROADCOM OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * #BRCM_4# */
+
+#ifndef NLM_HAL_XLP_DEV_H
+#define NLM_HAL_XLP_DEV_H
+
+#define NLM_MAX_NODES			4
+#define NODE_0					0
+#define BUS_0					0
+
+#define MAX_VC_PERTHREAD		4
+
+#define XLP_CACHELINE_SIZE		64
+#define CACHELINE_MASK			(XLP_CACHELINE_SIZE - 1)
+
+#ifndef NLM_NCPUS_PER_NODE
+#define NLM_NCPUS_PER_NODE		32
+#endif
+
+#define NLM_MAX_CORES_PER_NODE	8
+#define NLM_MAX_CPUS_PER_CORE	4
+
+/*
+ * This File has all the XLP Device specific Defines
+ */
+#define XLP_PCIE_CFG_SIZE				0x1000 /* 4K */
+#define XLP_PCIE_DEV_BLK_SIZE			0x8000 /* 4k per function  and 8 function in a dev block */
+#define XLP_PCIE_BUS_BLK_SIZE			(256 * XLP_PCIE_DEV_BLK_SIZE)
+
+/*XLP8XX/4XX B0 and A2 supported apis*/
+#define CHIP_PROCESSOR_ID_XLP_8XX		0
+#define CHIP_PROCESSOR_ID_XLP_8_4_XX	0x10
+#define CHIP_PROCESSOR_ID_XLP_3XX		0x11
+#define CHIP_PROCESSOR_ID_XLP_2XX		0x12
+#define CHIP_PROCESSOR_ID_XLP_1XX		0x13
+#define CHIP_PROCESSOR_ID_XLP_9XX		0x15
+
+/*XLP 8XX  A0,A1,A2 chip support*/
+#define CHIP_PROCESSOR_ID_XLP_832		CHIP_PROCESSOR_ID_XLP_8_4_XX
+#define CHIP_PROCESSOR_ID_XLP_816		0x14
+#define CHIP_PROCESSOR_ID_XLP_432		0x90
+#define CHIP_PROCESSOR_ID_XLP_416		0x94
+#define CHIP_PROCESSOR_ID_XLP_408		0x95
+#define CHIP_PROCESSOR_ID_XLP_208		0xB5
+#define CHIP_PROCESSOR_ID_XLP_204		0xB7
+#define CHIP_PROCESSOR_ID_XLP_104		0xF7
+
+/*Software Revision Number			XLP8XX  XLP3XX	XLP2xx	*/
+#define XLP_REVISION_A0		0x00 /*	0		0		0		*/
+#define XLP_REVISION_A1		0x01 /*	1		1		1		*/
+#define XLP_REVISION_A2		0x02 /*	2						*/
+#define XLP_REVISION_B0		0x03 /*	3		2		2		*/
+#define XLP_REVISION_B1		0x04 /*	4		3		3		*/
+#define XLP_REVISION_B2		0x05 /*	5		4				*/
+
+/* Local defines for Storm and Firefly B0 (neither has A2) */
+#define XLP2XX_REVISION_B0  0x02
+#define XLP3XX_REVISION_B0  0x02
+
+#define XLP_REVISION_AX		0xAF
+#define XLP_REVISION_BX		0xBF
+#define XLP_REVISION_INV	0xFE
+#ifndef XLP_REVISION_ANY
+#define XLP_REVISION_ANY	0xFF
+#endif
+
+/*XLP 3XX EXTPID type */
+/*xlp3xx Base
+ *--------
+ *xlp316   4x4 16 threads
+ *xlp308   2x4  8 threads
+ *xlp304   1x4  4 threads
+ *xlp208a  2x4  8 trheads
+ *xlp108a  2x4  8 trheads
+ *xlp204a  1x4  4 trheads
+ *xlp104a  1x4  4 trheads
+ *xlp202a  2x1  2 trheads
+ *xlp201a  1x1  1 trheads
+ *xlp101a  1x1  1 trheads
+ */
+#define CPU_EXTPID_XLP_3XX_NONE		0x00
+#define CPU_EXTPID_XLP_3XX_BASE		0x00
+
+#define CPU_EXTPID_XLP_3XX_L		0x01
+#define CPU_EXTPID_XLP_3XX_LP		0x02
+#define CPU_EXTPID_XLP_3XX_LP2		0x03
+
+#define CPU_EXTPID_XLP_208a			0x06
+#define CPU_EXTPID_XLP_108a			0x07
+#define CPU_EXTPID_XLP_204a			0x05
+#define CPU_EXTPID_XLP_104a			0x04
+#define CPU_EXTPID_XLP_202a			0x08
+#define CPU_EXTPID_XLP_201a			0x09
+#define CPU_EXTPID_XLP_101a			0x0A
+
+#define CPU_EXTPID_XLP_3XX_MAX		0x0F
+
+#define CPU_EXTPID_XLP_3XX_INV		0xFE  	 /* invalid */
+#define CPU_EXTPID_XLP_3XX_ANY		0xFF	 /* Any 3XX */
+
+#ifndef __ASSEMBLY__
+#ifndef __XLP_CHIPID_MACROS__
+#define __XLP_CHIPID_MACROS__
+
+extern int is_nlm_xlp(unsigned int chipid, unsigned int rev, unsigned int ext);
+
+/* 16 bits Software CPU ID Encoding rule:
+ * [15:12]: xlp family: 2, 3, 8, 9
+ * [11:04]: num of cores
+ * [ 3: 0]: num of threads per core
+ */
+
+#ifndef is_nlm_xlp8xx
+#define is_nlm_xlp8xx()			( is_nlm_xlp(0x8000, XLP_REVISION_ANY, 0) || is_nlm_xlp(0x4000, XLP_REVISION_ANY, 0))
+#endif /* is_nlm_xlp8xx */
+
+#define is_nlm_xlp8xx_ax()		( is_nlm_xlp(0x8000, XLP_REVISION_AX,  0) || is_nlm_xlp(0x4000, XLP_REVISION_AX, 0))
+#define is_nlm_xlp8xx_b0()		( is_nlm_xlp(0x8000, XLP_REVISION_B0,  0) || is_nlm_xlp(0x4000, XLP_REVISION_B0, 0))
+#define is_nlm_xlp8xx_b1()		( is_nlm_xlp(0x8000, XLP_REVISION_B1,  0) || is_nlm_xlp(0x4000, XLP_REVISION_B1, 0))
+#define is_nlm_xlp8xx_bx()		( is_nlm_xlp(0x8000, XLP_REVISION_BX,  0) || is_nlm_xlp(0x4000, XLP_REVISION_BX, 0))
+#define is_nlm_xlp832_ax()		( is_nlm_xlp(0x8084, XLP_REVISION_AX,  0))
+
+#define is_nlm_xlp8xx_832()		is_nlm_xlp(0x8084, XLP_REVISION_ANY, 0)
+#define is_nlm_xlp8xx_824()		is_nlm_xlp(0x8064, XLP_REVISION_ANY, 0)
+#define is_nlm_xlp8xx_816()		is_nlm_xlp(0x8044, XLP_REVISION_ANY, 0)
+
+#define is_nlm_xlp8xx_432()		is_nlm_xlp(0x4084, XLP_REVISION_ANY, 0)
+#define is_nlm_xlp8xx_424()		is_nlm_xlp(0x4064, XLP_REVISION_ANY, 0)
+#define is_nlm_xlp8xx_416()		is_nlm_xlp(0x4044, XLP_REVISION_ANY, 0)
+#define is_nlm_xlp8xx_408()		is_nlm_xlp(0x8024, XLP_REVISION_ANY, 0)
+
+#define is_nlm_xlp3xx_B(rev)	( is_nlm_xlp(0x3000, rev, CPU_EXTPID_XLP_3XX_BASE))
+#define is_nlm_xlp316_B(rev)	( is_nlm_xlp(0x3044, rev, CPU_EXTPID_XLP_3XX_BASE))
+#define is_nlm_xlp312_B(rev)	( is_nlm_xlp(0x3034, rev, CPU_EXTPID_XLP_3XX_BASE))
+#define is_nlm_xlp308_B(rev)	( is_nlm_xlp(0x3024, rev, CPU_EXTPID_XLP_3XX_BASE))
+#define is_nlm_xlp304_B(rev)	( is_nlm_xlp(0x3014, rev, CPU_EXTPID_XLP_3XX_BASE))
+
+#define is_nlm_xlp3xx_L(rev)	( is_nlm_xlp(0x3000, rev, CPU_EXTPID_XLP_3XX_L))
+#define is_nlm_xlp316_L(rev)	( is_nlm_xlp(0x3044, rev, CPU_EXTPID_XLP_3XX_L))
+#define is_nlm_xlp312_L(rev)	( is_nlm_xlp(0x3034, rev, CPU_EXTPID_XLP_3XX_L))
+#define is_nlm_xlp308_L(rev)	( is_nlm_xlp(0x3024, rev, CPU_EXTPID_XLP_3XX_L))
+#define is_nlm_xlp304_L(rev)	( is_nlm_xlp(0x3014, rev, CPU_EXTPID_XLP_3XX_L))
+
+#define is_nlm_xlp3xx_LP(rev)	( is_nlm_xlp(0x3000, rev, CPU_EXTPID_XLP_3XX_LP))
+#define is_nlm_xlp316_LP(rev)	( is_nlm_xlp(0x3044, rev, CPU_EXTPID_XLP_3XX_LP))
+#define is_nlm_xlp312_LP(rev)	( is_nlm_xlp(0x3034, rev, CPU_EXTPID_XLP_3XX_LP))
+#define is_nlm_xlp308_LP(rev)	( is_nlm_xlp(0x3024, rev, CPU_EXTPID_XLP_3XX_LP))
+#define is_nlm_xlp304_LP(rev)	( is_nlm_xlp(0x3014, rev, CPU_EXTPID_XLP_3XX_LP))
+
+#define is_nlm_xlp3xx_LP2(rev)	( is_nlm_xlp(0x3000, rev, CPU_EXTPID_XLP_3XX_LP2))
+#define is_nlm_xlp316_LP2(rev)	( is_nlm_xlp(0x3044, rev, CPU_EXTPID_XLP_3XX_LP2))
+#define is_nlm_xlp312_LP2(rev)	( is_nlm_xlp(0x3034, rev, CPU_EXTPID_XLP_3XX_LP2))
+#define is_nlm_xlp308_LP2(rev)	( is_nlm_xlp(0x3024, rev, CPU_EXTPID_XLP_3XX_LP2))
+#define is_nlm_xlp304_LP2(rev)	( is_nlm_xlp(0x3014, rev, CPU_EXTPID_XLP_3XX_LP2))
+
+#define is_nlm_xlp316_rev(rev)	(is_nlm_xlp316_B(rev) || is_nlm_xlp316_L(rev) || is_nlm_xlp316_LP(rev) || is_nlm_xlp316_LP2(rev))
+#define is_nlm_xlp312_rev(rev)	(is_nlm_xlp312_B(rev) || is_nlm_xlp312_L(rev) || is_nlm_xlp312_LP(rev) || is_nlm_xlp312_LP2(rev))
+#define is_nlm_xlp308_rev(rev)	(is_nlm_xlp308_B(rev) || is_nlm_xlp308_L(rev) || is_nlm_xlp308_LP(rev) || is_nlm_xlp308_LP2(rev))
+#define is_nlm_xlp304_rev(rev)	(is_nlm_xlp304_B(rev) || is_nlm_xlp304_L(rev) || is_nlm_xlp304_LP(rev) || is_nlm_xlp304_LP2(rev))
+
+#define is_nlm_xlp316()			is_nlm_xlp316_rev(XLP_REVISION_ANY)
+#define is_nlm_xlp312()			is_nlm_xlp312_rev(XLP_REVISION_ANY)
+#define is_nlm_xlp308()			is_nlm_xlp308_rev(XLP_REVISION_ANY)
+#define is_nlm_xlp304()			is_nlm_xlp304_rev(XLP_REVISION_ANY)
+
+#define is_nlm_xlp3xx_rev(rev)	(is_nlm_xlp(0x3000, rev, CPU_EXTPID_XLP_3XX_ANY))
+#define is_nlm_xlp3xx()			is_nlm_xlp3xx_rev(XLP_REVISION_ANY)
+#define is_nlm_xlp3xx_ax()		is_nlm_xlp3xx_rev(XLP_REVISION_AX)
+#define is_nlm_xlp3xx_bx()		is_nlm_xlp3xx_rev(XLP_REVISION_BX)
+#define is_nlm_xlp3xx_b0()		is_nlm_xlp3xx_rev(XLP3XX_REVISION_B0)
+
+#define is_nlm_xlp3xx_208a()	( is_nlm_xlp(0x3024, XLP_REVISION_ANY, CPU_EXTPID_XLP_208a))
+#define is_nlm_xlp3xx_108a()	( is_nlm_xlp(0x3024, XLP_REVISION_ANY, CPU_EXTPID_XLP_108a))
+
+#define is_nlm_xlp3xx_204a()	( is_nlm_xlp(0x3014, XLP_REVISION_ANY, CPU_EXTPID_XLP_204a))
+#define is_nlm_xlp3xx_104a()	( is_nlm_xlp(0x3014, XLP_REVISION_ANY, CPU_EXTPID_XLP_104a))
+
+#define is_nlm_xlp3xx_202a()	( is_nlm_xlp(0x3021, XLP_REVISION_ANY, CPU_EXTPID_XLP_202a))
+#define is_nlm_xlp3xx_201a()	( is_nlm_xlp(0x3011, XLP_REVISION_ANY, CPU_EXTPID_XLP_201a))
+#define is_nlm_xlp3xx_101a()	( is_nlm_xlp(0x3011, XLP_REVISION_ANY, CPU_EXTPID_XLP_101a))
+
+#define is_nlm_xlp3xx_lite()	(is_nlm_xlp3xx() && (!is_nlm_xlp3xx_B(XLP_REVISION_ANY)) )
+
+#define is_nlm_xlp2xx()			is_nlm_xlp(0x2000, XLP_REVISION_ANY, 0)
+#define is_nlm_xlp2xx_ax()		is_nlm_xlp(0x2000, XLP_REVISION_AX, 0)
+#define is_nlm_xlp2xx_b0()		is_nlm_xlp(0x2000, XLP_REVISION_B0, 0)
+#define is_nlm_xlp2xx_bx()		is_nlm_xlp(0x2000, XLP_REVISION_BX, 0)
+
+#endif /*__XLP_CHIPID_MACROS__ */
+
+#endif /* __ASSEMBLY__ */
+
+/*
+ *	FMN
+ */
+#define XLP_STN_RX_QSIZE		256
+
+#define XLP_STNID_CPU0			0x00
+#define XLP_STNID_CPU1			0x10
+#define XLP_STNID_CPU2			0x20
+#define XLP_STNID_CPU3			0x30
+#define XLP_STNID_CPU4			0x40
+#define XLP_STNID_CPU5			0x50
+#define XLP_STNID_CPU6			0x60
+#define XLP_STNID_CPU7			0x70
+#define XLP_STNID_PCIE0			0x100
+#define XLP_STNID_PCIE1			0x102
+#define XLP_STNID_PCIE2			0x104
+#define XLP_STNID_PCIE3			0x106
+#define XLP_STNID_GDX			0x108
+#define XLP_STNID_RSA_ECC		0x110
+#define XLP_STNID_CRYPTO		0x119
+#define XLP_STNID_CMP			0x129
+#define XLP_STNID_POE			0x180
+#define XLP_STNID_NAE_TX		0x1DC
+#define XLP_STNID_NAE_RX		0x3E8
+#define XLP_STNID_INVALID		0x400
+#define XLP_MAX_TX_STNS			20
+
+#define XLP_PCIE0_VC_BASE		256
+#define XLP_PCIE0_VC_LIMIT		257
+#define XLP_PCIE1_VC_BASE		258
+#define XLP_PCIE1_VC_LIMIT		259
+#define XLP_PCIE2_VC_BASE		260
+#define XLP_PCIE2_VC_LIMIT		261
+#define XLP_PCIE3_VC_BASE		262
+#define XLP_PCIE3_VC_LIMIT		263
+#define XLP_GDX_VC_BASE			264
+#define XLP_GDX_VC_LIMIT		267
+#define XLP_RSA_ECC_VC_BASE		272
+#define XLP_RSA_ECC_VC_LIMIT	280
+#define XLP_CRYPTO_VC_BASE		281
+#define XLP_CRYPTO_VC_LIMIT		296
+#define XLP_CMP_VC_BASE			297
+#define XLP_CMP_VC_LIMIT		304
+#define XLP_POE_VC_BASE			384
+#define XLP_POE_VC_LIMIT		391
+#define XLP_NET_TX_VC_BASE		476
+#define XLP_NET_TX_VC_LIMIT		999
+#define XLP_NET_RX_VC_BASE		1000
+#define XLP_NET_RX_VC_LIMIT		1019
+#define XLP_NET_VC_BASE			XLP_NET_TX_VC_BASE
+#define XLP_NET_VC_LIMIT		1023
+
+#define XLP_POPQ_VC_BASE		128
+#define XLP_POPQ_VC_LIMIT		255
+
+#define XLP_CPU0_VC_BASE		0
+#define XLP_CPU0_VC_LIMIT		15
+#define XLP_CPU1_VC_LIMIT		31
+#define XLP_CPU2_VC_LIMIT		47
+#define XLP_CPU3_VC_LIMIT		63
+#define XLP_CPU4_VC_LIMIT		79
+#define XLP_CPU5_VC_LIMIT		95
+#define XLP_CPU6_VC_LIMIT		111
+#define XLP_CPU7_VC_LIMIT		127
+
+#define XLP_INVALID_STATION		0xFFFF	
+
+/* XLP_3XX */
+#define XLP_3XX_MAX_NAE_UCORES		8
+
+#define XLP_3XX_POPQ_VC_LIMIT		191
+
+#define XLP_3XX_REGEX_VC_BASE		268
+#define XLP_3XX_REGEX_VC_LIMIT		271
+
+#define XLP_3XX_RSA_ECC_VC_BASE		272
+#define XLP_3XX_RSA_ECC_VC_LIMIT	275
+
+#define XLP_3XX_CRYPTO_VC_BASE		276
+#define XLP_3XX_CRYPTO_VC_LIMIT		279
+
+#define XLP_3XX_SRIO_VC_BASE		280
+#define XLP_3XX_SRIO_VC_LIMIT		288
+#define XLP_3XX_B0_SRIO_VC_LIMIT	289
+
+#define XLP_3XX_POE_VC_BASE			384
+#define XLP_3XX_POE_VC_LIMIT		391
+#define XLP_3XX_NET_TX_VC_BASE		432
+#define XLP_3XX_NET_TX_VC_LIMIT		495
+#define XLP_3XX_NET_RX_VC_BASE		496
+#define XLP_3XX_NET_RX_VC_LIMIT		503 /* 511 */
+#define XLP_3XX_NET_VC_BASE			XLP_3XX_NET_TX_VC_BASE
+#define XLP_3XX_NET_VC_LIMIT		511
+
+/* XLP2XX */
+#define XLP_2XX_POPQ_VC_LIMIT		159
+
+#define XLP_2XX_CDE_VC_BASE			266
+#define XLP_2XX_CDE_VC_LIMIT		267
+
+#define XLP_2XX_REGEX_VC_BASE		268
+#define XLP_2XX_REGEX_VC_LIMIT		271
+
+#define XLP_2XX_RSA_ECC_VC_BASE		272
+#define XLP_2XX_RSA_ECC_VC_LIMIT	272
+
+#define XLP_2XX_CRYPTO_VC_BASE		276
+#define XLP_2XX_CRYPTO_VC_LIMIT		276
+
+#define XLP_2XX_POE_VC_BASE			384
+#define XLP_2XX_POE_VC_LIMIT		391
+#define XLP_2XX_NET_TX_VC_BASE		432
+#define XLP_2XX_NET_TX_VC_LIMIT		495
+#define XLP_2XX_NET_RX_VC_BASE		496
+#define XLP_2XX_NET_RX_VC_LIMIT		503 /* 511 */
+#define XLP_2XX_NET_VC_BASE			XLP_2XX_NET_TX_VC_BASE
+#define XLP_2XX_NET_VC_LIMIT		511
+
+/*Sw Code */
+#define XLP_CODE_MAC				0
+#define XLP_CODE_SEC				1
+#define XLP_CODE_BOOT_WAKEUP		200
+
+/*Cop2 Regs */
+#define XLP_TX_BUF_REG				$0
+#define XLP_RX_BUF_REG				$1
+#define XLP_MSG_TXSTATUS_REG		$2
+#define XLP_MSG_RXSTATUS_REG		$3
+#define XLP_MSG_STATUS1_REG			$4
+#define XLP_MSG_CONFIG_REG			$5
+#define XLP_MSG_CONFIG1_REG			$6
+#define XLP_MSG_INT_REG				$8
+
+/*sys register offset in pcie config space*/
+#define XLP_PCIE_NODE0_SYSOFFSET	0x35000
+#define XLP_PCIE_NODE1_SYSOFFSET	0x75000
+#define XLP_PCIE_NODE2_SYSOFFSET	0xB5000
+#define XLP_PCIE_NODE3_SYSOFFSET	0xF5000
+
+/* DTR related */
+#define XLP_DTR_NODE					0x0
+#define XLP_DTR_BUS						0x0
+#define XLP_DTR_DEVICE					0x5
+#define XLP_DTR_FUNC					0x0
+#define XLP_DTR_MASTER_CONTROL_REG		0x40
+#define XLP_DTR_CHANNEL_CONTROL_REG_0	0x48
+#define XLP_DTR_CHANNEL_CONTROL_REG_1	0x49
+#define XLP_DTR_CHANNEL_CONTROL_REG_2	0x4A
+#define XLP_DTR_CHANNEL_CONTROL_REG_3	0x4B
+
+/* Crypto related */
+#define XLP_CRYPTO_NODE				0x0
+#define XLP_CRYPTO_BUS				0x0
+#define XLP_CRYPTO_DEVICE			0x5
+#define XLP_CRYPTO_FUNC				0x1
+
+/*RSA related */
+#define XLP_RSA_NODE				0x0
+#define XLP_RSA_BUS					0x0
+#define XLP_RSA_DEVICE				0x5
+#define XLP_RSA_FUNC				0x2
+
+/*CDE related */
+#define XLP_CDE_NODE				0x0
+#define XLP_CDE_BUS					0x0
+#define XLP_CDE_DEVICE				0x5
+#define XLP_CDE_FUNC				0x3
+
+/* XLP Storm Regex related */
+#define XLP_3XX_REGEX_NODE			0x0
+#define XLP_3XX_REGEX_BUS			0x0
+#define XLP_3XX_REGEX_DEVICE		0x5
+#define XLP_3XX_REGEX_FUNC			0x5
+
+#define XLP_IO_DEVICE				0x0
+#define XLP_IO_FUNC					0x0
+
+#define XLP_FMN_DEVICE				0x4
+#define XLP_FMN_FUNC				0x0
+
+#define XLP_NAE_DEVICE				0x3
+#define XLP_NAE_FUNC				0x0
+
+#define XLP_POE_DEVICE				0x3
+#define XLP_POE_FUNC				0x1
+
+#define XLP_SAE_DEVICE				0x5
+#define XLP_SAE_FUNC				0x1
+
+#define XLP_RSA_DEVICE				0x5
+#define XLP_RSA_FUNC				0x2
+
+#define XLP_SYS_DEVICE				0x6
+#define XLP_SYS_FUNC				0x5
+
+#define XLP_MAXDEV_PERNODE			8
+
+#define XLP_CFG_BASE(node, SOC)		((((node * XLP_MAXDEV_PERNODE) + SOC##_DEVICE) << 15) | (SOC##_FUNC << 12))
+
+#ifndef __ASSEMBLY__
+/* Device Id: Bus[8:6], Dev[5:3], func[2:0] */
+
+enum sae_cfg_regs {
+	SECCONENGSL0 = 0x41,
+	SECCONENGSL1 = 0x42,
+	SECCONENGSL2 = 0x43,
+	SECCONENGSL3 = 0x44,
+	SECCONENGSL4 = 0x45,
+	SECCONENGSL5 = 0x46,
+	SECCONENGSL6 = 0x47,
+	SECCONENGSL7 = 0x48,
+	SECCONENGSL8 = 0x49,
+	SECEMSGCTLLO = 0x82,
+	SECEMSGCTLL1 = 0x83
+};
+
+enum NLH_DEV_ID {
+	NLH_BRIDGE	= 0,
+	NLH_PIC		= 4,
+	NLH_NAE		= 0x18,
+	NLH_POE		= 0x19,
+	NLH_FMN		= 0x20,
+	NLH_GDX		= 0x28,
+	NLH_SEC		= 0x29,
+	NLH_RSA		= 0x2a,
+	NLH_COMP	= 0x2b,
+	NLH_UART0	= 0x30,
+	NLH_UART1	= 0x31,
+	NLH_SYS		= 0x35
+};
+
+enum XLP_MSG_HANDLES {
+	XLP_MSG_HANDLE_CPU0 = 0,
+	XLP_MSG_HANDLE_CPU1,
+	XLP_MSG_HANDLE_CPU2,
+	XLP_MSG_HANDLE_CPU3,
+	XLP_MSG_HANDLE_CPU4,
+	XLP_MSG_HANDLE_CPU5,
+	XLP_MSG_HANDLE_CPU6,
+	XLP_MSG_HANDLE_CPU7,
+	XLP_MSG_HANDLE_PCIE0,
+	XLP_MSG_HANDLE_PCIE1,
+	XLP_MSG_HANDLE_PCIE2,
+	XLP_MSG_HANDLE_PCIE3,
+	XLP_MSG_HANDLE_GDX,
+	XLP_MSG_HANDLE_REGX,
+	XLP_MSG_HANDLE_RSA_ECC,
+	XLP_MSG_HANDLE_CRYPTO,
+	XLP_MSG_HANDLE_SRIO,
+	XLP_MSG_HANDLE_CMP,
+	XLP_MSG_HANDLE_POE,
+	XLP_MSG_HANDLE_NAE_0,
+	XLP_MSG_HANDLE_INVALID,
+	XLP_MSG_HANDLE_MAX
+};
+
+/*
+ *  NET Accelerator
+ */
+#define XLP_NA_REG_BLOCK_SIZE 0x2000 /* 8KB */
+#define XLP_NA_REG_IFACE_SIZE 0x200 /* 512B */
+
+/* Use the following macros to access these registers:
+   nlm_hal_read_nae_reg(int node, int register)
+   nlm_hal_write_nae_reg(int node, int register, uint_32t value)
+ */
+enum net_cfg_regs {
+	RX_CONFIG						= 0x10,
+	TX_CONFIG						= 0x11,
+	RX_IF_BASE_CONFIG_0				= 0x12,
+	RX_IF_BASE_CONFIG_1				= 0x13,
+	RX_IF_BASE_CONFIG_2				= 0x14,
+	RX_IF_BASE_CONFIG_3				= 0x15,
+	RX_IF_BASE_CONFIG_4				= 0x16,
+	RX_IF_BASE_CONFIG_5				= 0x17,
+	RX_IF_BASE_CONFIG_6				= 0x18,
+	RX_IF_BASE_CONFIG_7				= 0x19,
+	RX_IF_BASE_CONFIG_8				= 0x1a,
+	RX_IF_BASE_CONFIG_9				= 0x1b,
+	RX_IFACE_VEC_VALID				= 0x1c,
+	RX_IFACE_SLOT_CAL				= 0x1d,
+	PARSER_CONFIG					= 0x1e,		// Was XLP_PARSER_CONFIG
+	PARSER_SEQ_FIFO_CFG				= 0x1f,
+	FREE_IN_LIFO_CFG				= 0x20,
+	RX_BUFFER_BASE_DEPTH_ADDR_REG	= 0x21,
+	RX_BUFFER_BASE_DEPTH_REG		= 0x22,
+	RX_UCORE_CFG					= 0x23,
+	RX_UCORE_CAM_MASK0_CFG			= 0x24,
+	RX_UCORE_CAM_MASK1_CFG			= 0x25,
+	RX_UCORE_CAM_MASK2_CFG			= 0x26,
+	RX_UCORE_CAM_MASK3_CFG			= 0x27,
+	FREE_IN_LIFO_UNIQ_SZ_CFG		= 0x28,
+	CRC_POLY0_CFG					= 0x2a,
+	CRC_POLY1_CFG					= 0x2b,
+	FREE_SPILL0_MEM_CFG				= 0x2c,
+	FREE_SPILL1_MEM_CFG				= 0x2d,
+	FREE_LIFO_THRESHOLD_CFG			= 0x2e,
+	FLOW_CRC16_POLY_CFG				= 0x2f,
+	DMA_TX_CREDIT_TH				= 0x29,
+	STG1_STG2CRDT_CMD				= 0x30,
+	STG1_STG2CRDT_STATUS			= 0x31,
+	STG2_EHCRDT_CMD					= 0x32,
+	STG2_EHCRDT_STATUS				= 0x33,
+	STG2_FREECRDT_CMD				= 0x34,
+	STG2_FREECRDT_STATUS			= 0x35,
+	STG2_STRCRDT_CMD				= 0x36,
+	STG2_STRCRDT_STATUS				= 0x37,
+	TXFIFO_IFACE_MAP_CMD			= 0x38,
+	TXFIFO_IFACE_MAP_STATUS			= 0x39,
+	VFBID_TO_DEST_MAP_CMD			= 0x3a,
+	STG1_PMEM_PROG					= 0x3c,
+	STG1_PMEM_STATUS				= 0x3d,
+	STG2_PMEM_PROG					= 0x3e,
+	STG2_PMEM_STATUS				= 0x3f,
+	EH_PMEM_PROG					= 0x40,
+	EH_PMEM_STATUS					= 0x41,
+	FREE_PMEM_PROG					= 0x42,
+	FREE_PMEM_STATUS				= 0x43,
+	TX_DRR_ACTVLIST_CMD				= 0x44,
+	TX_DRR_ACTVLIST_STATUS			= 0x45,
+	TX_IFACE_BURSTMAX_CMD			= 0x46,
+	TX_IFACE_BURSTMAX_STATUS		= 0x47,
+	TX_IFACE_ENBL_CMD				= 0x48,
+	TX_IFACE_ENBL_STATUS			= 0x49,
+	TX_PKTLEN_PMEM_CMD				= 0x4a,
+	TX_PKTLEN_PMEM_STATUS			= 0x4b,
+	TX_SCHED_MAP_CMD0				= 0x4c,
+	TX_SCHED_MAP_CMD1				= 0x4d,
+	EGR_NIOR_CAL_LEN_REG			= 0x4e,
+	EGR_NIOR_CRDT_CAL_PROG	 		= 0x52,
+	TX_PKT_PMEM_CMD0				= 0x50,
+	TX_PKT_PMEM_CMD1				= 0x51,
+	TX_SCHED_CTRL					= 0x53,
+	STR_PMEM_CMD					= 0x58,
+	TX_IORCRDT_INIT					= 0x59,
+	RX_FREE_LIFO_POP				= 0x62,
+	FLOW_BASE_MASK_CFG				= 0x80,
+	POE_CLASS_SETUP_CFG				= 0x81,
+	UCORE_IFACE_MASK_CFG			= 0x82,
+	RX_BUFFER_XOFFON_THR			= 0x83,		// Was RX_BUFFER_XONOFF_THR
+	FLOW_TABLE1_CFG					= 0x84,
+	FLOW_CLASS_BASE_MASK			= 0x85,
+	FLOW_TABLE3_CFG					= 0x86,
+	RX_FREE_LIFO_THRESH				= 0x87,
+	IFACE_FIFO_CFG			 		= 0x8a,
+	PARSER_SEQ_FIFOTH_CFG			= 0x8b,
+
+	L2_TYPE_0						= 0x210,
+	L3_CTABLE_MASK_0				= 0x22c,
+	L3_CTABLE_0_0					= 0x230,
+	L3_CTABLE_0_1					= 0x231,
+	L4_CTABLE_0_0					= 0x250,
+	L4_CTABLE_0_1					= 0x251,
+
+	NET_IF0_INTR_STAT				= 0x280,
+	NET_IF0_INTR_MASK				= 0x281,
+	NET_COMMON0_INTR_STS			= 0x2A8,
+	NET_COMMON0_INTR_MASK			= 0x2A9,
+	NET_COMMON1_INTR_STS			= 0x2AA,
+	NET_COMMON1_INTR_MASK			= 0x2AB,
+
+	 /*1588 PTP timer */
+	IF_1588_TMSMP_HI				= 0x300,
+	IF_1588_TMSMP_LO				= 0x301,
+
+	VFBID_TO_DEST_MAP_STATUS		= 0x380,
+	TX_SCHED_MAP_STATUS0			= 0x387,
+	TX_SCHED_MAP_STATUS1			= 0x388,
+	TX_PKT_PMEM_STATUS				= 0x389,
+
+	LANE_CFG_CPLX_0_1				= 0x780,	// Changed to be consistent with PRM.  Also changed
+	LANE_CFG_CPLX_2_3				= 0x781,	// code in nlm_hal_nae.c, nlm_hal_interface.c and
+	LANE_CFG_CPLX_4					= 0x782,	// similar places in u-boot.
+	NETIOR_SOFTRESET				= 0x783,
+	PTP_OFFSET_HI					= 0x784,
+	PTP_OFFSET_LO					= 0x785,
+	PTP_INC_DEN						= 0x786,
+	PTP_INC_NUM						= 0x787,
+	PTP_INC_INTG					= 0x788,
+	PTP_CONTROL						= 0x789,
+	PTP_STATUS						= 0x78A,
+	PTP_USER_VALUE_HI				= 0x78B,
+	PTP_USER_VALUE_LO				= 0x78C,
+	PTP_TMR1_HI						= 0x78D,
+	PTP_TMR1_LO						= 0x78E,
+	PTP_TMR2_HI						= 0x78F,
+	PTP_TMR2_LO						= 0x790,
+	PTP_TMR3_HI						= 0x791,
+	PTP_TMR3_LO						= 0x792,
+
+	MAC_FC_SLOT0					= 0x7AD,		// Removed GMAC_FC_SLOT0 below
+
+	NETIOR_MISC_CTRL0				= 0x7B2,
+
+	XGMAC_PFC_REPEAT				= 0x7B8,
+
+	NETIOR_MISC_CTRL1				= 0x7B9,		// Was NETIOR_MISC_REG1_ADDR
+	NETIOR_MISC_CTRL2				= 0x7BA,		// Was NETIOR_MISC_REG2_ADDR
+	NETIOR_MISC_CTRL3				= 0x7BD,		// Was NETIOR_MISC_REG3_ADDR
+
+	PTP_CMD							= 0x7C0,
+	PTP_DATA_LO						= 0x7C1,
+	PTP_DATA_HI						= 0x7C2
+};
+
+enum if_cfg_regs {
+	MAC_CONF1				= 0,
+	MAC_CONF2				= 1,
+	SGMII_MAX_FRAME_LEN		= 4,
+	NETIOR_GMAC_CTRL3		= 0x7c,		// Was NETWK_INF_CTRL3_REG
+	NETIOR_GMAC_STAT		= 0x7d,
+	NETIOR_GMAC_CTRL2		= 0x7e,		// Was NETWK_INF_CTRL2_REG
+	NETIOR_GMAC_CTRL1		= 0x7f		// Was NETWK_INF_CTRL_REG
+};
+
+enum xaui_cfg_regs {
+	XAUI_CONFIG_0			= 0x00,
+	XAUI_CONFIG_1			= 0x01,
+	XAUI_CONFIG_2			= 0x02,
+	XAUI_CONFIG_3			= 0x03,
+	XAUI_MAX_FRAME_LEN		= 0x08,
+	NETIOR_XGMAC_STAT		= 0x7c,		// Was XGMAC_STATUS_REG
+	NETIOR_XGMAC_CTRL3		= 0x7d,		// Was XGMAC_CTL_REG3
+	NETIOR_XGMAC_CTRL2		= 0x7e,		// Was XGMAC_CTL_REG2
+	NETIOR_XGMAC_CTRL1		= 0x7f		// Was XGMAC_CTL_REG1
+};
+
+/* Moved netior regs to main net config regs enum, fixed code.  More consistent with PRM */
+
+enum NAE_TX_TYPE {
+	P2D_NEOP	= 0,
+	P2P			= 1,
+	P2D_EOP		= 2,
+	MSC			= 3
+};
+
+/* NAE Interface Definitions
+ */
+enum NAE_INTF_TYPE {
+	GMAC_0		= 0,
+	GMAC_1		= 1,
+	GMAC_2		= 2,
+	GMAC_3		= 3,
+	XGMAC		= 4,
+	INTERLAKEN	= 5,
+	PHY			= 0xE,
+	LANE_CFG	= 0xF
+};
+
+enum NAE_BLOCK_NR {
+	BLOCK_0 = 0,
+	BLOCK_1,
+	BLOCK_2,
+	BLOCK_3,
+	BLOCK_4,
+	BLOCK_5,
+	BLOCK_6,
+	BLOCK_7
+};
+
+typedef enum PHY_LANE_INTF_TYPE {
+	LANE_DISCONNECTED,
+	LANE_GMAC,
+	LANE_XGMAC,
+	LANE_8ILAKEN
+} phy_lane_intf_t;
+
+/* MACSEC
+ */
+enum nae_macsec_cfg_regs {
+	TX_MSEC_ETHER_TYPE			= 0x33e,
+	TX_MSEC_PORT_EN			  	= 0x33f,
+	TX_MSEC_BYPASS		 		= 0x340,
+	TX_MSEC_PROG_STATUS		  	= 0x341,
+	TX_MSEC_INIT_PN			  	= 0x342,
+	TX_MSEC_PN_THRESH			= 0x343,
+	TX_MSEC_PREAMBLE_LEN_CODE	= 0x344,
+	TX_MSEC_KEY_IN_USE0			= 0x345,
+	TX_MSEC_KEY_IN_USE1			= 0x346,
+	TX_MSEC_KEY_IN_USE2			= 0x347,
+	TX_MSEC_KEY_IN_USE3			= 0x348,
+	TX_MSEC_KEY_XED_THRESH0	 	= 0x349,
+	TX_MSEC_KEY_XED_THRESH1	  	= 0x34a,
+	TX_MSEC_KEY_XED_THRESH2	  	= 0x34b,
+	TX_MSEC_KEY_XED_THRESH3	  	= 0x34c,
+	TX_MSEC_KEY_STALE0			= 0x34d,
+	TX_MSEC_KEY_STALE2			= 0x34f,
+	TX_MSEC_KEY_STALE3			= 0x350,
+	TX_MSEC_KEY_ERR0			= 0x351,
+	TX_MSEC_KEY_ERR1			= 0x352,
+	TX_MSEC_KEY_ERR2			= 0x353,
+	TX_MSEC_KEY_ERR3			= 0x354,
+
+	TX_MSEC_MEM_DATAREG_0		= 0x38c,
+	TX_MSEC_MEM_DATAREG_1		= 0x38d,
+	TX_MSEC_MEM_DATAREG_2		= 0x38e,
+	TX_MSEC_MEM_DATAREG_3		= 0x38f,
+	TX_MSEC_MEM_CTRL_REG		= 0x390,
+
+	RX_MSEC_MEM_DATAREG_0		= 0x400,
+	RX_MSEC_MEM_DATAREG_1		= 0x401,
+	RX_MSEC_MEM_DATAREG_2		= 0x402,
+	RX_MSEC_MEM_DATAREG_3		= 0x403,
+	RX_MSEC_MEM_CTRL_REG		= 0x404,
+
+	RX_MSEC_PORT_EN		 		= 0x405,
+	RX_MSEC_BYPASS		 		= 0x406,
+	RX_MSEC_SEC_TAG0			= 0x407,
+	RX_MSEC_SEC_TAG1	  		= 0x408,
+	RX_MSEC_INIT_PN			 	= 0x409,
+	RX_MSEC_REPLAY_WIN_SIZE	 	= 0x40a,
+	RX_MSEC_SCI_MASK0_LO		= 0x40b,
+	RX_MSEC_SCI_MASK0_HI	 	= 0x40c,
+	RX_MSEC_SCI_MASK1_LO	 	= 0x40d,
+	RX_MSEC_SCI_MASK1_HI	 	= 0x40e,
+	RX_MSEC_SCI_MASK2_LO	 	= 0x40f,
+	RX_MSEC_SCI_MASK2_HI	 	= 0x410,
+	RX_MSEC_SCI_MASK3_LO	 	= 0x411,
+	RX_MSEC_SCI_MASK3_HI	 	= 0x412,
+	RX_MSEC_SCI_MASK4_LO	 	= 0x413,
+	RX_MSEC_SCI_MASK4_HI	 	= 0x414,
+	RX_MSEC_SCI_MASK5_LO	 	= 0x415,
+	RX_MSEC_SCI_MASK5_HI	 	= 0x416,
+	RX_MSEC_SCI_MASK6_LO	 	= 0x417,
+	RX_MSEC_SCI_MASK6_HI	 	= 0x418,
+	RX_MSEC_SCI_MASK7_LO	 	= 0x419,
+	RX_MSEC_SCI_MASK7_HI		= 0x41a
+};
+
+#define RX_MSEC_SCI_MASK_LO(i) (0x40b + i *2)
+#define RX_MSEC_SCI_MASK_HI(i) (0x40c + i *2)
+
+/*
+ *  POE
+ */
+
+enum poe_reg_type {
+	PCIE_CFG_POE_REG = 0,
+	PCIE_MEM_POE_REG = 1,
+};
+
+/* Why are these all off by 64 vs. PRM?  And why is this enum created then a bunch of the
+   same registers are #defined below? */
+enum poe_cfg_reg {
+	CL0_ENQ_SPILL_BASE_L	= 0x40,
+	CL0_DEQ_SPILL_BASE_L	= 0x50,
+	MSG_STORAGE_BASE_ADR_L	= 0x60,
+	FBP_BASE_ADR_L			= 0x62,
+	CL0_ENQ_SPILL_MAXLINE_L	= 0x64,
+	CL0_DEQ_SPILL_MAXLINE_L	= 0x6c,
+	MAX_FLOW_MSGS0			= 0x80,
+	MAX_MSGS_CLASS0			= 0x88,
+	MAX_LOC_BUF_STG_CL0		= 0x90,
+	CLASS0_SIZE				= 0x98,
+	ERROR_MESG0				= 0xa0,
+	LO_CNT_OOO_MSG			= 0xa8,
+	LO_CNT_INORDER_MSG		= 0xa9,
+	LO_CNT_LOCBUF_ST		= 0xaa,
+	LO_CNT_EXTBUF_ST		= 0xab,
+	LO_CNT_LOCBUF_ALLOC		= 0xac,
+	LO_CNT_EXTBUF_ALLOC		= 0xad,
+	HI_CNT_OOO_MSG			= 0xae,
+	HI_CNT_INORDE_RMSG		= 0xaf,
+	HI_CNT_LOCBUF_ST		= 0xb0,
+	HI_CNT_EXTBUF_ST		= 0xb1,
+	HI_CNT_LOCBUF_ALLOC		= 0xb2,
+	HI_CNT_EXTBUF_ALLOC		= 0xb3,
+	MODE_ERROR_FLOW_ID		= 0xb4,
+	STATISTICS_ENABLE		= 0xb5,
+	MAX_SIZE_FLOW			= 0xb6,
+	MAX_SIZE				= 0xb7,
+	FBP_SP					= 0xb8,
+	FBP_SP_EN				= 0xb9,
+	LOC_ALLOC_EN			= 0xba,
+	EXT_ALLOC_EN			= 0xbb,
+	DROP_CNT_DIST0			= 0x100,
+	DROP_CNT_CLASS0			= 0x110,
+	DROP_CNT_DIST_CLASS0	= 0x118,
+	DROP_CNT_CPU			= 0x120,
+	DROP_CNT_MAX_FLOW		= 0x121,
+	INT_VECTOR				= 0x180,
+	POE_INT_MASK			= 0x181,
+	FATAL_ERR_MASK			= 0x182,
+	BIU_CONFIG				= 0x183,
+	BIU_TIMEOUT				= 0x184,
+	ENQUED_MSG_SENT			= 0x190,
+	ENQUED_MSG_CNT			= 0x191,
+	DIST_THRESHOLD0			= 0x200,
+	DEST_THRESHOLD			= 0x204,
+	DIST_ENABLE				= 0x205,
+	ENQ_SPILL_THRESHOLD		= 0x208,
+	DEQ_SPILL_THRESHOLD		= 0x209,
+	DEQ_SPILL_TIMER			= 0x20a,
+	DIST_CLASS_DROP_ENABLE	= 0x20b,
+	DIST_VEC_DROP_ENABLE	= 0x20c,
+	DIST_DROP_TIMER			= 0x20d,
+	ERROR_LOG_WORD0			= 0x20e,
+	ERROR_INJ_CTL0			= 0x211,
+	SW_RESET				= 0x213,
+	POE_TX_TIMER			= 0x214,
+	FMN_TX_COUNTER			= 0x215,
+	FMN_RX_COUNTER			= 0x216,
+	CPU_ENQ_CLASS_MAP_MODE	= 0x217,
+	LOCAL_FBP_BASE			= 0x400
+};
+
+enum poe_stats_reg {
+	OO_MSG_CNT_LO			= 0xa8,
+	IN_ORDER_MSG_CNT_LO,
+	LOC_BUF_STOR_CNT_LO,
+	EXT_BUF_STOR_CNT_LO,
+	LOC_BUF_ALLOC_CNT_LO,
+	EXT_BUF_ALLOC_CNT_LO,
+	OO_MSG_CNT_HI ,
+	IN_ORDER_MSG_CNT_HI,
+	LOC_BUF_STOR_CNT_HI,
+	EXT_BUF_STOR_CNT_HI,
+	LOC_BUF_ALLOC_CNT_HI,
+	EXT_BUF_ALLOC_CNT_HI,
+	MODE_ERR_FLOW_ID,
+	POE_STATISTICS_EN,
+	POE_MAX_SIZE_FLOW,
+	POE_MAX_SIZE
+};
+
+#define POE_CL0_ENQ_SPILL_BASE_L	0x40
+#define POE_CL0_ENQ_SPILL_BASE_H	0x41
+#define POE_CL1_ENQ_SPILL_BASE_L	0x42
+#define POE_CL1_ENQ_SPILL_BASE_H	0x43
+#define POE_CL2_ENQ_SPILL_BASE_L	0x44
+#define POE_CL2_ENQ_SPILL_BASE_H	0x45
+#define POE_CL3_ENQ_SPILL_BASE_L	0x46
+#define POE_CL3_ENQ_SPILL_BASE_H	0x47
+#define POE_CL4_ENQ_SPILL_BASE_L	0x48
+#define POE_CL4_ENQ_SPILL_BASE_H	0x49
+#define POE_CL5_ENQ_SPILL_BASE_L	0x4a
+#define POE_CL5_ENQ_SPILL_BASE_H	0x4b
+#define POE_CL6_ENQ_SPILL_BASE_L	0x4c
+#define POE_CL6_ENQ_SPILL_BASE_H	0x4d
+#define POE_CL7_ENQ_SPILL_BASE_L	0x4e
+#define POE_CL7_ENQ_SPILL_BASE_H	0x4f
+
+#define POE_CL0_DEQ_SPILL_BASE_L	0x50
+#define POE_CL0_DEQ_SPILL_BASE_H	0x51
+#define POE_CL1_DEQ_SPILL_BASE_L	0x52
+#define POE_CL1_DEQ_SPILL_BASE_H	0x53
+#define POE_CL2_DEQ_SPILL_BASE_L	0x54
+#define POE_CL2_DEQ_SPILL_BASE_H	0x55
+#define POE_CL3_DEQ_SPILL_BASE_L	0x56
+#define POE_CL3_DEQ_SPILL_BASE_H	0x57
+#define POE_CL4_DEQ_SPILL_BASE_L	0x58
+#define POE_CL4_DEQ_SPILL_BASE_H	0x59
+#define POE_CL5_DEQ_SPILL_BASE_L	0x5a
+#define POE_CL5_DEQ_SPILL_BASE_H	0x5b
+#define POE_CL6_DEQ_SPILL_BASE_L	0x5c
+#define POE_CL6_DEQ_SPILL_BASE_H	0x5d
+#define POE_CL7_DEQ_SPILL_BASE_L	0x5e
+#define POE_CL7_DEQ_SPILL_BASE_H	0x5f
+
+#define POE_CL0_ENQ_SPILL_MAXLINE	0x64
+#define POE_CL1_ENQ_SPILL_MAXLINE	0x65
+#define POE_CL2_ENQ_SPILL_MAXLINE	0x66
+#define POE_CL3_ENQ_SPILL_MAXLINE	0x67
+#define POE_CL4_ENQ_SPILL_MAXLINE	0x68
+#define POE_CL5_ENQ_SPILL_MAXLINE	0x69
+#define POE_CL6_ENQ_SPILL_MAXLINE	0x6a
+#define POE_CL7_ENQ_SPILL_MAXLINE	0x6b
+
+#define POE_CL0_DEQ_SPILL_MAXLINE	0x6c
+#define POE_CL1_DEQ_SPILL_MAXLINE	0x6d
+#define POE_CL2_DEQ_SPILL_MAXLINE	0x6e
+#define POE_CL3_DEQ_SPILL_MAXLINE	0x6f
+#define POE_CL4_DEQ_SPILL_MAXLINE	0x70
+#define POE_CL5_DEQ_SPILL_MAXLINE	0x71
+#define POE_CL6_DEQ_SPILL_MAXLINE	0x72
+#define POE_CL7_DEQ_SPILL_MAXLINE	0x73
+
+#define POE_DIST_THRESHOLD_0		 	0x200
+#define POE_DEST_THRESHOLD				0x204
+#define POE_DIST_ENABLE 				0x205
+#define POE_DIST_VEC0					0x100
+#define POE_DIST_THRESHOLD_VAL			0xa
+#define POE_MAX_LOCAL_MSGS				(6 << 10) /* 6K */
+#define POE_TX_TIMER					0x214
+#define POE_FBP_SP						0xb8
+#define POE_FBP_SP_EN					0xb9
+#define POE_LOC_ALLOC_EN				0xba
+#define POE_EXT_ALLOC_EN				0xbb
+#define POE_LOCAL_FBP_BASE				0x400
+
+#define POE_ENQ_SPILL_THOLD				0x208
+#define POE_DEQ_SPILL_THOLD				0x209
+#define POE_DEQ_SPILL_TIMER				0x20A
+#define POE_DISTR_CLASS_DROP_EN			0x20B
+#define POE_DISTR_VEC_DROP_EN			0x20C
+#define POE_DISTRVEC_DROP_TIMER			0x20D
+
+#define EXT_FBP_START_ADDR				0x1800
+#define MAX_POE_EXT_MSG_STORAGE			(58 << 10) /* 58K entries */
+#define POE_FBP_SP_INIT					0x740
+
+#define XLP3XX_EXT_FBP_START_ADDR		0x1000
+#define XLP3XX_POE_MAX_LOCAL_MSGS		(4 << 10)
+#define XLP3XX_MAX_POE_EXT_MSG_STORAGE	(28 << 10)
+#define XLP3XX_POE_FBP_SP_INIT			0x380
+
+enum POE_SW_CODE {
+	DROP_IN_NAE = 0,
+	FWD_DEST,
+	RENQ_DVEC,
+	RENQ_DEST,
+	FWD_DVEC,
+	DROP_IN_POE,
+	RENQ_DVEC_SERIAL,
+	RENQ_DEST_SERIAL
+};
+
+/*
+ *  UCORE
+ */
+#define MAX_NAE_UCORES							16
+#define NAE_UCORE_MASK							0xffff
+#define CODE_SIZE_PER_UCORE						(4 << 10)
+#define UC_MAGIC_REG_OFFSET_TO_INDEX(offset)	(((offset) - 0x8000)/4)
+#define UCORE_OUTBUF_DONE						0x8000
+#define UCORE_RX_PKT_RDY						0x8004
+#define UCORE_RX_PKT_INFO						0x8008
+#define UCORE_CAM0								0x800c
+#define UCORE_CAM1								0x8010
+#define UCORE_CAM2								0x8014
+#define UCORE_CAM3								0x8018
+#define UCORE_CAM_RES							0x801c
+#define UCORE_CSUM_INFO							0x8020
+#define UCORE_CRC_INFO							0x8024
+#define UCORE_CRC_POS							0x8028
+#define UCORE_FREE_FIFO_EMPTY					0x802c
+#define UCORE_PKT_DISTR							0x8030
+#define UCORE_MAGIC_REG_BASE					UCORE_OUTBUF_DONE
+#define UCORE_MAGIC_REG_LIMIT					UCORE_PKT_DISTR
+#define UCORE_MAX_MAGIC_REGS					(1 + (UCORE_MAGIC_REG_LIMIT - UCORE_MAGIC_REG_BASE) / 4)
+
+#define UCORE_PKT_DISCARD						0x2
+
+/* Ucore Memory Map. To be used in Microcode based apps only */
+#define UCORE_SHARED_CAM_START					0x17000
+#define UCORE_SHARE_CAM_END						0x17bff
+#define UCORE_SHARED_MEM_START					0x18000
+#define UCORE_SHARE_MEM_END						0x1ffff
+
+/* Ucore Shared memory Map for cpu. To be used in cpu only, to access ucore shared mem */
+#define UCORE_CPU_SHARED_CAM_START				0x18000
+#define UCORE_CPU_SHARED_CAM_END				0x18bff
+#define UCORE_CPU_SHARED_MEM_START				0x10000
+#define UCORE_CPU_SHARED_MEM_END				0x17fff
+
+#define SYS_REG_BASE		(( KSEG1 + 0x18000000 + XLP_PCIE_NODE0_SYSOFFSET) & 0x1fffffff )
+#define SYS_REG_INDEX(x)	( 0x40 + (x))
+
+/* System Management PCIe config registers */
+enum sys_cfg_regs {
+	CHIP_RESET				= 0x00,
+	POWER_ON_RESET_CFG		= 0x01,
+	EFUSE_DEVICE_CFG0		= 0x02,
+	EFUSE_DEVICE_CFG1		= 0x03,
+	EFUSE_DEVICE_CFG2		= 0x04,
+	EFUSE_DEVICE_CFG3		= 0x05,
+	EFUSE_DEVICE_CFG4		= 0x06,
+	EFUSE_DEVICE_CFG5		= 0x07,
+	EFUSE_DEVICE_CFG6		= 0x08,
+	EFUSE_DEVICE_CFG7		= 0x09,
+	PLL_CTRL				= 0x0a,
+	CPU_RESET				= 0x0b,
+	CPU_THREAD_EN			= 0x0c,
+	CPU_NONCOHERENT_MODE	= 0x0d,
+	CORE_DFS_DIS_CTRL		= 0x0e,
+	CORE_DFS_RST_CTRL		= 0x0f,
+	CORE_DFS_BYP_CTRL		= 0x10,
+	CORE_DFS_PHA_CTRL		= 0x11,
+	CORE_DFS_DIV_INC_CTRL	= 0x12,
+	CORE_DFS_DIV_DEC_CTRL	= 0x13,
+	CORE_DFS_DIV_VALUE		= 0x14,
+	SYS_RESET				= 0x15,
+	SYS_DFS_DIS_CTRL		= 0x16,
+	SYS_DFS_RST_CTRL		= 0x17,
+	SYS_DFS_BYP_CTRL		= 0x18,
+	SYS_DFS_DIV_INC_CTRL	= 0x19,
+	SYS_DFS_DIV_DEC_CTRL	= 0x1a,
+	SYS_DFS_DIV_VALUE0	 	= 0x1b,
+	SYS_DFS_DIV_VALUE1	 	= 0x1c,
+	CPU_SENSE_AMP_DLY		= 0x1d,
+	SOC_SENSE_AMP_DLY		= 0x1e,
+	SYS_CTRL0				= 0x1f,
+	SYS_CTRL1				= 0x20,
+	TIMEOUT_BSI				= 0x21,
+	BYTE_SWAP				= 0x22,
+	VRM_VID					= 0x23,
+	SYS_PWR_RAM_CMD			= 0x24,
+	SYS_PWR_RAM_ADDR		= 0x25,
+	SYS_PWR_RAM_DATA0		= 0x26,
+	SYS_PWR_RAM_DATA1		= 0x27,
+	SYS_PWR_RAM_DATA2		= 0x28,
+	SYS_PWR_UCODE			= 0x29,
+	CPU0_PWR_STATUS			= 0x2a,
+	CPU1_PWR_STATUS			= 0x2b,
+	CPU2_PWR_STATUS			= 0x2c,
+	CPU3_PWR_STATUS			= 0x2d,
+	CPU4_PWR_STATUS			= 0x2e,
+	CPU5_PWR_STATUS			= 0x2f,
+	CPU6_PWR_STATUS			= 0x30,
+	CPU7_PWR_STATUS			= 0x31,
+	SYS_STATUS				= 0x32,
+	SYS_INT_POL				= 0x33,
+	SYS_INT_TYPE			= 0x34,
+	SYS_INT_STATUS			= 0x35,
+	SYS_INT_EN0				= 0x36,
+	SYS_INT_EN1				= 0x37,
+
+	/* Added XLP3XX or XLP8XX.Bx Registers: from 0x38 to 0x8a*/
+	PLL_DFS_DIS_CTRL		= 0x38,
+	PLL_DFS_RST_CTRL		= 0x39,
+	PLL_DFS_BYP_CTRL		= 0x3a,
+	PLL_DFS_DIV_INC_CTRL	= 0x3b,
+	PLL_DFS_DIV_DEC_CTRL	= 0x3c,
+	PLL_DFS_DIV_VALUE		= 0x3d,
+	SYS_DISABLE				= 0x3e,
+	SYS_UCO_S_ECC			= 0x3f,
+	SYS_UCO_M_ECC			= 0x40,
+	SYS_UCO_ADDR			= 0x41,
+	SYS_UCO_INST			= 0x42,
+
+	MEM_BIST0				= 0x43,
+	MEM_BIST1				= 0x44,
+	MEM_BIST2				= 0x45,
+	MEM_BIST3				= 0x46,
+	MEM_BIST4				= 0x47,
+	MEM_BIST5				= 0x48,
+	MEM_BIST6				= 0x49,
+	MEM_BIST7				= 0x4a,
+	MEM_BIST8				= 0x4b,
+	MEM_BIST9				= 0x4c,
+	MEM_BIST10				= 0x4d,
+	MEM_BIST11				= 0x4e,
+	MEM_BIST12				= 0x4f,
+	MEM_STAT0				= 0x50,
+	MEM_STAT1				= 0x51,
+
+	SYS_SCRATCH0			= 0x52,
+	SYS_SCRATCH1			= 0x53,
+	SYS_SCRATCH2			= 0x54,
+	SYS_SCRATCH3			= 0x55,
+
+	SYS_COUNTER				= 0x56,
+	SYS_CTRLSECUREBOOT		= 0x57,
+	SYS_SECUREKEY			= 0x60,
+	SYS_EFUSECTRL			= 0x80,
+	SYS_EFUSECMD			= 0x81,
+	SYS_EFUSECMDKEY			= 0x82,
+	SYS_EFUSESTAT			= 0x8a
+};
+
+#define XLP2XX_CHIPRESET_REG					0x0
+#define XLP2XX_POWERONRESETCFG_REG				0x1
+#define XLP2XX_EFUSEDEVICECFG0_REG				0x2
+#define XLP2XX_EFUSEDEVICECFG1_REG				0x3
+#define XLP2XX_EFUSEDEVICECFG2_REG				0x4
+#define XLP2XX_EFUSEDEVICECFG3_REG				0x5
+#define XLP2XX_EFUSEDEVICECFG4_REG				0x6
+#define XLP2XX_EFUSEDEVICECFG5_REG				0x7
+#define XLP2XX_EFUSEDEVICECFG6_REG				0x8
+#define XLP2XX_EFUSEDEVICECFG7_REG				0x9
+#define XLP2XX_PLLCTRL_REG						0xa
+#define XLP2XX_CPURESET_REG						0xb
+#define XLP2XX_CPUTHREADEN_REG					0xc
+#define XLP2XX_CPUNONCOHERENTMODE_REG			0xd
+#define XLP2XX_TCUDISABLE_REG					0xe
+#define XLP2XX_CPUSTOP_REG						0xf
+#define XLP2XX_CPUPSWCTRL_REG					0x10
+#define XLP2XX_CPUPWRDOWN_REG					0x11
+#define XLP2XX_CPUMEMCLR_REG					0x12
+#define XLP2XX_SYSDISABLE_REG					0x14
+#define XLP2XX_SYSRESET_REG						0x15
+#define XLP2XX_CPUPSWISO_REG					0x16
+#define XLP2XX_CPUPSWSET_REG					0x17
+#define XLP2XX_CPUPSWRESET_REG					0x18
+#define XLP2XX_CPUPSWCLKEN_REG					0x19
+#define XLP2XX_CPUPSWIN_REG						0x1a
+#define XLP2XX_CPUPSWSRAMOFF_REG				0x1b
+#define XLP2XX_CPUPSWSRAMCLKEN_REG				0x1c
+#define XLP2XX_CPUSENSEAMPDLY_REG				0x1d
+#define XLP2XX_SOCSENSEAMPDLY_REG				0x1e
+#define XLP2XX_SYSCTRL0_REG						0x1f
+#define XLP2XX_SYSCTRL1_REG						0x20
+#define XLP2XX_TIMEOUTBSI_REG					0x21
+#define XLP2XX_BYTESWAP_REG						0x22
+#define XLP2XX_SYSVRMVID_REG					0x23
+#define XLP2XX_SYSPWRRAMCMD_REG					0x24
+#define XLP2XX_SYSPWRRAMADDR_REG				0x25
+#define XLP2XX_SYSPWRRAMDATA0_REG				0x26
+#define XLP2XX_SYSPWRRAMDATA1_REG				0x27
+#define XLP2XX_SYSPWRRAMDATA2_REG				0x28
+#define XLP2XX_SYSPWRUCODE_REG					0x29
+#define XLP2XX_SYSPWRSTATUS0_REG				0x2a
+#define XLP2XX_SYSPWRSTATUS1_REG				0x2b
+#define XLP2XX_SYSSTATUS_REG					0x32
+#define XLP2XX_SYSINTPOL_REG					0x33
+#define XLP2XX_SYSINTTYPE_REG					0x34
+#define XLP2XX_SYSINTSTATUS_REG					0x35
+#define XLP2XX_SYSINTENABLE0_REG				0x36
+#define XLP2XX_SYSINTENABLE1_REG				0x37
+#define XLP2XX_CPUSTOPPIC_REG					0x38
+#define XLP2XX_CPUSTOPNBU_REG					0x39
+#define XLP2XX_CPUSTOPMSG_REG					0x3a
+#define XLP2XX_CPUPSWDATAOUT_REG				0x3b
+#define XLP2XX_CPUPWRSTATUS_REG					0x3c
+#define XLP2XX_CPUMEMCLRDONE_REG				0x3d
+#define XLP2XX_SYSUCOSECC_REG					0x3f
+#define XLP2XX_SYSUCOMECC_REG					0x40
+#define XLP2XX_SYSUCOADDR_REG					0x41
+#define XLP2XX_SYSUCOINST_REG					0x42
+#define XLP2XX_SYSMEMBISTGO0_REG				0x43
+#define XLP2XX_SYSMEMBISTGO1_REG				0x44
+#define XLP2XX_SYSMEMBISTGO2_REG				0x45
+#define XLP2XX_SYSMEMBISTGO3_REG				0x46
+#define XLP2XX_SYSMEMBISTGO4_REG				0x47
+#define XLP2XX_SYSMEMBISTGO5_REG				0x48
+#define XLP2XX_SYSMEMBISTGO6_REG				0x49
+#define XLP2XX_SYSMEMBISTGO7_REG				0x4a
+#define XLP2XX_SYSMEMBISTGO8_REG				0x4b
+#define XLP2XX_SYSMEMBISTGO9_REG				0x4c
+#define XLP2XX_SYSMEMBISTGO10_REG				0x4d
+#define XLP2XX_SYSMEMBISTGO11_REG				0x4e
+#define XLP2XX_SYSMEMBISTGO12_REG				0x4f
+#define XLP2XX_SYSMEMSTAT0_REG					0x54
+#define XLP2XX_SYSMEMSTAT1_REG					0x55
+#define XLP2XX_SYSSCRATCH0_REG					0x58
+#define XLP2XX_SYSSCRATCH1_REG					0x59
+#define XLP2XX_SYSSCRATCH2_REG					0x5a
+#define XLP2XX_SYSSCRATCH3_REG					0x5b
+#define XLP2XX_SYSCOUNTER_REG					0x5c
+#define XLP2XX_SYSCTRLSECUREBOOT_REG			0x5d
+#define XLP2XX_SYSSECUREKEY_REG					0xc0
+#define XLP2XX_SYSEFUSECTRL_REG					0x140
+#define XLP2XX_SYSEFUSECMD_REG					0x141
+#define XLP2XX_SYSEFUSECMDDATA_REG				0x142
+#define XLP2XX_SYSEFUSESTAT_REG					0x14a
+#define XLP2XX_SYSTHERMCTRL_REG					0x14b
+#define XLP2XX_CPUTHERMPWRDOWN_REG				0x14c
+#define XLP2XX_SYSTHERMPWRDOWN_REG				0x14d
+#define XLP2XX_CPUTHERMEN_REG					0x14e
+#define XLP2XX_SYSTHERMEN_REG					0x14f
+#define XLP2XX_THERMTHRESH0_REG					0x150
+#define XLP2XX_THERMTHRESH1_REG					0x151
+#define XLP2XX_THERMTHRESH2_REG					0x152
+#define XLP2XX_THERMTHRESH3_REG					0x153
+#define XLP2XX_CPUTHERMINTSTATUSHIGH0_REG		0x154
+#define XLP2XX_CPUTHERMINTSTATUSLOW0_REG		0x155
+#define XLP2XX_SYSTHERMINTSTATUSHIGH0_REG		0x156
+#define XLP2XX_SYSTHERMINTSTATUSLOW0_REG		0x157
+#define XLP2XX_CPUTHERMINTSTATUSHIGH1_REG		0x158
+#define XLP2XX_CPUTHERMINTSTATUSLOW1_REG		0x159
+#define XLP2XX_SYSTHERMINTSTATUSHIGH1_REG		0x15a
+#define XLP2XX_SYSTHERMINTSTATUSLOW1_REG		0x15b
+#define XLP2XX_CPUTHERMINTSTATUSHIGH2_REG		0x15c
+#define XLP2XX_CPUTHERMINTSTATUSLOW2_REG		0x15d
+#define XLP2XX_SYSTHERMINTSTATUSHIGH2_REG		0x15e
+#define XLP2XX_SYSTHERMINTSTATUSLOW2_REG		0x15f
+#define XLP2XX_CPUTHERMINTSTATUSHIGH3_REG		0x160
+#define XLP2XX_CPUTHERMINTSTATUSLOW3_REG		0x161
+#define XLP2XX_SYSTHERMINTSTATUSHIGH3_REG		0x162
+#define XLP2XX_SYSTHERMINTSTATUSLOW3_REG		0x163
+#define XLP2XX_CPUTHERMINTENHIGH0_REG			0x164
+#define XLP2XX_CPUTHERMINTENLOW0_REG			0x165
+#define XLP2XX_SYSTHERMINTENHIGH0_REG			0x166
+#define XLP2XX_SYSTHERMINTENLOW0_REG			0x167
+#define XLP2XX_CPUTHERMINTENHIGH1_REG			0x168
+#define XLP2XX_CPUTHERMINTENLOW1_REG			0x169
+#define XLP2XX_SYSTHERMINTENHIGH1_REG			0x16a
+#define XLP2XX_SYSTHERMINTENLOW1_REG			0x16b
+#define XLP2XX_CPUTHERMINTENHIGH2_REG			0x16c
+#define XLP2XX_CPUTHERMINTENLOW2_REG			0x16d
+#define XLP2XX_SYSTHERMINTENHIGH2_REG			0x16e
+#define XLP2XX_SYSTHERMINTENLOW2_REG			0x16f
+#define XLP2XX_CPUTHERMINTENHIGH3_REG			0x170
+#define XLP2XX_CPUTHERMINTENLOW3_REG			0x171
+#define XLP2XX_SYSTHERMINTENHIGH3_REG			0x172
+#define XLP2XX_SYSTHERMINTENLOW3_REG			0x173
+#define XLP2XX_CPUTHERMCOUNT_REG				0x174
+#define XLP2XX_SYSTHERMCOUNT_REG				0x194
+#define XLP2XX_THERMCOUNT_REG					0x19c
+
+#define XLP2XX_SYSCPUPLLCTRL0_REG				0x1c0
+#define XLP2XX_SYSCPUPLLCTRL1_REG				0x1c1
+#define XLP2XX_SYSCPUPLLCTRL2_REG				0x1c2
+#define XLP2XX_SYSCPUPLLCTRL3_REG				0x1c3
+
+#define XLP2XX_SYSCPU1PLLCTRL0_REG				0x1c4
+#define XLP2XX_SYSCPU1PLLCTRL1_REG				0x1c5
+#define XLP2XX_SYSCPU1PLLCTRL2_REG				0x1c6
+#define XLP2XX_SYSCPU1PLLCTRL3_REG				0x1c7
+
+#define XLP2XX_SYSSYSPLLCTRL0_REG				0x240
+#define XLP2XX_SYSSYSPLLCTRL1_REG				0x241
+#define XLP2XX_SYSSYSPLLCTRL2_REG				0x242
+#define XLP2XX_SYSSYSPLLCTRL3_REG				0x243
+#define XLP2XX_SYSDMCPLLCTRL0_REG				0x244
+#define XLP2XX_SYSDMCPLLCTRL1_REG				0x245
+#define XLP2XX_SYSDMCPLLCTRL2_REG				0x246
+#define XLP2XX_SYSDMCPLLCTRL3_REG				0x247
+
+#define XLP2XX_SYSDEVPLLCTRL0_REG				0x248
+#define XLP2XX_SYSDEVPLLCTRL1_REG				0x249
+#define XLP2XX_SYSDEVPLLCTRL2_REG				0x24a
+#define XLP2XX_SYSDEVPLLCTRL3_REG				0x24b
+
+#define XLP2XX_SYSDEV1PLLCTRL0_REG				0x24c
+#define XLP2XX_SYSDEV1PLLCTRL1_REG				0x24d
+#define XLP2XX_SYSDEV1PLLCTRL2_REG				0x24e
+#define XLP2XX_SYSDEV1PLLCTRL3_REG				0x24f
+
+#define XLP2XX_SYSDEV2PLLCTRL0_REG				0x250
+#define XLP2XX_SYSDEV2PLLCTRL1_REG				0x251
+#define XLP2XX_SYSDEV2PLLCTRL2_REG				0x252
+#define XLP2XX_SYSDEV2PLLCTRL3_REG				0x253
+
+#define XLP2XX_SYSCPUPLLCHGCTRL_REG				0x288
+#define XLP2XX_SYSSYSPLLCHGCTRL_REG				0x289
+#define XLP2XX_SYSCLKDEVDIS_REG					0x28a
+#define XLP2XX_SYSCLKDEVSEL_REG					0x28b
+#define XLP2XX_SYSCLKDEVDIV_REG					0x28c
+#define XLP2XX_SYSCLKDEVCHG_REG					0x28d
+#define XLP2XX_SYSCLKDEVSELREG_REG				0x28e
+#define XLP2XX_SYSCLKDEVDIVREG_REG				0x28f
+#define XLP2XX_SYSCPUPLLLOCK_REG				0x29f
+#define XLP2XX_SYSSYSPLLLOCK_REG				0x2a0
+#define XLP2XX_SYSPLLMEMCMD_REG					0x2a1
+#define XLP2XX_SYSCPUPLLMEMREQ_REG				0x2a2
+#define XLP2XX_SYSSYSPLLMEMREQ_REG				0x2a3
+#define XLP2XX_SYSPLLMEMSTAT_REG				0x2a4
+
+#define XLP2XX_RTC_REG_SECONDS_REG				0x300
+#define XLP2XX_RTC_REG_MINUTES_REG				0x301
+#define XLP2XX_RTC_REG_CENTURY_HOURS_REG		0x302
+#define XLP2XX_RTC_REG_DAY_REG					0x303
+#define XLP2XX_RTC_REG_DATE_REG					0x304
+#define XLP2XX_RTC_REG_MONTH_REG				0x305
+#define XLP2XX_RTC_REG_YEAR_REG					0x306
+#define XLP2XX_RTC_REG_CONTROL_REG				0x307
+#define XLP2XX_RTC_REG_STATUS_REG				0x308
+#define XLP2XX_RTC_REG_FLAG_REG					0x309
+#define XLP2XX_RTC_REG_CLOCK_PERIOD_REG			0x30a
+#define XLP2XX_RTC_REG_LOCK_REG					0x30b
+#define XLP2XX_RTC_REG_VOLT_REG					0x30c
+#define XLP2XX_RTC_REG_TEST_REG					0x30f
+
+/*  Reference Clock Select 00:66; 01:100; 10:125; 11:133 */
+#define XLP2XX_SYS_PWRON_RCS(x)			( ((x)>>18) & 0x3)
+#define XLP2XX_SYS_NAND_BOOT(x)			( ((x) & 0x1f) == 6)
+
+enum xlp2xx_sys_cfg_regs {
+	XLP2XX_RESET						= 0,
+	XLP2XX_POWER_ON_RESET_CFG			= 1,
+	XLP2XX_EFUSE_DEVICE_CFG0			= 2,
+	XLP2XX_EFUSE_DEVICE_CFG1			= 3,
+	XLP2XX_EFUSE_DEVICE_CFG2			= 4,
+	XLP2XX_EFUSE_DEVICE_CFG3			= 5,
+	XLP2XX_EFUSE_DEVICE_CFG4			= 6,
+	XLP2XX_EFUSE_DEVICE_CFG5			= 7,
+	XLP2XX_EFUSE_DEVICE_CFG6			= 8,
+	XLP2XX_EFUSE_DEVICE_CFG7			= 9,
+	XLP2XX_SYS_PLL_CTRL			 		= 10,
+
+	XLP2XX_CPU_RESET					= 0xb,
+	XLP2XX_CPU_THREAD_EN				= 0xc,
+	XLP2XX_CPUNONCOHERENTMODE			= 0xd,
+	XLP2XX_TCU_DISABLE					= 0xe,
+	XLP2XX_CPU_STOP						= 0xf,
+	XLP2XX_CPU_PSWCTRL					= 0x10,
+	XLP2XX_CPU_PWRDOWN					= 0x11,
+	XLP2XX_CPU_MEMCLR					= 0x12,
+
+	XLP2XX_SYSDISABLE					= 0x14,
+	XLP2XX_SYSRESET						= 0x15,
+	XLP2XX_CPUPSWISO					= 0x16,
+	XLP2XX_CPUPSWSET					= 0x17,
+	XLP2XX_CPUPSWRESET					= 0x18,
+	XLP2XX_CPUPSWCLKEN					= 0x19,
+	XLP2XX_CPUPSWIN						= 0x1a,
+	XLP2XX_CPUPSWSRAMOFF				= 0x1b,
+	XLP2XX_CPUPSWSRAMCLKEN				= 0x1c,
+	XLP2XX_CPUSENSEAMPDLY				= 0x1d,
+	XLP2XX_SOCSENSEAMPDLY				= 0x1e,
+	XLP2XX_SYSCTRL0						= 0x1f,
+	XLP2XX_SYSCTRL1						= 0x20,
+	XLP2XX_TIMEOUTBSI					= 0x21,
+	XLP2XX_BYTESWAP						= 0x22,
+	XLP2XX_SYSVRMVID					= 0x23,
+	XLP2XX_SYSPWRRAMCMD					= 0x24,
+	XLP2XX_SYSPWRRAMADDR				= 0x25,
+	XLP2XX_SYSPWRRAMDATA0				= 0x26,
+	XLP2XX_SYSPWRRAMDATA1				= 0x27,
+	XLP2XX_SYSPWRRAMDATA2				= 0x28,
+	XLP2XX_SYSPWRUCODE					= 0x29,
+	XLP2XX_SYSPWRSTATUS0				= 0x2a,
+	XLP2XX_SYSPWRSTATUS1				= 0x2b,
+	XLP2XX_SYSSTATUS					= 0x32,
+	XLP2XX_SYSINTPOL					= 0x33,
+	XLP2XX_SYSINTTYPE					= 0x34,
+	XLP2XX_SYSINTSTATUS					= 0x35,
+	XLP2XX_SYSINTENABLE0				= 0x36,
+	XLP2XX_SYSINTENABLE1				= 0x37,
+	XLP2XX_CPUSTOPPIC					= 0x38,
+	XLP2XX_CPUSTOPNBU					= 0x39,
+	XLP2XX_CPUSTOPMSG					= 0x3a,
+	XLP2XX_CPUPSWDATAOUT				= 0x3b,
+	XLP2XX_CPUPWRSTATUS					= 0x3c,
+	XLP2XX_CPUMEMCLRDONE				= 0x3d,
+	XLP2XX_SYSUCOSECC					= 0x3f,
+	XLP2XX_SYSUCOMECC					= 0x40,
+	XLP2XX_SYSUCOADDR					= 0x41,
+	XLP2XX_SYSUCOINST					= 0x42,
+	XLP2XX_SYSMEMBISTGO0				= 0x43,
+	XLP2XX_SYSMEMBISTGO1				= 0x44,
+	XLP2XX_SYSMEMBISTGO2				= 0x45,
+	XLP2XX_SYSMEMBISTGO3				= 0x46,
+	XLP2XX_SYSMEMBISTGO4				= 0x47,
+	XLP2XX_SYSMEMBISTGO5				= 0x48,
+	XLP2XX_SYSMEMBISTGO6				= 0x49,
+	XLP2XX_SYSMEMBISTGO7				= 0x4a,
+	XLP2XX_SYSMEMBISTGO8				= 0x4b,
+	XLP2XX_SYSMEMBISTGO9				= 0x4c,
+	XLP2XX_SYSMEMBISTGO10				= 0x4d,
+	XLP2XX_SYSMEMBISTGO11				= 0x4e,
+	XLP2XX_SYSMEMBISTGO12				= 0x4f,
+	XLP2XX_SYSMEMSTAT0					= 0x54,
+	XLP2XX_SYSMEMSTAT1					= 0x55,
+	XLP2XX_SYSSCRATCH0					= 0x58,
+	XLP2XX_SYSSCRATCH1					= 0x59,
+	XLP2XX_SYSSCRATCH2					= 0x5a,
+	XLP2XX_SYSSCRATCH3					= 0x5b,
+	XLP2XX_SYSCOUNTER					= 0x5c,
+	XLP2XX_SYSCTRLSECUREBOOT			= 0x5d,
+	XLP2XX_SYSSECUREKEY					= 0xc0,
+	XLP2XX_SYSEFUSECTRL					= 0x140,
+	XLP2XX_SYSEFUSECMD					= 0x141,
+	XLP2XX_SYSEFUSECMDDATA				= 0x142,
+	XLP2XX_SYSEFUSESTAT					= 0x14a,
+	XLP2XX_SYSTHERMCTRL					= 0x14b,
+	XLP2XX_CPUTHERMPWRDOWN				= 0x14c,
+	XLP2XX_SYSTHERMPWRDOWN				= 0x14d,
+	XLP2XX_CPUTHERMEN					= 0x14e,
+	XLP2XX_SYSTHERMEN					= 0x14f,
+	XLP2XX_THERMTHRESH0					= 0x150,
+	XLP2XX_THERMTHRESH1					= 0x151,
+	XLP2XX_THERMTHRESH2					= 0x152,
+	XLP2XX_THERMTHRESH3					= 0x153,
+	XLP2XX_CPUTHERMINTSTATUSHIGH0		= 0x154,
+	XLP2XX_CPUTHERMINTSTATUSLOW0		= 0x155,
+	XLP2XX_SYSTHERMINTSTATUSHIGH0		= 0x156,
+	XLP2XX_SYSTHERMINTSTATUSLOW0		= 0x157,
+	XLP2XX_CPUTHERMINTSTATUSHIGH1		= 0x158,
+	XLP2XX_CPUTHERMINTSTATUSLOW1		= 0x159,
+	XLP2XX_SYSTHERMINTSTATUSHIGH1		= 0x15a,
+	XLP2XX_SYSTHERMINTSTATUSLOW1		= 0x15b,
+	XLP2XX_CPUTHERMINTSTATUSHIGH2		= 0x15c,
+	XLP2XX_CPUTHERMINTSTATUSLOW2		= 0x15d,
+	XLP2XX_SYSTHERMINTSTATUSHIGH2		= 0x15e,
+	XLP2XX_SYSTHERMINTSTATUSLOW2		= 0x15f,
+	XLP2XX_CPUTHERMINTSTATUSHIGH3		= 0x160,
+	XLP2XX_CPUTHERMINTSTATUSLOW3		= 0x161,
+	XLP2XX_SYSTHERMINTSTATUSHIGH3		= 0x162,
+	XLP2XX_SYSTHERMINTSTATUSLOW3		= 0x163,
+	XLP2XX_CPUTHERMINTENHIGH0			= 0x164,
+	XLP2XX_CPUTHERMINTENLOW0			= 0x165,
+	XLP2XX_SYSTHERMINTENHIGH0			= 0x166,
+	XLP2XX_SYSTHERMINTENLOW0			= 0x167,
+	XLP2XX_CPUTHERMINTENHIGH1			= 0x168,
+	XLP2XX_CPUTHERMINTENLOW1			= 0x169,
+	XLP2XX_SYSTHERMINTENHIGH1			= 0x16a,
+	XLP2XX_SYSTHERMINTENLOW1			= 0x16b,
+	XLP2XX_CPUTHERMINTENHIGH2			= 0x16c,
+	XLP2XX_CPUTHERMINTENLOW2			= 0x16d,
+	XLP2XX_SYSTHERMINTENHIGH2			= 0x16e,
+	XLP2XX_SYSTHERMINTENLOW2			= 0x16f,
+	XLP2XX_CPUTHERMINTENHIGH3			= 0x170,
+	XLP2XX_CPUTHERMINTENLOW3			= 0x171,
+	XLP2XX_SYSTHERMINTENHIGH3			= 0x172,
+	XLP2XX_SYSTHERMINTENLOW3			= 0x173,
+	XLP2XX_CPUTHERMCOUNT				= 0x174,
+	XLP2XX_SYSTHERMCOUNT				= 0x194,
+	XLP2XX_THERMCOUNT					= 0x19c,
+
+	XLP2XX_CORE0_PLL_CTRL0				= 0x1c0,
+	XLP2XX_CORE0_PLL_CTRL1				= 0x1c1,
+	XLP2XX_CORE0_PLL_CTRL2				= 0x1c2,
+	XLP2XX_CORE0_PLL_CTRL3				= 0x1c3,
+
+	XLP2XX_CORE1_PLL_CTRL0				= 0x1c4,
+	XLP2XX_CORE1_PLL_CTRL1				= 0x1c5,
+	XLP2XX_CORE1_PLL_CTRL2				= 0x1c6,
+	XLP2XX_CORE1_PLL_CTRL3				= 0x1c7,
+
+	XLP2XX_SYS_PLL_CTRL0				= 0x240,
+	XLP2XX_SYS_PLL_CTRL1				= 0x241,
+	XLP2XX_SYS_PLL_CTRL2				= 0x242,
+	XLP2XX_SYS_PLL_CTRL3				= 0x243,
+	XLP2XX_DMC_PLL_CTRL0				= 0x244,
+	XLP2XX_DMC_PLL_CTRL1				= 0x245,
+	XLP2XX_DMC_PLL_CTRL2				= 0x246,
+	XLP2XX_DMC_PLL_CTRL3				= 0x247,
+
+	XLP2XX_DEV0_PLL_CTRL0				= 0x248,
+	XLP2XX_DEV0_PLL_CTRL1				= 0x249,
+	XLP2XX_DEV0_PLL_CTRL2				= 0x24a,
+	XLP2XX_DEV0_PLL_CTRL3				= 0x24b,
+	XLP2XX_DEV1_PLL_CTRL0				= 0x24c,
+	XLP2XX_DEV1_PLL_CTRL1				= 0x24d,
+	XLP2XX_DEV1_PLL_CTRL2				= 0x24e,
+	XLP2XX_DEV1_PLL_CTRL3				= 0x24f,
+	XLP2XX_DEV2_PLL_CTRL0				= 0x250,
+	XLP2XX_DEV2_PLL_CTRL1				= 0x251,
+	XLP2XX_DEV2_PLL_CTRL2				= 0x252,
+	XLP2XX_DEV2_PLL_CTRL3				= 0x253,
+
+	XLP2XX_CPU_PLL_CHG_CTRL				= 0x288,
+	XLP2XX_SYS_PLL_CHG_CTRL				= 0x289,
+	XLP2XX_SYS_CLK_DEV_DIS				= 0x28a,
+	XLP2XX_SYS_CLK_DEV_SEL				= 0x28b,
+	XLP2XX_SYS_CLK_DEV_DIV				= 0x28c,
+	XLP2XX_SYS_CLK_DEV_CHG				= 0x28d,
+	XLP2XX_SYS_CLK_DEV_SEL_REG			= 0x28e,
+	XLP2XX_SYS_CLK_DEV_DIV_REG			= 0x28f,
+	XLP2XX_SYS_CPU_PLL_LOCK				= 0x29f,
+	XLP2XX_SYS_SYS_PLL_LOCK 			= 0x2a0,
+	XLP2XX_SYS_PLL_MEM_CMD				= 0x2a1,
+	XLP2XX_SYS_CPU_PLL_MEM_REQ			= 0x2a2,
+	XLP2XX_SYS_SYS_PLL_MEM_REQ			= 0x2a3,
+	XLP2XX_SYS_PLL_MEM_STAT				= 0x2a4,
+
+	XLP2XX_RTC_REG_SECONDS				= 0x300,
+	XLP2XX_RTC_REG_MINUTES				= 0x301,
+	XLP2XX_RTC_REG_CENTURY_HOURS		= 0x302,
+	XLP2XX_RTC_REG_DAY					= 0x303,
+	XLP2XX_RTC_REG_DATE					= 0x304,
+	XLP2XX_RTC_REG_MONTH				= 0x305,
+	XLP2XX_RTC_REG_YEAR					= 0x306,
+	XLP2XX_RTC_REG_CONTROL				= 0x307,
+	XLP2XX_RTC_REG_STATUS				= 0x308,
+	XLP2XX_RTC_REG_FLAG			 		= 0x309,
+	XLP2XX_RTC_REG_CLOCK_PERIOD	 		= 0x30a,
+	XLP2XX_RTC_REG_LOCK			 		= 0x30b,
+	XLP2XX_RTC_REG_VOLT			 		= 0x30c,
+	XLP2XX_RTC_REG_TEST			 		= 0x30f,
+};
+
+/* EFUSE Config2 Reg */
+#define XLP2XX_RSA_BLOCK_INDEX			0
+#define XLP2XX_REGX_BLOCK_INDEX			11
+
+/* EFUSE Config1 Reg */
+#define XLP2XX_CMP_BLOCK_INDEX			9
+#define XLP2XX_CRYPTO_BLOCK_INDEX		14
+
+/*1588-PTP CLOCK selection*/
+#define NET_SYS_CLK 					0
+#define INT_SYNCE_CLK					1
+#define GPIO_1588_CLK					2
+#define SGMII_REF_CLK					3
+
+#define nlm_hal_read_sys_reg(node, index) \
+		nlm_hal_read_32bit_reg((xlp_sys_base[node] + 0x100), (index))
+
+#define nlm_hal_write_sys_reg(node, index, val) \
+		nlm_hal_write_32bit_reg((xlp_sys_base[node] + 0x100), (index), (val))
+
+#define nlm_hal_read_rsa_reg(reg) \
+		nlm_hal_read_32bit_reg((xlp_rsa_base), (reg))
+
+#define nlm_hal_write_rsa_reg(reg, val) \
+		nlm_hal_write_32bit_reg ((xlp_rsa_base), (reg), (val))
+
+#define nlm_hal_read_sae_reg(node, reg) \
+		nlm_hal_read_32bit_reg((xlp_sae_base[node]), (reg))
+
+#define nlm_hal_write_sae_reg(node, reg, val) \
+		nlm_hal_write_32bit_reg ((xlp_sae_base[node]), (reg), (val))
+
+#if 0
+#define nlm_hal_read_rsa_reg(node, reg) \
+		nlm_hal_read_32bit_reg((xlp_rsa_base[node]), (reg))
+
+#define nlm_hal_write_rsa_reg(node, reg, val) \
+		nlm_hal_write_32bit_reg ((xlp_rsa_base[node]), (reg), (val))
+
+#endif
+
+enum {
+	PHYMODE_NONE		= 0,
+	PHYMODE_HS_SGMII	= 1,
+	PHYMODE_XAUI		= 1,
+	PHYMODE_SGMII		= 2,
+	PHYMODE_IL			= 3,
+	PHYMODE_RXAUI		= 6,
+};
+
+enum {
+	LM_UNCONNECTED		= 0,
+	LM_SGMII			= 1,
+	LM_XAUI				= 2,
+	LM_IL				= 3,
+};
+
+#define MAX_GMAC_PORT			18
+#define MAX_CPLX_BLOCK			5
+#define MAX_LANE_PER_CPLX		4
+
+/*PRM: PMA2P0 CONFIG REGISTERS*/
+#define PMA2P0_CMD					0x9
+#define PMA2P0_CTL0					0xA
+	#define PMA2P0_CTL_POR			(1<<9)
+	#define PMA2P0_CTL_SYNTH_RST		(1<<10)
+	#define PMA2P0_CTL_RTHR			(0xf<<12)
+#define PMA2P0_CTL1					0xB
+
+	#define PMA2P0_CTL_MASK_DR		(0x7)
+	#define PMA2P0_CTL_RXAUI_10G_DR	(0x3)
+	#define PMA2P0_CTL_XAUI_16G_DR	(0x3)
+	#define PMA2P0_CTL_XAUI_12G_DR	(0x3)
+	#define PMA2P0_CTL_XAUI_DR		(0x2)
+	#define PMA2P0_CTL_SGMII_DR		(0x1)
+
+	#define PMA2P0_CTL_MASK_DW		(0x70)
+	#define PMA2P0_CTL_RXAUI_10G_DW	(0x30)
+	#define PMA2P0_CTL_XAUI_16G_DW	(0x10)
+	#define PMA2P0_CTL_XAUI_12G_DW	(0x10)
+	#define PMA2P0_CTL_XAUI_DW		(0x10)
+	#define PMA2P0_CTL_SGMII_DW		(0x10)
+	
+#define PMA2P0_STATUS				0xC
+#define PMA2P0_PINCTRL				0xD
+#define PMA2P0_PIN_STS				0XE
+
+/*
+ * PRM: 11.10.2 PHY and PMA Controller Registers
+ */
+#define PHY_LANE_0_STATUS					0
+#define PHY_LANE_1_STATUS					1
+#define PHY_LANE_2_STATUS					2
+#define PHY_LANE_3_STATUS					3
+	#define PHY_LANE_STAT_SRCS				0x00000001 /* bit 1: Rx clock stable if 1 */
+	#define PHY_LANE_STAT_STD				0x00000010 /* bit 4: Transmit Detect if 1 */
+	#define PHY_LANE_STAT_SFEA			 	0x00000020 /* bit 5: Far end absent if 1 */
+	#define PHY_LANE_STAT_STCS			 	0x00000040 /* bit 6: Tx clock stable if 1 */
+	#define PHY_LANE_STAT_SPC				0x00000200 /* bit  9: SGMII PCS Sync bit; 1:synced 0:fault*/
+	#define PHY_LANE_STAT_XLF				0x00000400 /* bit 10: XAUI lane sync bit; 0:synced 1:fault*/
+	#define PHY_LANE_STAT_PCR				0x00000800 /* bit 11: PMA Controller Ready; 1:ready */
+	#define LANE_RX_CLK						(1 << 0)
+	#define LANE_TX_CLK						(1 << 6)
+#define PHY_LANE_0_CTRL					 	4
+#define PHY_LANE_1_CTRL					 	5
+#define PHY_LANE_2_CTRL					 	6
+#define PHY_LANE_3_CTRL					 	7
+	#define PHY_LANE_CTRL_DATA_POS		 	0
+	#define PHY_LANE_CTRL_ADDR_POS		 	8
+	#define PHY_LANE_CTRL_CMD_READ		 	0x00010000
+	#define PHY_LANE_CTRL_CMD_WRITE		 	0x00000000
+	#define PHY_LANE_CTRL_CMD_START			0x00020000
+	#define PHY_LANE_CTRL_CMD_PENDING		0x00040000
+	#define PHY_LANE_CTRL_RESET_PMA			0x00100000
+	#define PHY_LANE_CTRL_ALL				0x00200000
+	#define PHY_LANE_CTRL_FAST_INIT			0x00400000
+	#define PHY_LANE_CTRL_REXSEL_POS		23
+	#define PHY_LANE_CTRL_PHYMODE_POS		25
+	#define PHY_LANE_CTRL_PWRDOWN			0x20000000
+	#define PHY_LANE_CTRL_RST				0x40000000
+	#define PHY_LANE_CTRL_RST_XAUI			0xc0000000
+	#define PHY_LANE_CTRL_BPC_XAUI			0x80000000
+
+/* LANE_CFG_CPLX_n */
+	#define LANE_CFG_LANE_0_POS				0
+	#define LANE_CFG_LANE_1_POS				4
+	#define LANE_CFG_LANE_2_POS				8
+	#define LANE_CFG_LANE_3_POS				12
+
+	#define LANE_CFG_DISCONNECT				0
+	#define LANE_CFG_GMAC					1
+	#define LANE_CFG_XGMAC					2
+	#define LANE_CFG_8ILAKEN				3
+
+#define INT_MDIO_CTRL						0x19
+	#define INT_MDIO_CTRL_ST				0
+	#define INT_MDIO_CTRL_ST_POS			0
+	#define INT_MDIO_CTRL_OP_POS			2
+	#define INT_MDIO_CTRL_PHYADDR_POS		4
+	#define INT_MDIO_CTRL_DEVTYPE_POS		9
+	#define INT_MDIO_CTRL_TA_POS			14
+	#define INT_MDIO_CTRL_TA				0x02
+	#define INT_MDIO_CTRL_MIIM_POS			16
+	#define INT_MDIO_CTRL_LOAD_POS			19
+	#define INT_MDIO_CTRL_XDIV_POS			21
+	#define INT_MDIO_CTRL_MCDIV_POS			28
+	#define INT_MDIO_CTRL_RST				0x40000000
+	#define INT_MDIO_CTRL_SMP				0x00100000
+	#define INT_MDIO_CTRL_CMD_LOAD			0x00080000
+
+	#define INT_MDIO_CTRL_XDIV				7
+	#define INT_MDIO_CTRL_MCDIV				1
+
+#define INT_MDIO_CTRL_DATA					0x1A
+#define INT_MDIO_RD_STAT					0x1B
+	#define INT_MDIO_RD_STAT_MASK			0x0000FFFF
+	#define INT_MDIO_STAT_LFV				0x00010000
+	#define INT_MDIO_STAT_SC				0x00020000
+	#define INT_MDIO_STAT_SM				0x00040000
+	#define INT_MDIO_STAT_MIILFS			0x00080000
+	#define INT_MDIO_STAT_MBSY				0x00100000
+#define INT_MDIO_LINK_STAT					0x1C
+
+#define EXT_XG0_MDIO_CTRL					0x25
+#define EXT_XG1_MDIO_CTRL					0x29
+	#define EXT_XG_MDIO_CTRL_ST				0
+	#define EXT_XG_MDIO_CTRL_OP_POS			2
+#define MDIO_CTRL_OP_INDIRECT_ADDR			0x00
+#define MDIO_CTRL_OP_WRITE_10G_MMD			0x01
+#define MDIO_CTRL_OP_READ_10G_MMD			0x02
+#define MDIO_CTRL_OP_POST_RDINC_ADDR		0x03
+
+	#define EXT_XG_MDIO_CTRL_PHYADDR_POS	4
+	#define EXT_XG_MDIO_CTRL_REG_POS		9
+	#define EXT_XG_MDIO_CTRL_TA				0x02
+	#define EXT_XG_MDIO_CTRL_TA_POS			14
+	#define EXT_XG_MDIO_CTRL_MIIM_POS		16
+	#define EXT_XG_MDIO_CTRL_LOAD_POS		19
+	#define EXT_XG_MDIO_CTRL_XDIV_POS		21
+	#define EXT_XG_MDIO_CTRL_MCDIV_POS  	28
+	#define EXT_XG_MDIO_CTRL_RST			0x40000000
+	#define EXT_XG_MDIO_CTRL_SMP			0x00100000
+	#define EXT_XG_MDIO_CTRL_CMD_LOAD		0x00080000
+	#define MDIO_MIIM_CMD_IDLE				0x000
+	#define MDIO_MIIM_CMD_WRITE				0x001
+	#define MDIO_MIIM_CMD_READ				0x002
+	#define MDIO_MIIM_CMD_SM				0x003
+	#define MDIO_MIIM_CMD_MM				0x004
+	#define MDIO_MIIM_CMD_10G_MMD			0x005
+	#define MDIO_MIIM_CMD_CLEAR_LINK		0x006
+
+#define EXT_G0_MDIO_CTRL					0x1D
+#define EXT_G1_MDIO_CTRL					0x21
+	#define EXT_G_MDIO_CLOCK_DIV_4			0
+	#define EXT_G_MDIO_CLOCK_DIV_2			1
+	#define EXT_G_MDIO_CLOCK_DIV_1			2
+	#define EXT_G_MDIO_REGADDR_POS			5
+	#define EXT_G_MDIO_PHYADDR_POS			10
+	#define EXT_G_MDIO_CMD_SP				0x00008000
+	#define EXT_G_MDIO_CMD_PSIA 			0x00010000
+	#define EXT_G_MDIO_CMD_LCD				0x00020000
+	#define EXT_G_MDIO_CMD_RDS				0x00040000
+	#define EXT_G_MDIO_CMD_SC				0x00080000
+	#define EXT_G_MDIO_MMRST				0x00100000
+	#define EXT_G_MDIO_DIV					0x0000001E		// For Eagle Ax/B0, Storm Ax (all now obsolete)
+	#define EXT_G_MDIO_DIV_WITH_HW_DIV64_11	0x00000011		// For Eagle B1/B2, Storm B0/B1/B2, Firefly A0/A1
+	#define EXT_G_MDIO_DIV_2XX_SLOW			0x00000012		// For Firefly Bx, NAE at <= 375 MHz
+	#define EXT_G_MDIO_DIV_2XX_FAST			0x0000001A		// For Firefly Bx, NAE at  > 375 MHz
+
+#define EXT_G0_MDIO_CTRL_DATA				0x1E
+#define EXT_G1_MDIO_CTRL_DATA				0x22
+
+#define EXT_G0_MDIO_LINK_STAT				0x20
+#define EXT_G1_MDIO_LINK_STAT				0x24
+
+#define EXT_G0_MDIO_RD_STAT					0x1F
+#define EXT_G1_MDIO_RD_STAT					0x23
+	#define EXT_G_MDIO_RD_STAT_MASK			0x0000FFFF
+	#define EXT_G_MDIO_STAT_LFV		 		0x00010000
+	#define EXT_G_MDIO_STAT_SC				0x00020000
+	#define EXT_G_MDIO_STAT_SM				0x00040000
+	#define EXT_G_MDIO_STAT_MIILFS			0x00080000
+	#define EXT_G_MDIO_STAT_MBSY			0x80000000
+	#define MDIO_OP_CMD_READ				0x10
+	#define MDIO_OP_CMD_WRITE				0x01
+
+#define EXT_XG0_MDIO_CTRL					0x25
+#define EXT_XG1_MDIO_CTRL					0x29
+	#define EXT_XG_MDIO_CTRL_ST_POS			0
+	#define EXT_XG_MDIO_CTRL_OP_POS			2
+	#define EXT_XG_MDIO_CTRL_PHYADDR_POS	4
+	#define EXT_XG_MDIO_CTRL_DEVTYPE_POS	9
+	#define EXT_XG_MDIO_CTRL_TA_POS			14
+	#define EXT_XG_MDIO_CTRL_MIIM_POS		16
+	#define EXT_XG_MDIO_CTRL_LOAD_POS		19
+	#define EXT_XG_MDIO_CTRL_XDIV_POS		21
+	#define EXT_XG_MDIO_CTRL_MCDIV_POS		28
+	#define EXT_XG_MDIO_CTRL_RST			0x40000000
+	#define EXT_XG_MDIO_CTRL_SMP			0x00100000
+	#define EXT_XG_MDIO_CTRL_CMD_LOAD		0x00080000
+
+#define EXT_XG0_MDIO_CTRL_DATA				0x26
+#define EXT_XG1_MDIO_CTRL_DATA				0x2A
+
+#define EXT_XG0_MDIO_LINK_STAT				0x28
+#define EXT_XG1_MDIO_LINK_STAT				0x2C
+
+#define EXT_XG0_MDIO_RD_STAT				0x27
+#define EXT_XG1_MDIO_RD_STAT				0x2B
+	#define EXT_XG_MDIO_RD_STAT_MASK		0x0000FFFF
+	#define EXT_XG_MDIO_STAT_LFV			0x00010000
+	#define EXT_XG_MDIO_STAT_SC				0x00020000
+	#define EXT_XG_MDIO_STAT_SM				0x00040000
+	#define EXT_XG_MDIO_STAT_MIILFS			0x00080000
+	#define EXT_XG_MDIO_STAT_MBSY			0x00100000
+
+#define	NETIOR_RX_ABORT_DROP_COUNT			0x77
+
+/* XAUI_CONFIG_0 */
+	#define XAUI_CONFIG_MACRST				0x80000000
+	#define XAUI_CONFIG_RSTRCTL				0x00400000
+	#define XAUI_CONFIG_RSTRFN				0x00200000
+	#define XAUI_CONFIG_RSTTCTL				0x00040000
+	#define XAUI_CONFIG_RSTTFN				0x00020000
+	#define XAUI_CONFIG_RSTMIIM				0x00010000
+
+/* XAUI_CONFIG_1 */
+	#define XAUI_CONFIG_TCTLEN				0x80000000
+	#define XAUI_CONFIG_TFEN				0x40000000
+	#define XAUI_CONFIG_RCTLEN				0x20000000
+	#define XAUI_CONFIG_RFEN				0x10000000
+    #define XAUI_CONFIG_RCTLSHRTP			0x00001000
+	#define XAUI_CONFIG_PPEN				0x00000080
+	#define XAUI_CONFIG_DRPLT64				0x00000020
+	#define XAUI_CONFIG_LENCHK				0x00000008
+	#define XAUI_CONFIG_GENFCS				0x00000004
+	#define XAUI_CONFIG_PAD_0				0x00000000
+	#define XAUI_CONFIG_PAD_64				0x00000001
+	#define XAUI_CONFIG_PAD_COND			0x00000002
+	#define XAUI_CONFIG_PAD_68				0x00000003
+
+#define XAUI_PHY_CTRL_1						0x00
+	#define XAUI_PHY_RST					0x8000
+	#define XAUI_PHY_LOOPBACK				0x4000
+	#define XAUI_PHY_SPSEL1					0x2000
+	#define XAUI_PHY_LOW_POWER				0x0800
+	#define XAUI_PHY_SPSEL0					0x0040
+	#define XAUI_PHY_10G					0x0000
+
+#define XAUI_PHY_STAT_1						0x01
+	#define XAUI_PHY_FAULT_DP				0x0008
+	#define XAUI_PHY_LINK_UP				0x0004
+	#define XAUI_PHY_LOWPOWER				0x0002
+
+#define XAUI_PHY_SPEED_CAP					0x04
+	#define XAUI_PHY_10G_CAP				0x0001
+
+#define XAUI_PHY_DEV_PRESENT				0x05
+	#define XAUI_PHY_DTE_XS_DP		 		0x0020
+	#define XAUI_PHY_XS_DP					0x0010
+	#define XAUI_PHY_PCS_DP					0x0008
+	#define XAUI_PHY_WIS_DP					0x0004
+	#define XAUI_PHY_PMD_PMA_DP				0x0002
+	#define XAUI_PHY_CL22_DP				0x0001
+
+#define XAUI_PHY_STAT_2						0x08
+	#define XAUI_PHY_STAT2_DP				0x2000
+	#define XAUI_PHY_TXF					0x0800
+	#define XAUI_PHY_RXF					0x0400
+#define XAUI_LANE_STAT						0x18
+	#define XAUI_LANE_ALIGNED				0x1000
+	#define XAUI_LANE_PTE_EN				0x0800
+	#define XAUI_LANE_LOOPBACK_EN			0x0400
+	#define XAUI_LANE_PTE_EN				0x0800
+	#define XAUI_LANE_PTE_EN				0x0800
+	#define XAUI_LANE_PTE_EN				0x0800
+	#define XAUI_LANE_L3S					0x0008
+	#define XAUI_LANE_L2S					0x0004
+	#define XAUI_LANE_L1S					0x0002
+	#define XAUI_LANE_L0S					0x0001
+
+#define XAUI_PHY_TEST_CTRL			  		0x19
+	#define XAUI_PHY_TEST_PATTERN_EN		0x04
+	#define XAUI_PHY_TEST_HI_FREQ			0x00
+	#define XAUI_PHY_TEST_LOW_FREQ	  		0x01
+	#define XAUI_PHY_TEST_MIXED_FREQ		0x02
+
+#define NAE_THR_SEPARATION					8
+#define NAE_MTU_LEN							1518
+#define NAE_REACTION_LEN_XAUI				1463
+#define NAE_REACTION_LEN_SGMII				1126
+#define NAE_REACTION_LEN_PARSER				14
+#define NAE_INFLIGHT_LEN_XAUI				504
+#define NAE_INFLIGHT_LEN_SGMII				108
+#define NAE_SMALLEST_PKT_LEN				64
+#define NAE_XAUI_THR_GROUP					1
+#define NAE_SGMII_THR_GROUP					2
+#define NAE_RXAUI_THR_GROUP					3
+#define NAE_ILK_THR_GROUP					4
+#define NAE_RX_THR_BYTE_UNIT				16
+#define NAE_PAUSE_TIMER_DELTA		 		32
+
+#define NETIOR_HIGIG2_CTRL0					0x70
+#define NETIOR_HIGIG2_CTRL1					0x71
+#define NETIOR_HIGIG2_CTRL2					0x72
+#define NETIOR_HIGIG2_PAUSE_CTRL1			0x73
+#define NETIOR_HIGIG2_MACSA					0x74
+#define NETIOR_HIGIG2_STATUS				0x75
+#define NETIOR_HIGIG2_MISC					0x76
+
+#define NETIOR_VLANTYPE_FILTER				0x76
+	#define VLAN_RxHMC						16
+	#define VLAN_RxPAC						17
+
+/* NETIOR_XGMAC_CTRL1*/
+	#define NETIOR_XGMAC_RXAUI_DC_POS		30 /* Rxaui Disparity calculation */
+	#define NETIOR_XGMAC_RXAUI_EN_POS		29 /* Enable RXAUI Mode */
+	#define NETIOR_XGMAC_VLAN_DC_POS		28
+	#define NETIOR_XGMAC_PHYADDR_POS		23
+	#define NETIOR_XGMAC_DEVID_POS			18
+	#define NETIOR_XGMAC_STATS_EN_POS		17
+	#define NETIOR_XGMAC_STATS_CLR_POS		16
+	#define NETIOR_XGMAC_TX_PFC_EN_POS  	14
+	#define NETIOR_XGMAC_RX_PFC_EN_POS  	13
+	#define NETIOR_XGMAC_SOFT_RST_POS		11
+	#define NETIOR_XGMAC_TX_PAUSE_POS		10
+	#define NETIOR_XGMAC_RXAUI_SCRAMBLER_POS 4
+
+#define MAC_ADDR0_LO						0x50
+#define MAC_ADDR0_HI						0x51
+#define MAC_FILTER_CONFIG					0x5c
+	#define MAC_FILTER_BCAST_EN_POS 		10
+	#define MAC_FILTER_MCAST_EN_POS			8
+	#define MAC_FILTER_ALL_UCAST_EN			7
+	#define MAC_FILTER_UHASH_EN				5
+		#define MAC_FILTER_MHASH_EN			6
+	#define MAC_FILTER_ADDR0_VALID_POS 		0
+#define MAC_ADDR0_MASK_LO					0x58
+#define MAC_ADDR0_MASK_HI					0x59
+
+/* Interlaken Registers */
+#define ILK_TX_CONTROL						0x00
+	#define ILK_TX_CTRL_RST_INF				0x80000000
+	#define ILK_TX_CTRL_RST_CORE			0x40000000
+	#define ILK_TX_CTRL_TXO					0x20000000
+	#define ILK_TX_CTRL_TXU					0x10000000
+	#define ILK_TX_CTRL_TXBE				0x08000000
+	#define ILK_TX_CTRL_DSW					0x00000200
+	#define ILK_TX_CTRL_BAD_LANE			0x00000100
+	#define ILK_TX_CTRL_RATELIM_EN			0x00000002
+	#define ILK_TX_CTRL_TX_EN				0x00000001
+
+	#define ILK_TX_CTRL_FIFO_THR_POS		19
+	#define ILK_TX_CTRL_CAL_LEN_POS			15
+	#define ILK_TX_CTRL_BS_POS				12
+	#define ILK_TX_CTRL_BMAX_POS			10
+	#define ILK_TX_CTRL_BLS_POS				5
+	#define ILK_TX_CTRL_LLS_POS				2
+
+#define ILK_TX_RATE_LIMIT					0x01
+	#define ILK_TX_RATE_LIM_UI_POS			24
+	#define ILK_TX_RATE_LIM_DELTA_POS		12
+	#define ILK_TX_RATE_LIM_MTC_POS			0
+
+#define ILK_TX_META_CTRL					0x02
+	#define ILK_TX_META_CTRL_TXLEN_POS		16
+	#define ILK_TX_META_CTRL_RXLEN_POS		0
+
+#define ILK_RX_CONTROL						0x03
+	#define ILK_RX_CTRL_RST_CORE			0x00800000
+	#define ILK_RX_CTRL_BAD_LANE			0x00000004
+	#define ILK_RX_CTRL_FORCE_RESYNC		0x00000002
+	#define ILK_RX_CTRL_PKT_MODE			0x00000001
+
+	#define ILK_RX_CTRL_RST_LANE_POS		24
+	#define ILK_RX_CTRL_BMAX_POS			9
+	#define ILK_RX_CTRL_LLS_POS				6
+	#define ILK_RX_CTRL_BLS_POS				3
+
+#define ILK_RX_STATUS1						0x04
+	/* All fields are RWC */
+	#define ILK_RX_STAT1_MFS_POS			24
+	#define ILK_RX_STAT1_MFSE_POS			16
+	#define ILK_RX_STAT1_MFLE_POS			8
+	#define ILK_RX_STAT1_MFRE_POS			0
+
+#define ILK_RX_STATUS2						0x05
+	/* All fields are RWC */
+	#define ILK_RX_STAT2_RDCV_POS			24
+	#define ILK_RX_STAT2_RDCE_POS			16
+	#define ILK_RX_STAT2_RDIS_POS			8
+	#define ILK_RX_STAT2_RDLS_POS			0
+
+#define ILK_GENERAL_CTRL1					0x06
+	#define ILK_GEN_CTRL1_RXBTE_POS			16
+	#define ILK_GEN_CTRL1_RXMBITS_POS		12	/* PRM bug */
+	#define ILK_GEN_CTRL1_RXFC_POS			8	/* Bits 8..11 RXFC (This is not included in PRM) */
+	#define ILK_GEN_CTRL1_TXMBITS_POS		0
+
+#define ILK_RX_STATUS3						0x07
+	#define ILK_RX_STAT3_CC_MAP				0x00080000
+	#define ILK_RX_STAT3_TIME_STAMP			0x00040000  /*RWC */
+	#define ILK_RX_STAT3_RXL_ALIGN			0x00020000
+	/* Bits 16-0 RWC */
+	#define ILK_RX_STAT3_WCRC_ERR			0x00010000
+	#define ILK_RX_STAT3_CWCRC_ERR			0x00008000
+	#define ILK_RX_STAT3_SS_ERR				0x00004000
+	#define ILK_RX_STAT3_MFLEN_ERR			0x00002000
+	#define ILK_RX_STAT3_MFRPT_ERR			0x00001000
+	#define ILK_RX_STAT3_WRDSYNC_ERR		0x00000800
+	#define ILK_RX_STAT3_MF_ERR				0x00000400
+	#define ILK_RX_STAT3_FRM_ERR			0x00000200
+	#define ILK_RX_STAT3_BADTYPE_ERR		0x00000100
+	#define ILK_RX_STAT3_SOP_ERR			0x00000080
+	#define ILK_RX_STAT3_EOP_ERR			0x00000040
+	#define ILK_RX_STAT3_LA_ERR				0x00000020
+	#define ILK_RX_STAT3_LM_ERR				0x00000010
+	#define ILK_RX_STAT3_BMAX_ERR			0x00000008
+	#define ILK_RX_STAT3_BURST_ERR			0x00000004
+	#define ILK_RX_STAT3_FIFO_OVF_ERR		0x00000002
+	#define ILK_RX_STAT3_OTHER_ERR			0x00000001
+
+#define ILK_RX_FC_TMAP0						0x08
+#define ILK_RX_FC_TMAP1						0x09
+#define ILK_RX_FC_TMAP2						0x0A
+#define ILK_RX_FC_TMAP3						0x0B
+#define ILK_RX_FC_TMAP4						0x0C
+
+#define ILK_RX_FC_TADDR						0x0D
+	#define ILK_RX_FC_RXMTUDROP_EN			0x40000000
+	#define ILK_RX_FC_REQ_VALID				0x00000020
+	#define ILK_RX_FC_WRITE_REQ				0x00000010
+
+	#define ILK_RX_FC_RXMTU_SIZE_POS		17  /* size in 16byte words */
+	#define ILK_RX_FC_TABLE_IDX_POS			0
+
+#define ILK_GENERAL_CTRL2					0x0E
+	#define ILK_GEN_CTRL2_STATS_COR			0x40000000
+
+	#define ILK_GEN_CTRL2_SCS5_POS			25
+	#define ILK_GEN_CTRL2_SCS4_POS			20
+	#define ILK_GEN_CTRL2_SCS3_POS			15
+	#define ILK_GEN_CTRL2_SCS2_POS			10
+	#define ILK_GEN_CTRL2_SCS1_POS			5
+	#define ILK_GEN_CTRL2_SCS0_POS			0
+
+#define ILK_GENERAL_CTRL3					0x0F
+	#define ILK_GEN_CTRL3_LCS1_POS			17
+	#define ILK_GEN_CTRL3_LCS0_POS			14
+	#define ILK_GEN_CTRL3_MCS1_POS			12
+	#define ILK_GEN_CTRL3_MCS0_POS			10
+	#define ILK_GEN_CTRL3_SCS7_POS			5
+	#define ILK_GEN_CTRL3_SCS6_POS			0
+
+#define ILK_SMALL_COUNT0					0x10
+#define ILK_SMALL_COUNT1					0x11
+#define ILK_SMALL_COUNT2					0x12
+#define ILK_SMALL_COUNT3					0x13
+#define ILK_SMALL_COUNT4					0x14
+#define ILK_SMALL_COUNT5					0x15
+#define ILK_SMALL_COUNT6					0x16
+#define ILK_SMALL_COUNT7					0x17
+#define ILK_MID_COUNT0						0x18
+#define ILK_MID_COUNT1						0x19
+#define ILK_LARGE_COUNT_L0					0x1A
+#define ILK_LARGE_COUNT_L1					0x1B
+#define ILK_LARGE_COUNT_H0					0x1C
+#define ILK_LARGE_COUNT_H1					0x1D
+
+/* Serdes Register */
+#define SER_GEN1_PWR_DOWN					0x0E
+	#define SERDES_PMFF_ALL_SET				0x04
+
+#define SERDES_PRBS_CTRL					0x64
+	#define SERDES_LOOPBACK_EN				0x02
+
+#define ILK_BURST_MAX						3	/* 256 bytes */
+
+#define XLP_ILK_LANE_RATE_LOW				0	/* 0, 19, 0 */
+#define XLP_ILK_LANE_RATE_HIDH				1	/* 1, 19, 0 */
+
+#define XLP_ILK_PORT_0						0
+#define XLP_ILK_PORT_1						8
+
+#define XLP_ILK_PORT0_CS					3
+#define XLP_ILK_PORT1_CS					4
+
+#define XLP_ILK_MAX_LANES					8
+
+/* SPI */
+#define XLP_SPI_CONFIG						0x40
+	#define XLP_SPI_CPHA					0x01
+	#define XLP_SPI_CPOL					0x02
+	#define XLP_SPI_MODE_MASK				0x03
+	#define XLP_SPI_CS_POL_HI				0x04
+	#define XLP_SPI_TXMISO_EN				0x08
+	#define XLP_SPI_TXMOSI_EN				0x10
+	#define XLP_SPI_RXMISO_EN				0x20
+	#define XLP_SPI_SB_EN					0x40
+	#define XLP_SPI_SBPOL					0x80
+	#define XLP_SPI_LSBF_EN					0x0400
+	#define XLP_SPI_RXCAP_EV				0x0800
+#define XLP_SPI_FDIV						0x41
+#define XLP_SPI_CMD							0x42
+	#define XLP_SPI_CMD_MASK				0xF
+	#define XLP_SPI_CMD_IDLE				0x0000
+	#define XLP_SPI_CMD_TX					0x0001
+	#define XLP_SPI_CMD_RX					0x0002
+	#define XLP_SPI_CMD_TXRX				0x0003
+	#define XLP_SPI_CMD_CONT				0x10
+	#define XLP_SPI_XFR_BITCNT_POS			16
+
+#define XLP_SPI_STATUS						0x43
+	#define XLP_SPI_XFR_PENDING				0x01
+	#define XLP_SPI_XFR_DONE				0x02
+	#define XLP_SPI_TX_OV_TH				0x04
+	#define XLP_SPI_RX_OV_TH				0x08
+	#define XLP_SPI_TX_UF					0x10
+	#define XLP_SPI_TX_OF					0x20
+#define XLP_SPI_INTEN						0x44
+	#define XLP_SPI_INT_XFR_DONE			0x01
+	#define XLP_SPI_INT_TX_THRESH			0x02
+	#define XLP_SPI_INT_RX_THRESH			0x04
+	#define XLP_SPI_INT_TX_UF				0x08
+	#define XLP_SPI_INT_RX_OF				0x10
+
+#define XLP_SPI_FIFO_THRESH					0x45
+	#define XLP_SPI_TXFIFO_THRESH_POS		4
+	#define XLP_SPI_RXFIFO_THRESH_POS		0
+
+#define XLP_SPI_FIFO_WCNT					0x46
+	#define XLP_SPI_TXFIFO_WCNT_POS			4
+	#define XLP_SPI_RXFIFO_WCNT_POS			0
+#define XLP_SPI_TXDATA_FIFO					0x47
+#define XLP_SPI_RXDATA_FIFO					0x48
+
+#define XLP_SPI_SYSCTRL						0x80
+	#define XLP_SPI_SYS_RESET				0x01
+	#define XLP_SPI_SYS_CLKDIS				0x0010
+	#define XLP_SPI_SYS_PMEN				0x0100
+
+/* I2C */
+#define XLP_PRESCALE0						0x0 
+#define XLP_PRESCALE1						0x1 
+#define XLP_I2C_CONTROL						0x2 
+		#define XLP_I2C_CTRL_EN				0x80
+		#define XLP_I2C_CTRL_IEN			0x40
+#define XLP_I2C_DATA						0x3			  
+#define XLP_I2C_COMMAND						0x4 
+		#define XLP_I2C_CMD_START			0x90
+		#define XLP_I2C_CMD_STOP			0x40
+		#define XLP_I2C_CMD_READ			0x20
+		#define XLP_I2C_CMD_WRITE			0x10
+		#define XLP_I2C_CMD_RDACK			0x20
+		#define XLP_I2C_CMD_RDNACK			0x28
+		#define XLP_I2C_CMD_IACK			0x01 
+#define XLP_I2C_STATUS						0x4		
+		#define XLP_I2C_STATUS_NACK			0x80	 
+		#define XLP_I2C_STATUS_BUSY			0x40
+		#define XLP_I2C_STATUS_AL			0x20	
+		#define XLP_I2C_STATUS_TIP			0x02	
+		#define XLP_I2C_STATUS_IF			0x01 
+#define XLP_WRITE_BIT						0x00
+#define XLP_READ_BIT						0x01
+
+#define XLP_USB_PCIE_MBAR					0x4
+#define XLP_USB_PCIE_MBAR1					0x5
+
+#define XLP_USB_PCI0						0x40
+#define XLP_USB_CTL0						0x41
+	#define USBCONTROLLERRESET			  	0x01
+	#define USBEHCI64BITEN					0x02
+	#define USBOHCISTARTCLK					0x04
+
+#define XLP_USB_CTL1						0x42
+#define XLP_USB_CTL2						0x43
+#define XLP_USB_CTL3						0x44
+#define XLP_USB_CTL4						0x45
+#define XLP_USB_CTL5						0x46
+#define XLP_USB_CTL6						0x47
+#define XLP_USB_CTL7						0x48
+
+#define XLP_USB_BYTESWAP					0x49
+
+#define XLP_USB_PHY0						0x4A
+#define XLP_USB_PHY1						0x4B
+#define XLP_USB_PHY2						0x4C
+	#define USBPHYRESET		 				0x01
+	#define USBVBUSDETECT					0x02
+	#define USBREFCLK_12MHZ					0x00
+	#define USBREFCLK_24MHZ	 				0x04
+	#define USBREFCLK_48MHZ	 				0x08
+	#define USBPHYPORTRESET0				0x10
+	#define USBPHYPORTRESET1				0x20
+
+#define XLP_USB_STATUS0		 				0x4D
+#define XLP_USB_INT_STATUS0	 				0x4E
+#define XLP_USB_INT_EN		  				0x4F
+	#define USB_PHY_INTERRUPT_EN			0x01
+	#define USB_OHCI_INTERRUPT_EN			0x02
+	#define USB_OHCI_INTERRUPT1_EN  		0x04
+	#define USB_OHCI_INTERRUPT12_EN 		0x08
+	#define USB_CTRL_INTERRUPT_EN			0x10
+
+#define XLP_USB3_CTL						0x100
+#define XLP_USB3_INT						0x102
+#define XLP_USB3_INT_MASK					0x103
+#define XLP_USB3_PHY_TEST					0x106
+#define XLP_USB3_PHY_LOS_LEV				0x109
+#define XLP_USB3_PHY_PLL_MULT				0x10a
+#define XLP_USB3_REF_CLK					0x10c
+
+/* USB Controller IP registers - >>2 if accessing through PCI-e config space */
+#define XLP_USB3_GUID						0xc128		// Endian test - should read 0x12345678
+#define XLP_USB3_GCTL						0xc110
+#define XLP_USB3_PHY_CFG					0xc200
+#define XLP_USB3_PIPE3CTL					0xc2c0
+
+#ifndef NLM_HAL_LINUX_KERNEL		/* This is not applicable in Linux */
+#define XLP_NOR_IRQ						20
+#define XLP_NAND_IRQ					21
+#define XLP_SPI_IRQ						22
+#define XLP_MMC_IRQ						23
+#define XLP_USB_EHCI_IRQ				24
+#define XLP_USB_OHCI_IRQ				25
+#define XLP_USB_IRT0					115
+#define XLP_NOR_IRT						150
+#define XLP_NAND_IRT					151
+#define XLP_SPI_IRT						152
+#define XLP_MMC_IRT						153
+#endif
+
+#define XLP_PCIE_SPI_NOR_FLASH_DEV		7
+#define XLP_PCIE_SPI_NOR				0
+#define XLP_PCIE_SPI_NAND				1
+#define XLP_PCIE_SPI_CTRL				2
+#define XLP_PCIE_SPI_SD					3
+
+#define XLP_PCIE_GIO_DEV				6
+#define XLP_PCIE_USB_DEV				2
+#define XLP_PCIE_USB3_DEV				4
+#define XLP_PCIE_USB_FUNC_0				0
+#define XLP_PCIE_USB_FUNC_1				1
+#define XLP_PCIE_USB_FUNC_2				2
+#define XLP_PCIE_USB_FUNC_3				3
+#define XLP_PCIE_USB_FUNC_4				4
+#define XLP_PCIE_USB_FUNC_5				5
+
+/* Added define for different I2C function in Firefly */
+#define XLP2_PCIE_I2C_FUNC_7			7
+
+#define XLP_GIO_UART0_FUNC				0
+#define XLP_GIO_UART1_FUNC				1
+#define XLP_GIO_I2C0_FUNC				2
+#define XLP_GIO_I2C1_FUNC				3
+#define XLP_GIO_GPIO_FUNC				4
+
+#define XLP_GPIO_OUTPUT_EN0				0x40	/* GPIO 31:0	*/
+#define XLP_GPIO_OUTPUT_EN1				0x41	/* GPIO 40:32	*/
+#define XLP_GPIO_OUTPUT0				0x42	/* outpin 31:0  */
+#define XLP_GPIO_OUTPUT1				0x43	/* outpin 40:32 */
+#define XLP_GPIO_INPUT0					0x44	/* input 31:0	*/
+#define XLP_GPIO_INPUT1					0x45	/* input 40:32  */
+#define XLP_GPIO_INTEN00				0x46	/* irt 146 31:0  */
+#define XLP_GPIO_INTEN01				0x47	/* irt 146 40:32  */
+#define XLP_GPIO_INTEN10				0x48	/* irt 147 31:0  */
+#define XLP_GPIO_INTEN11				0x49	/* irt 147 40:32  */
+#define XLP_GPIO_INTEN20				0x4A	/* irt 148 31:0  */
+#define XLP_GPIO_INTEN21				0x4B	/* irt 148 40:32  */
+#define XLP_GPIO_INTEN30				0x4C	/* irt 149 31:0  */
+#define XLP_GPIO_INTEN31				0x4D	/* irt 149 40:32  */
+#define XLP_GPIO_INT_POLAR0				0x5E	/* int polarity	31:0	*/
+#define XLP_GPIO_INT_POLAR1				0x5F	/* int polarity	40:32  */
+#define XLP_GPIO_INT_TYPE0				0x60	/* int level type 31:0	*/
+#define XLP_GPIO_INT_TYPE1				0x61	/* int level type 40:32  */
+#define XLP_GPIO_INT_STAT0				0x62	/* int status 31:0	*/
+#define XLP_GPIO_INT_STAT1				0x63	/* int status 40:32  */
+#define XLP_8XX_GPIO_INT_POLAR0			0x4E	/* int polarity	31:0	*/
+#define XLP_8XX_GPIO_INT_POLAR1			0x4F	/* int polarity	40:32  */
+#define XLP_8XX_GPIO_INT_TYPE0			0x50	/* int level type 31:0	*/
+#define XLP_8XX_GPIO_INT_TYPE1			0x51	/* int level type 40:32  */
+#define XLP_8XX_GPIO_INT_STAT0			0x52	/* int status 31:0	*/
+#define XLP_8XX_GPIO_INT_STAT1			0x53	/* int status 40:32  */
+#define XLP_GPIO_INT0_IRT				146
+#define XLP_GPIO_INT1_IRT				147
+#define XLP_GPIO_INT2_IRT				148
+#define XLP_GPIO_INT3_IRT				149
+
+/* NOR Flash memory interface */
+#define NLM_NOR_BUS_NUM					0
+#define NLM_NOR_DEV_NUM					7
+#define NLM_NOR_FUN_NUM					0
+
+#define NLM_NOR_CFG_BASE				( 0x18000000 | (NLM_NOR_DEV_NUM << 15) | (NLM_NOR_FUN_NUM << 12))
+
+#define XLP_NOR_CS_BASE					0x40
+#define XLP_NOR_CS_LIMIT				0x48
+#define XLP_NOR_DEVPARAM				0x50
+#define XLP_NOR_DEV_TIME0				0x58
+#define XLP_NOR_DEV_TIME1				0x59
+
+#define NAE_CLK_DIV						0x1
+#define SAE_CLK_DIV						0x2
+
+#ifdef NLM_HAL_LINUX_KERNEL
+#define DFS_OUTPUT(DR, DF, DV)			((400/((DR+1) * 3)) * (DF+1) * 2)/(DV+1)
+#else
+#define DFS_OUTPUT(DR, DF, DV)			((133.33/(DR+1)) * (DF+1) * 2)/(DV+1)
+#endif
+
+#endif /*__ASSEMBLY__*/
+
+/* SATA related */
+
+/* SATA CONTROLLER PORT REGISTERS */
+#define SataCLB				0x00
+#define SataCLBU			0x04
+#define SataFB				0x08
+#define SataFBU				0x0c
+#define SataIS				0x10
+#define SataIE				0x14
+#define SataCMD				0x18
+#define SataTFD				0x20
+#define SataSIG				0x24
+#define SataSSTS			0x28
+#define SataSCTL			0x2c
+#define SataSERR			0x30
+#define SataSACT			0x34
+#define SataCI				0x38
+#define SataSNTF			0x3c
+#define SataFBS				0x40
+#define SataDMACR			0x70
+#define SataPHYCR			0x78
+#define SataPHYSTS			0x7c
+
+#define ECFG_BASE			0xffffffffb8000000ULL
+#define SATA_DEV_NUM		3
+#define SATA_FUNC_NUM		2
+#define XLP_IO_SATA_BASE	(ECFG_BASE | (SATA_DEV_NUM << 15) | (SATA_FUNC_NUM << 12))
+
+/* #define XLP_MEM_SATA_BASE				0xd0042000 */
+/* #define wr_sata_mem_reg(offset, val)		sw_40bit_phys_uncached(((uint64_t)XLP_MEM_SATA_BASE) + (offset), val) */
+/* #define rd_sata_mem_reg(offset)			lw_40bit_phys_uncached(((uint64_t)XLP_MEM_SATA_BASE) + (offset)) */
+
+#define wr_sata_glue_reg(offset, val)		write_32bit_cfg_reg((uint32_t *)(XLP_IO_SATA_BASE + 0x900), (offset >> 2), val)
+#define rd_sata_glue_reg(offset)			read_32bit_cfg_reg((uint32_t *)(XLP_IO_SATA_BASE + 0x900), (offset >> 2))
+
+#define set_sata_glue_reg(offset, bit)		wr_sata_glue_reg(offset, (rd_sata_glue_reg(offset) | bit))
+#define clear_sata_glue_reg(offset, bit)	wr_sata_glue_reg(offset, (rd_sata_glue_reg(offset) & ~bit))
+
+#define XLP_HAL_SATA_CTL				0x00	/*  */
+#define XLP_HAL_SATA_STATUS				0x04	/* SATA Status register */
+#define XLP_HAL_SATA_INT				0x08	/* SATA Interrupt Register */
+#define XLP_HAL_SATA_INT_MASK			0x0c	/* SATA Interrupt Mask Register */
+#define XLP_HAL_SATA_CR_REG_TIMER		0x10	/* PHY Conrol Timer Register */
+#define XLP_HAL_SATA_CORE_ID			0x14	/* SATA Core ID Register */
+#define XLP_HAL_SATA_AXI_SLAVE_OPT1		0x18	/* SATA AXI Slave Options Register */
+#define XLP_HAL_SATA_PHY_LOS_LEV		0x1c	/* SATA PHY LOS Level Register  */
+#define XLP_HAL_SATA_PHY_MULTI			0x20	/* SATA PHY Multiplier Register		  */
+#define XLP_HAL_SATA_PHY_CLK_SEL		0x24	/* SATA PHY Clock Select Register */
+#define XLP_HAL_SATA_PHY_AMP1_GEN1		0x28	/* SATA PHY Transmit Amplitude Register 1	*/
+#define XLP_HAL_SATA_PHY_AMP1_GEN2		0x2c	/* SATA PHY Transmit Amplitude Register 2	*/
+#define XLP_HAL_SATA_PHY_AMP1_GEN3		0x30	/* SATA PHY Transmit Amplitude Register 3	*/
+#define XLP_HAL_SATA_PHY_PRE1			0x34	/* SATA PHY Transmit Preemphasis Register 1 */
+#define XLP_HAL_SATA_PHY_PRE2			0x38	/* SATA PHY Transmit Preemphasis Register 2 */
+#define XLP_HAL_SATA_PHY_PRE3			0x3c	/* SATA PHY Transmit Preemphasis Register 3 */
+#define XLP_HAL_SATA_SPDMODE			0x40	/* SATA Speed Mode Register */
+#define XLP_HAL_SATA_REFCLK				0x44	/* SATA Reference Clock Control Register */
+#define XLP_HAL_SATA_BYTE_SWAP_DIS		0x74	/* SATA byte swap disable */
+
+/* SATA_CTL Bits */
+#define SATA_RST_N		(1 << 0)
+#define PHY0_RESET_N	(1 << 16)
+#define PHY1_RESET_N	(1 << 17)
+#define PHY2_RESET_N	(1 << 18)
+#define PHY3_RESET_N	(1 << 19)
+#define M_CSYSREQ		(1 << 2)
+#define S_CSYSREQ		(1 << 3)
+
+/* SATA_STATUS Bits */
+#define P0_PHY_READY	(1 << 4)
+#define P1_PHY_READY	(1 << 5)
+#define P2_PHY_READY	(1 << 6)
+#define P3_PHY_READY	(1 << 7)
+
+/* SATA CONTROLLER GENERIC HOST REGISTERS */
+#define SATA_CAP			0x00
+#define SATA_GHC			0x04
+#define SATA_IS				0x08
+#define SATA_PI				0x0c
+#define SATA_AHCI			0x10
+#define SATA_CCC_CTL		0x14
+#define SATA_CCC_PORTS		0x18
+#define SATA_CAP2			0x24
+#define SATA_BISTAFR		0xa0
+#define SATA_BISTCR			0xa4
+#define SATA_BISTFCTR		0xa8
+#define SATA_BISTSR			0xac
+#define SATA_OOBR			0xbc
+#define SATA_TIMER1MS		0xe0
+#define Reserved5			0x0
+#define SATA_GPARAM1R		0xe8
+#define SATA_GPARAM2R		0xec
+#define SATA_PPARAMR		0xf0
+#define SATA_TESTR			0xf4
+#define SATA_VERSIONR		0xf8
+#define SATA_IDR			0xfc
+
+#define HBAReset			(1 << 0)
+
+
+/* XLP BIU_NUMBER
+ * Used by 6.5.0x54.SYSDISABLE & 6.5.0x55.SYS_RESET
+ */
+#define XLP2XX_IO_NUM_OF_BIUS				16
+/* sbb0 */
+#define XLP2XX_IO_PIC_BIU_NUMBER			0
+#define XLP2XX_IO_PCIE0_BIU_NUMBER			1
+#define XLP2XX_IO_PCIE1_BIU_NUMBER			2
+#define XLP2XX_IO_PCIE2_BIU_NUMBER			3
+#define XLP2XX_IO_PCIE3_BIU_NUMBER			4
+#define XLP2XX_IO_USB_BIU_NUMBER			5
+#define XLP2XX_IO_GDX_BIU_NUMBER			6
+#define XLP2XX_IO_CMP_BIU_NUMBER			7
+#define XLP2XX_IO_SEC_BIU_NUMBER			8
+#define XLP2XX_IO_RSA_BIU_NUMBER			9
+/* sbb1 */
+#define XLP2XX_IO_GIO_BIU_NUMBER			10
+#define XLP2XX_IO_GBU_BIU_NUMBER			11
+#define XLP2XX_IO_NET_BIU_NUMBER			12
+#define XLP2XX_IO_MSG_BIU_NUMBER			13
+#define XLP2XX_IO_POE_BIU_NUMBER			14
+#define XLP2XX_IO_REGX_BIU_NUMBER			15
+
+
+#define XLP3XX_IO_NUM_OF_BIUS				17
+/* sbb0 */
+#define XLP3XX_IO_PIC_BIU_NUMBER			0
+#define XLP3XX_IO_PCIE0_BIU_NUMBER			1
+#define XLP3XX_IO_PCIE1_BIU_NUMBER			2
+#define XLP3XX_IO_PCIE2_BIU_NUMBER			3
+#define XLP3XX_IO_PCIE3_BIU_NUMBER			4
+#define XLP3XX_IO_USB_BIU_NUMBER			5
+#define XLP3XX_IO_POE_BIU_NUMBER			7
+#define XLP3XX_IO_SATA_BIU_NUMBER			10
+#define XLP3XX_IO_SRIO_BIU_NUMBER			15
+#define XLP3XX_IO_REGX_BIU_NUMBER			16
+/* sbb1 */
+#define XLP3XX_IO_GIO_BIU_NUMBER			8
+#define XLP3XX_IO_GBU_BIU_NUMBER			9
+#define XLP3XX_IO_NET_BIU_NUMBER			6
+#define XLP3XX_IO_MSG_BIU_NUMBER			11
+#define XLP3XX_IO_GDX_BIU_NUMBER			12
+#define XLP3XX_IO_SEC_BIU_NUMBER			13
+#define XLP3XX_IO_RSA_BIU_NUMBER			14
+
+
+#define XLP8XX_IO_NUM_OF_BIUS				18
+/* sbb0 */
+#define XLP8XX_IO_ICI0_BIU_NUMBER			0
+#define XLP8XX_IO_ICI1_BIU_NUMBER			1
+#define XLP8XX_IO_ICI2_BIU_NUMBER			2
+#define XLP8XX_IO_PIC_BIU_NUMBER			3
+#define XLP8XX_IO_PCIE0_BIU_NUMBER			4
+#define XLP8XX_IO_PCIE1_BIU_NUMBER			5
+#define XLP8XX_IO_PCIE2_BIU_NUMBER			6
+#define XLP8XX_IO_PCIE3_BIU_NUMBER			7
+#define XLP8XX_IO_USB_BIU_NUMBER			8
+#define XLP8XX_IO_NET_BIU_NUMBER			9
+#define XLP8XX_IO_POE_BIU_NUMBER			10
+#define XLP8XX_IO_GIO_BIU_NUMBER			16
+#define XLP8XX_IO_GBU_BIU_NUMBER			17
+/* sbb1 */
+#define XLP8XX_IO_MSG_BIU_NUMBER			11
+#define XLP8XX_IO_GDX_BIU_NUMBER			12
+#define XLP8XX_IO_SEC_BIU_NUMBER			13
+#define XLP8XX_IO_RSA_BIU_NUMBER			14
+#define XLP8XX_IO_CMP_BIU_NUMBER			15
+
+#endif /* #ifndef NLM_HAL_XLP_DEV_H */
+

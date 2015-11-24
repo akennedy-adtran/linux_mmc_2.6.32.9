@@ -1,0 +1,83 @@
+/*-
+ * Copyright (c) 2003-2012 Broadcom Corporation
+ * All Rights Reserved
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY BROADCOM ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL BROADCOM OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * #BRCM_2# */
+
+		
+RMI - Spi4 ethernet driver
+======================================================================
+
+RMI-spi4 ethernet driver provides ethernet interfaces to 
+the end-user. It isolates the SPI-4 hardware for the user 
+and provides twenty 10/100/1000 Mb/sec ports. Ports are 
+named in the following order:
+
+19  17	15  13	11  9	7  5  3  1	
+18  16	14  12	10  8	6  4  2	 0
+
+Each interface has prefix  "spi"  with the port. 
+E.g.  port-0 is named with "spi0"
+
+Driver treats 10 ports from the spi4-slot A as spi0 to 
+spi9 eth ports and remaining 10 ports from the slot B as 
+spi10 to spi19. 
+
+======================================================================
+How to build the driver?
+======================================================================
+
+From the latest kernel sources, run make menuconfig and 
+select "Support for On-Chip Spi4 " under "Machine Selection". 
+Build the new vmlinux image after saving the configuration.  
+By default, the driver assumes there are two spi4 daughter 
+cards on the ATX-1 board. Driver will initialise both the 
+cards and if successful, driver will register 10 interfaces 
+for the corresponding cards.
+
+======================================================================
+Features:
+======================================================================
+
+There is an option to configure the driver to build for 
+one daughter card. If you want to configure the driver to 
+support only one of the cards, then do the following:
+
+1. Edit linux/drivers/net/rmi_spi4/rmi_vits_eth.h
+2. Initialize spi4_slot[] array element to INVALID_SLOT for 
+   the slot you *don't* want to use the spi4 card. 
+3. Modify corresponding cards port to INVALID_PORT in the 
+   active_port[] array.
+
+======================================================================
+How to load the image?
+======================================================================
+
+1.  ifconfig gmac0  : note down the ip address given
+2.  tftpc -s <server ip> -f <image path>
+3.  userapp 
+
+======================================================================

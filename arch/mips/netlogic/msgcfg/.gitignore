@@ -1,0 +1,6 @@
+msgring*.lex.c
+msgring*.yacc.c
+msgring*.yacc.h
+msgring
+msgring_shared
+msgring_xls

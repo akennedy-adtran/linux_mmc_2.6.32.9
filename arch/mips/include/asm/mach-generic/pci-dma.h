@@ -1,0 +1,5 @@
+#ifndef __ASM_MACH_GENERIC_PCI_DMA_H
+#define __ASM_MACH_GENERIC_PCI_DMA_H
+
+
+#endif  /* __ASM_MACH_GENERIC_PCI_DMA_H */

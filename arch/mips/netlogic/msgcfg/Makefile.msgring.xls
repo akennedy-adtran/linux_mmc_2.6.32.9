@@ -1,0 +1,25 @@
+ifeq ($(objtree),)
+objtree := ../../../../
+endif
+
+include $(objtree)/.config
+
+MSGRNG_CFG = msgring_xls.cfg
+
+MSGRNG_OUT_DIR = $(objtree)/arch/mips/netlogic/msgcfg
+MSGRNG_OUT_C_DIR = $(objtree)/arch/mips/netlogic/common
+
+MSGRNG_CFG_C = $(MSGRNG_OUT_C_DIR)/$(patsubst %.cfg,%.c,$(MSGRNG_CFG))
+
+
+all: $(MSGRNG_CFG_C)
+
+$(MSGRNG_CFG_C): msgring_xls.l msgring_xls.y $(MSGRNG_CFG)
+	mkdir -p $(MSGRNG_OUT_DIR)
+	flex -o$(MSGRNG_OUT_DIR)/msgring_xls.lex.c msgring_xls.l
+	bison -d -o$(MSGRNG_OUT_DIR)/msgring_xls.yacc.c  msgring_xls.y
+	gcc -g3 $(MSGRNG_OUT_DIR)/msgring_xls.lex.c $(MSGRNG_OUT_DIR)/msgring_xls.yacc.c -o $(MSGRNG_OUT_DIR)/msgring_xls
+	$(MSGRNG_OUT_DIR)/msgring_xls -i $(MSGRNG_CFG) -o $(MSGRNG_CFG_C)
+
+clean:
+	$(RM) $(MSGRNG_OUT_DIR)/msgring_xls.lex.c $(MSGRNG_OUT_DIR)/msgring_xls.yacc.c $(MSGRNG_OUT_DIR)/msgring_xls.yacc.h $(MSGRNG_OUT_DIR)/msgring_xls

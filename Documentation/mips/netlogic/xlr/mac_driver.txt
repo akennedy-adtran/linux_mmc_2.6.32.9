@@ -1,0 +1,82 @@
+File:
+~~~~~
+drivers/net/xlr_mac.c
+
+The source for both gmac and xgmac driver is in the above file. The below
+xlr specific linux command line arguments can be used to configure the linux
+at boot time.
+
+xls_gmac0_sgmii=1
+~~~~~~~~~~~~~~~~~
+
+On XLS systems, by default, RGMII is used for port 0. To use SGMII, this
+option needs to be passed at boot time.
+
+xlr_msgring_thread_mask=<4-bit bit mask specifying threads in a core>
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This can be used to specify the configure the bitmask of threads to which the
+message ring interrupt of a core should rounb-robin'ed.
+
+The default value is 0xf.  Please see msgring.txt for further details.
+
+xlr_complete_msgring_thread_mask=<32-bit value bit mask to enable threads in each core>
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This can be used to specify which threads in the core will get interrupted when message
+is recieved.
+
+Please see msgring.txt for further details.
+
+xlr_msgring_watermark=<0...255>
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This can be used to specify a watermark for the message ring buckets in the
+cpu core. A value higher than the number of credits from a tx station to the
+cpu may cause some performance problems as the interrupt would only be
+delivered on a timeout
+
+There is no message ring watermark timeout supported by the hardware. Instead,
+one of the PIC system timers is used to deliver a 1ms timer interrupt for this
+purpose.
+
+The most optimal watermark value is 8. The default value is 1.
+
+xlr_mac_desc=<4...2048>
+~~~~~~~~~~~~~~~~~~~~~~~
+This can be used to specify the number of free descriptors per gmac interface
+to be used. Accordingly, the spill areas are configured. A higher number is
+not necessarily better because the cpus may not keep up with high traffic
+throughput and the packets are dropped in the software instead of at the
+mac interface.
+
+The default value is 512.
+
+xlr_napi
+~~~~~~~~~~~~~~~~~~~~~~~
+Enables NAPI polling mode on GMAC/XGMAC drivers. Option is disabled by default.
+This option also enables another optimization: it sets lockless tx mode 
+(NETIF_F_LLTX) on the interfaces and turns off use of the default pfifo_fast 
+interface transmit queue in the stack (by setting tx_queue_len to 0). With 32
+vcpus, the cost of synchronizing the transmit interface queue using the pfifo_fast
+discipline is pretty high. Since the transmit of packets to the mac on XLR is 
+via message ring on which multiple agents can transmit message simultaneously 
+lockless tx helps to avoid locks in the generic driver.
+
+If intention is to co-exist GMAC/XGMAC NAPI polling loop with processing messages sent by 
+non-GMAC/XGMAC stations (e.g. Security, Compression, DMA) then special option has to be 
+enabled in the kernel:
+
+  make menuconfig
+         -->Machine Selection
+	    [*] Demultiplex messages from on-chip devices inside NAPI poll loop 
+
+  exit saving kernel config, execute "make clean && make"
+
+XLR_NAPI option requires xls_msgring_thread_mask to match user_mask_cpus: E.g. if
+linux is booted with "userapp_mask_cpus 0x33333333" then linux kernel option
+"xlr_msgring_thread_mask=0x03" must be passed to the kernel.
+ 
+----------------------------------------------------------------------------
+To get the best performance for networking benchmarks like routing, please
+use the following options while booting linux with all hardware threads.
+
+"xlr_msgring_thread_mask=0x0f xlr_napi"
+

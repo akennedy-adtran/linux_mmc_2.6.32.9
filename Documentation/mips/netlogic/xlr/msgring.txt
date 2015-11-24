@@ -1,0 +1,25 @@
+Message ring thread mask:
+-------------------------
+There are two mutually exclusive Linux boot parameters that determine how
+interrupts are dispatched to the hardware threads in the CPU:
+"xlr_msgring_thread_mask" and "xlr_complete_msgring_thread_mask".  For
+hardware details please refer to Section 4.3.2.5 MsgConfig in the XLR
+Programmers Reference Manual.  The "xlr_msgring_thread_mask" parameter is
+a 4 bit value to specify the thread mask that will be applied for all
+cores running Linux.  For example, if xlr_msgring_thread_mask is set to
+0x3 and core 0 and 1 are running Linux, the vcpus 0, 1, 4 and 5 will get
+interrupts when there are messages in their respective buckets.  Thread 2,
+3, 6 and 7 will not get interrupts.
+
+To get finer control over the thread mask on each core, the
+"xlr_complete_msgring_thread_mask" may be used.  This is a 32 bit value
+and each nibble is used as the mask for the appropriate core.  For example
+xlr_complete_msgring_thread_mask=0xf1ffffff will use 0xf as thread mask for
+all cores except core 1.  Core 1 will be set with thread mask as 0x1.
+
+On Linux, thread mask bit for core 0 thread 0 will always be set even if it
+is not set by either of the thread mask parameters.  By default, Linux is
+started with xlr_msgring_thread_mask=0xf.  This value is AND with the
+CPUs enabled in a core.  So, if Linux is started with userapp_mask_cpus=
+0x33333333, the thread mask applied to each core will be 0x3.
+

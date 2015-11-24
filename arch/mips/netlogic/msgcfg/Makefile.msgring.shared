@@ -1,0 +1,24 @@
+ifeq ($(objtree),)
+objtree := ../../../../
+endif
+
+include  $(objtree)/.config
+
+MSGRNG_CFG = msgring_shared.cfg
+
+MSGRNG_OUT_DIR = $(objtree)/arch/mips/netlogic/msgcfg
+MSGRNG_OUT_C_DIR = $(objtree)/arch/mips/netlogic/common
+
+MSGRNG_CFG_C = $(MSGRNG_OUT_C_DIR)/$(patsubst %.cfg,%.c,$(MSGRNG_CFG))
+
+all: $(MSGRNG_CFG_C)
+
+$(MSGRNG_CFG_C): msgring_shared.l msgring_shared.y $(MSGRNG_CFG)
+	mkdir -p $(MSGRNG_OUT_DIR)
+	flex -o$(MSGRNG_OUT_DIR)/msgring_shared.lex.c msgring_shared.l
+	bison -d -o$(MSGRNG_OUT_DIR)/msgring_shared.yacc.c  msgring_shared.y
+	gcc -g3 $(MSGRNG_OUT_DIR)/msgring_shared.lex.c $(MSGRNG_OUT_DIR)/msgring_shared.yacc.c -o $(MSGRNG_OUT_DIR)/msgring_shared
+	$(MSGRNG_OUT_DIR)/msgring_shared -i $(MSGRNG_CFG) -o $(MSGRNG_CFG_C)
+
+clean:
+	$(RM) $(MSGRNG_OUT_DIR)/msgring_shared.lex.c $(MSGRNG_OUT_DIR)/msgring_shared.yacc.c $(MSGRNG_OUT_DIR)/msgring_shared.h $(MSGRNG_OUT_DIR)/msgring_shared

@@ -1,0 +1,31 @@
+Instructions to modify initramfs
+=================================
+
+1. Copy the existing ramfs image to /tmp directory
+
+     cp /opt/rmi/<release>/linux/src/arch/mips/rmi/phoenix/initramfs_data.cpio /tmp
+
+2. Create /tmp/ramfs directory and change directory to /tmp/ramfs
+
+3. Extract the ramfs archive
+
+     cpio -i -d -H newc -F ../initramfs_data.cpio --no-absolute-filename
+
+     This will extract the contents of initramfs_data.cpio to the current directory (/tmp/ramfs)
+
+4. Make the required changes to /tmp/ramfs directory.
+
+5. Change to /opt/rmi/<release>/linux/src
+
+6. Edit .config and  change
+    change CONFIG_INITRAMFS_SOURCE 
+    	   to 
+    /tmp/ramfs
+
+7. Rebuild linux kernel
+
+
+For more information, please read
+
+  ~/linux/Documentation/filesystems/ramfs-rootfs-initramfs.txt
+

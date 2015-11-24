@@ -1,0 +1,172 @@
+config NLM_COMMON
+	bool
+
+config NLM_XLP
+	select NLM_ATOMICS
+	select PCI
+	bool
+
+config NLM_ATOMICS
+	bool
+
+config NLMCOMMON_VM_DEBUG
+	bool "Debug VM System"
+	depends on NLM_COMMON
+	default n
+
+config NLMCOMMON_USERSEGV_DEBUG
+	bool "Debug User process SEGV crash"
+	depends on NLM_COMMON
+	default n
+
+config NLMCOMMON_SMP_PREFIX
+	bool "Prefix the cpu number for every printk"
+	depends on NLM_COMMON
+	default y
+
+config MAPPED_KERNEL
+	bool "Mapped kernel"
+	default y
+	help
+		Select this option if you want the kernel's code and data to
+		be in mapped memory.  The kernel will be mapped using a
+		single wired TLB entry, thus reducing the number of
+		available TLB entries by one.  Kernel modules will be able
+		to use a more efficient calling convention.
+
+config PHYS_LOAD_ADDRESS
+	hex "Physical load address"
+	depends on MAPPED_KERNEL
+	default 0xffffffff84000000
+	help
+		The physical load address reflected as the program header
+		physical address in the kernel ELF image.
+
+config NLM_COMMON_LOAD_ADDRESS
+	hex "Netlogic Linux kernel start address"
+	depends on NLM_COMMON
+	default "0xffffffffc4000000"
+	help
+		This is start address for the linux kernel. Default value
+		should be good for most of the applications unless specified
+		explicitly: e.g. running Netlogic ToE requires kernel to be linked
+		at address 0xffffffff86000000.
+
+config NLMCOMMON_PTP_SUPPORT
+	bool "1588PTP Support(enables prepad)"
+	depends on NLM_COMMON
+	default n
+	help
+		Support for 1588 timing feature. Timestamps Rx/Tx packets.
+
+config NLM_VMIPS
+	bool "Virtual Mips support"
+	depends on NLM_COMMON
+	default n
+	help
+		The kseg0 and kseg1 unmapped access will become mapped.
+
+config KSEG2_LOWMEM
+	bool "Mapped Lowmem"
+	depends on MAPPED_KERNEL && (64BIT || 32BIT)
+	default y
+
+config READ_INHIBIT
+	bool "Enable Read Inhibit Semantics"
+	depends on NLM_XLP
+	default n
+
+config EXEC_INHIBIT
+	bool "Enable Exec Inhibit Semantics"
+	depends on NLM_XLP
+	default n
+
+config XEN
+	bool "Enable Paravirtualization for Xen"
+	depends on NLM_XLP
+	default n
+
+config NLM_CORTINA_SUPPORT
+	bool "Enable Cortina Interlaken Support "
+	depends on NLM_XLP
+	default n
+	help
+		This option enables Cortina Interlaken Card Support.
+
+config NLM_XLP_DEVMODE
+	depends on NLM_XLP
+	bool "Enable XLP device mode"
+	default n
+	help
+		Some XLP specific drivers need be compiled as host or device
+		mode. If selected, this option enables device mode compilation.
+		Otherwise, these drivers are compiled as host mode drivers.
+
+config NLM_RIXI
+	bool "Enable Read Inhibit/ Execute Inhibit support"
+	depends on NLM_XLP && 64BIT
+	default n
+
+config NLM_NET_OPTS
+	bool "Enable Network Optimization (memcpy/memset)"
+	depends on NLM_XLP && 64BIT
+	default n
+
+config NLM_EXCL_VC_NAPI_HANDLER_SUPPORT
+	bool "Exclusive VC handler , where napi is done in the application code"
+	depends on NLM_XLP && 64BIT
+	default n
+
+config XLP_PIC_TIMER
+	bool "Use constant frequency PIC timer"
+	depends on NLM_XLP
+	help
+		This option enables PIC timer at a constant frequency
+		instead of per cpu count compare registers. This option must be
+		selected if you want to enable CPU frequency scaling.
+
+config XLP_REPLACE_R4K_TIMER
+	bool
+	default y
+	depends on NLM_XLP && XLP_CPUFREQ
+
+config XLP_PIC_TIMER_GENERIC
+	tristate "Generic driver to access sys/watchdog timers on XLP"
+	depends on XLP_PIC_TIMER
+	default m
+
+config NLM_XMC_SUPPORT
+	bool "Enable XMC Board Support "
+	depends on NLM_XLP
+	default n
+	help
+		This option enables XMC Card Support.
+
+config NLM_XLP_EVP_CPLD
+	bool "Enable support for CPLD on Broadcom XLP Eval Systems"
+	default y
+	depends on NLM_XLP
+
+config XLP_GPIO
+    bool "Enable support for XLP GPIO drivers via GPIOLIB"
+    default y
+    depends on NLM_XLP && GPIOLIB
+
+config NLM_FDT_PROC
+	tristate "Proc access to fdt and NAE uCore source"
+	depends on NLM_XLP && FDT
+	default n
+	help
+		This option exposes the flattened device tree used to boot the kernel
+		via the proc file system.  Two human readable (plain text) files will be
+		created.  /proc/netlogic/fdt-main contains the fdt except for the Network
+		Accelerator micro core source.  That source will be in
+		/proc/netlogic/fdt-ucore.
+
+config NLM_XLP_EEPROM
+	bool "Enable driver for EEPROM on NetLogic eval boards"
+	depends on NLM_XLP && I2C_NLM_XLP
+	default n
+	help
+		Simple I2C device driver for EEPROM used on XLP eval boards to hold
+		MAC address for the network driver.

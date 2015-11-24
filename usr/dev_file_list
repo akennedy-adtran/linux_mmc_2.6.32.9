@@ -1,0 +1,6 @@
+#Type path			Mode UID GID b/c Maj Min
+dir /dev			755	 0	 0
+dir /dev/cgroup		755	 0	 0
+dir /dev/pts		755	 0	 0
+dir /dev/shm		755	 0	 0
+nod /dev/console	600	 0	 0	 c	 5	 1

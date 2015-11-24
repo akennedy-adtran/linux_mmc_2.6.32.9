@@ -1,0 +1,146 @@
+/*-
+ * Copyright (c) 2003-2012 Broadcom Corporation
+ * All Rights Reserved
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY BROADCOM ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL BROADCOM OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * #BRCM_2# */
+
+
+Below are the memory maps with different combinations of linux and rmios
+running on different boards. Please note that the memory map usage is not
+the most efficient and could be optimized...
+
+When running Linux and RMIOS, explicit command line arguments need to be
+passed specifying the memory map. Compilation time memory map arguments 
+have been deprecated. Currently, IPSEC is the only application supported
+in the hybrid mode and so check ipsec documentation for more information
+on this.
+
+
+Standalone Linux on ATX-I/ATX-II with 1GB memory:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   1 MB -->  184 MB	: Linux lowmem
+
+ 184 MB -->  192 MB	: user_mac segment
+
+ 192 MB -->  256 MB	: Linux lowmem
+
+ 512 MB --> 1280 MB	: Linux Highmem
+
+Standalone Linux on ATX-I/ATX-II with 4GB memory:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   1 MB -->  184 MB	: Linux lowmem
+
+ 184 MB -->  192 MB	: user_mac segment
+
+ 192 MB -->  256 MB	: Linux lowmem
+
+ 512 MB --> 3072 MB	: Linux Highmem
+
+3072 MB --> 3584 MB	: Linux Highmem
+
+Standalone Linux on ATX-III (PCIX Card) with 256MB memory:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   1 MB -->  184 MB	: Linux lowmem
+
+ 184 MB -->  192 MB	: user_mac segment
+
+ 192 MB -->  256 MB	: Linux lowmem
+
+Standalone Linux on ATX-III (PCIX Card) with 512MB memory:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   1 MB -->  184 MB	: Linux lowmem
+
+ 184 MB -->  192 MB	: user_mac segment
+
+ 192 MB -->  256 MB	: Linux lowmem
+
+ 512 MB -->  768 MB	: Linux Highmem
+
+Linux and RMIOS on ATX-I/ATX-II with 1GB memory:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   1 MB -->   16 MB	: Available 
+
+  16 MB -->   48 MB	: RMIOS Packet Pool
+
+  48 MB -->  184 MB	: Linux lowmem
+
+ 184 MB -->  192 MB	: Linux <--> RMIOS Shared Memory Segment
+
+ 192 MB -->  256 MB	: Resident Bootloader
+
+ 512 MB --> 1280 MB	: RMIOS
+
+Linux and RMIOS on ATX-I/ATX-II with 4GB memory:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   1 MB -->   16 MB	: Available
+
+  16 MB -->   48 MB	: RMIOS Packet Pool
+
+  48 MB -->  184 MB	: Linux lowmem
+
+ 184 MB -->  192 MB	: Linux <--> RMIOS Shared Memory Segment
+
+ 192 MB -->  256 MB	: Resident Bootloader
+
+ 512 MB --> 4096 MB	: RMIOS
+
+Linux and RMIOS on ATX-III (PCIX Card) with 256MB memory:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   1 MB -->   16 MB	: Available
+
+  16 MB -->   48 MB	: RMIOS Packet Pool
+
+  48 MB -->  184 MB	: Linux lowmem
+
+ 184 MB -->  192 MB	: Linux <--> RMIOS Shared Memory Segment
+
+ 192 MB -->  256 MB	: Resident Bootloader
+
+*** Can not run RMIOS in this configuration ***
+
+Linux and RMIOS on ATX-III (PCIX Card) with 512MB memory:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   1 MB -->   16 MB	: Available
+
+  16 MB -->   48 MB	: RMIOS Packet Pool
+
+  48 MB -->  184 MB	: Linux lowmem
+
+ 184 MB -->  192 MB	: Linux <--> RMIOS Shared Memory Segment
+
+ 192 MB -->  256 MB	: Resident Bootloader
+
+ 512 MB -->  768 MB	: RMIOS
+
+======================================================================
