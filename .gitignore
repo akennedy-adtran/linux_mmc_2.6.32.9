@@ -79,15 +79,3 @@ GTAGS
 *.orig
 *~
 \#*#
-usr/rootfs.xlp/helinux/
-usr/rootfs.xlp/linuxloader/
-usr/rootfs.xlp/tmp/cryptotest
-usr/rootfs.xlp/tmp/openssl
-usr/rootfs.xlp/tmp/riotest
-usr/rootfs.xlp/bin/cryptotest
-usr/rootfs.xlp/bin/openssl
-
-arch/mips/netlogic/common/cortina_cs34x7/
-arch/mips/netlogic/common/nlm_evp_cpld.c
-arch/mips/netlogic/common/nlm_hal_cpu_info.c
-
