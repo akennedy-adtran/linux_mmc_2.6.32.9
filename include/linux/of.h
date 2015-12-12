@@ -19,7 +19,7 @@
 #include <linux/bitops.h>
 #include <linux/mod_devicetable.h>
 
-//#include <asm/prom.h>  //ADTRAN
+//#include <asm/prom.h>  // 4_2_4
 
 typedef u32 phandle;
 
@@ -65,7 +65,7 @@ extern struct device_node *of_find_node_with_property(
 	for (dn = of_find_node_with_property(NULL, prop_name); dn; \
 	     dn = of_find_node_with_property(dn, prop_name))
 
-#if CONFIG_OF  //ADTRAN
+#ifdef CONFIG_OF  // 4_2_4
 extern struct property *of_find_property(const struct device_node *np,
 					 const char *name,
 					 int *lenp);
@@ -73,8 +73,7 @@ extern int of_device_is_compatible(const struct device_node *device,
 				   const char *);
 #else
 static inline struct property *of_find_property(const struct device_node *np,
-						const char *name,
-						int *lenp)
+						const char *name, int *lenp)
 {
 	return NULL;
 }
@@ -102,20 +101,13 @@ extern int of_parse_phandles_with_args(struct device_node *np,
 	const char *list_name, const char *cells_name, int index,
 	struct device_node **out_node, const void **out_args);
 
-// ADTRAN ADDED:
+/* 4_2_4 */
 static inline void of_core_init(void)
 {
 }
 
-static inline bool is_of_node(struct fwnode_handle *fwnode)
-{
-	return false;
-}
-
-static inline struct device_node *to_of_node(struct fwnode_handle *fwnode)
-{
-	return NULL;
-}
+#define is_of_node(...)		0
+#define to_of_node(...)		NULL
 
 static inline const char* of_node_full_name(const struct device_node *np)
 {
@@ -245,21 +237,8 @@ static inline int of_property_match_string(struct device_node *np,
 	return -ENOSYS;
 }
 
-static inline int of_parse_phandle_with_args(struct device_node *np,
-					     const char *list_name,
-					     const char *cells_name,
-					     int index,
-					     struct of_phandle_args *out_args)
-{
-	return -ENOSYS;
-}
-
-static inline int of_parse_phandle_with_fixed_args(const struct device_node *np,
-	const char *list_name, int cells_count, int index,
-	struct of_phandle_args *out_args)
-{
-	return -ENOSYS;
-}
+#define of_parse_phandle_with_args(...)			-ENOSYS
+#define of_parse_phandle_with_fixed_args(...)	-ENOSYS
 
 static inline int of_count_phandle_with_args(struct device_node *np,
 					     const char *list_name,

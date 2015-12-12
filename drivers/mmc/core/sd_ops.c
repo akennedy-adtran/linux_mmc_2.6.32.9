@@ -11,8 +11,7 @@
 
 #include <linux/slab.h>
 #include <linux/types.h>
-//#include <linux/export.h>  //ADTRAN
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/scatterlist.h>
 
 #include <linux/mmc/host.h>
@@ -268,7 +267,11 @@ int mmc_app_send_scr(struct mmc_card *card, u32 *scr)
 	/* dma onto stack is unsafe/nonportable, but callers to this
 	 * routine normally provide temporary on-stack buffers ...
 	 */
+#if defined(CONFIG_MMC_SDHCI_XLP) || defined(CONFIG_MMC_SDHCI_XLP_MODULE)
+	data_buf = kmalloc(sizeof(card->raw_scr), GFP_KERNEL | GFP_DMA);
+#else
 	data_buf = kmalloc(sizeof(card->raw_scr), GFP_KERNEL);
+#endif
 	if (data_buf == NULL)
 		return -ENOMEM;
 

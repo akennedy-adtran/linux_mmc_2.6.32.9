@@ -31,7 +31,7 @@ struct attribute {
 	mode_t			mode;
 };
 
-/* ADTRAN */
+/* 4_2_4 */
 /**
  *	sysfs_attr_init - initialize a dynamically allocated sysfs attribute
  *	@attr: struct attribute to initialize

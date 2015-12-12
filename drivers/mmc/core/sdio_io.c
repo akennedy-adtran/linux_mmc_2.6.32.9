@@ -9,8 +9,7 @@
  * your option) any later version.
  */
 
-//#include <linux/export.h>  //ADTRAN
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/sdio.h>
@@ -18,7 +17,6 @@
 
 #include "sdio_ops.h"
 
-#include <linux/andy.h>
 /**
  *	sdio_claim_host - exclusively claim a bus for a certain SDIO function
  *	@func: SDIO function that will be accessed
@@ -94,12 +92,10 @@ int sdio_enable_func(struct sdio_func *func)
 
 	pr_debug("SDIO: Enabled device %s\n", sdio_func_id(func));
 
-printg();
 	return 0;
 
 err:
 	pr_debug("SDIO: Failed to enable device %s\n", sdio_func_id(func));
-printb(ret);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(sdio_enable_func);
@@ -133,12 +129,10 @@ int sdio_disable_func(struct sdio_func *func)
 
 	pr_debug("SDIO: Disabled device %s\n", sdio_func_id(func));
 
-printg();
 	return 0;
 
 err:
 	pr_debug("SDIO: Failed to disable device %s\n", sdio_func_id(func));
-printb(-EIO);
 	return -EIO;
 }
 EXPORT_SYMBOL_GPL(sdio_disable_func);
@@ -166,7 +160,6 @@ int sdio_set_block_size(struct sdio_func *func, unsigned blksz)
 {
 	int ret;
 
-if (blksz > func->card->host->max_blk_size) printb(-EINVAL);
 	if (blksz > func->card->host->max_blk_size)
 		return -EINVAL;
 
@@ -178,17 +171,14 @@ if (blksz > func->card->host->max_blk_size) printb(-EINVAL);
 	ret = mmc_io_rw_direct(func->card, 1, 0,
 		SDIO_FBR_BASE(func->num) + SDIO_FBR_BLKSIZE,
 		blksz & 0xff, NULL);
-if (ret) printb(ret);
 	if (ret)
 		return ret;
 	ret = mmc_io_rw_direct(func->card, 1, 0,
 		SDIO_FBR_BASE(func->num) + SDIO_FBR_BLKSIZE + 1,
 		(blksz >> 8) & 0xff, NULL);
-if (ret) printb(ret);
 	if (ret)
 		return ret;
 	func->cur_blksize = blksz;
-printg();
 	return 0;
 }
 EXPORT_SYMBOL_GPL(sdio_set_block_size);
@@ -205,11 +195,9 @@ static inline unsigned int sdio_max_byte_size(struct sdio_func *func)
 	else
 		mval = min(mval, func->max_blksize);
 
-if (mmc_card_broken_byte_mode_512(func->card)) printv(min(mval, 511u), "min(mval, 511u) = ");
 	if (mmc_card_broken_byte_mode_512(func->card))
 		return min(mval, 511u);
 
-printv(min(mval, 511u), "min(mval, 511u) = ");
 	return min(mval, 512u); /* maximum size for byte mode */
 }
 
@@ -246,7 +234,6 @@ unsigned int sdio_align_size(struct sdio_func *func, unsigned int sz)
 	 * If we can still do this with just a byte transfer, then
 	 * we're done.
 	 */
-if (sz <= sdio_max_byte_size(func)) printv(sz, "sz = ");
 	if (sz <= sdio_max_byte_size(func))
 		return sz;
 
@@ -254,7 +241,6 @@ if (sz <= sdio_max_byte_size(func)) printv(sz, "sz = ");
 		/*
 		 * Check if the transfer is already block aligned
 		 */
-if ((sz % func->cur_blksize) == 0) printv(sz, "sz = ");
 		if ((sz % func->cur_blksize) == 0)
 			return sz;
 
@@ -270,7 +256,6 @@ if ((sz % func->cur_blksize) == 0) printv(sz, "sz = ");
 		 * This value is only good if it is still just
 		 * one request.
 		 */
-if ((blk_sz % func->cur_blksize) == 0) printv(blk_sz, "blk_sz = ");
 		if ((blk_sz % func->cur_blksize) == 0)
 			return blk_sz;
 
@@ -282,7 +267,6 @@ if ((blk_sz % func->cur_blksize) == 0) printv(blk_sz, "blk_sz = ");
 				sz % func->cur_blksize);
 		if (byte_sz <= sdio_max_byte_size(func)) {
 			blk_sz = sz / func->cur_blksize;
-printv(blk_sz, "blk_sz = ");
 			return blk_sz * func->cur_blksize + byte_sz;
 		}
 	} else {
@@ -302,7 +286,6 @@ printv(blk_sz, "blk_sz = ");
 						byte_sz);
 			}
 
-printv((orig_sz / chunk_sz) * chunk_sz + byte_sz, "sz = ", );
 			return (orig_sz / chunk_sz) * chunk_sz + byte_sz;
 		}
 	}
@@ -311,7 +294,6 @@ printv((orig_sz / chunk_sz) * chunk_sz + byte_sz, "sz = ", );
 	 * The controller is simply incapable of transferring the size
 	 * we want in decent manner, so just return the original size.
 	 */
-printv(orig_sz, "sz = ");
 	return orig_sz;
 }
 EXPORT_SYMBOL_GPL(sdio_align_size);
@@ -342,7 +324,6 @@ static int sdio_io_rw_ext_helper(struct sdio_func *func, int write,
 			ret = mmc_io_rw_extended(func->card, write,
 				func->num, addr, incr_addr, buf,
 				blocks, func->cur_blksize);
-if (ret) printb(ret);
 			if (ret)
 				return ret;
 
@@ -360,7 +341,6 @@ if (ret) printb(ret);
 		/* Indicate byte mode by setting "blocks" = 0 */
 		ret = mmc_io_rw_extended(func->card, write, func->num, addr,
 			 incr_addr, buf, 0, size);
-if (ret) printb(ret);
 		if (ret)
 			return ret;
 
@@ -369,7 +349,6 @@ if (ret) printb(ret);
 		if (incr_addr)
 			addr += size;
 	}
-printg();
 	return 0;
 }
 
@@ -708,7 +687,6 @@ mmc_pm_flag_t sdio_get_host_pm_caps(struct sdio_func *func)
 	BUG_ON(!func);
 	BUG_ON(!func->card);
 
-printv(func->card->host->pm_caps);
 	return func->card->host->pm_caps;
 }
 EXPORT_SYMBOL_GPL(sdio_get_host_pm_caps);
@@ -734,13 +712,11 @@ int sdio_set_host_pm_flags(struct sdio_func *func, mmc_pm_flag_t flags)
 
 	host = func->card->host;
 
-if (flags & ~host->pm_caps) printb(-EINVAL);
 	if (flags & ~host->pm_caps)
 		return -EINVAL;
 
 	/* function suspend methods are serialized, hence no lock needed */
 	host->pm_flags |= flags;
-printg();
 	return 0;
 }
 EXPORT_SYMBOL_GPL(sdio_set_host_pm_flags);

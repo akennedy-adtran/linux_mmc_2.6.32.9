@@ -26,8 +26,7 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/slot-gpio.h>
 
-//#include <asm/sizes.h>  ADTRAN
-#include <linux/sizes.h>
+#include <asm/sizes.h>
 #include <asm/unaligned.h>
 #include <linux/platform_data/mmc-mvsdio.h>
 

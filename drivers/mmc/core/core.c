@@ -10,7 +10,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-#include <linux/kernel.h>  //ADTRAN
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -47,7 +46,6 @@
 #include "sd_ops.h"
 #include "sdio_ops.h"
 
-#include <linux/andy.h>
 /* If the device is not responding */
 #define MMC_CORE_TIMEOUT_MS	(10 * 60 * 1000) /* 10 minute timeout */
 
@@ -205,7 +203,6 @@ static void __mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 	if (err) {
 		mrq->cmd->error = err;
 		mmc_request_done(host, mrq);
-printb(err);
 		return;
 	}
 
@@ -220,7 +217,6 @@ static int mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 #endif
 	mmc_retune_hold(host);
 
-if (mmc_card_removed(host->card)) printb(-ENOMEDIUM);
 	if (mmc_card_removed(host->card))
 		return -ENOMEDIUM;
 
@@ -283,7 +279,6 @@ if (mmc_card_removed(host->card)) printb(-ENOMEDIUM);
 	led_trigger_event(host->led, LED_FULL);
 	__mmc_start_request(host, mrq);
 
-printg();
 	return 0;
 }
 
@@ -305,7 +300,6 @@ void mmc_start_bkops(struct mmc_card *card, bool from_exception)
 
 	BUG_ON(!card);
 
-if (!card->ext_csd.man_bkops_en || mmc_card_doing_bkops(card)) printb(0);
 	if (!card->ext_csd.man_bkops_en || mmc_card_doing_bkops(card))
 		return;
 
@@ -313,15 +307,12 @@ if (!card->ext_csd.man_bkops_en || mmc_card_doing_bkops(card)) printb(0);
 	if (err) {
 		pr_err("%s: Failed to read bkops status: %d\n",
 		       mmc_hostname(card->host), err);
-printb(err);
 		return;
 	}
 
-if (!card->ext_csd.raw_bkops_status) printb(0);
 	if (!card->ext_csd.raw_bkops_status)
 		return;
 
-if (card->ext_csd.raw_bkops_status < EXT_CSD_BKOPS_LEVEL_2 && from_exception) printb(0);
 	if (card->ext_csd.raw_bkops_status < EXT_CSD_BKOPS_LEVEL_2 &&
 	    from_exception)
 		return;
@@ -401,7 +392,6 @@ static int __mmc_start_data_req(struct mmc_host *host, struct mmc_request *mrq)
 		mmc_wait_data_done(mrq);
 	}
 
-printv(err);
 	return err;
 }
 
@@ -418,7 +408,6 @@ static int __mmc_start_req(struct mmc_host *host, struct mmc_request *mrq)
 		complete(&mrq->completion);
 	}
 
-printv(err);
 	return err;
 }
 
@@ -472,12 +461,10 @@ static int mmc_wait_for_data_req_done(struct mmc_host *host,
 		} else if (context_info->is_new_req) {
 			context_info->is_new_req = false;
 			if (!next_req)
-printv(MMC_BLK_NEW_REQUEST);
 				return MMC_BLK_NEW_REQUEST;
 		}
 	}
 	mmc_retune_release(host);
-printv(err);
 	return err;
 }
 
@@ -600,7 +587,6 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 			 * The previous request was not completed,
 			 * nothing to return
 			 */
-printv(NULL);
 			return NULL;
 		}
 		/*
@@ -640,7 +626,6 @@ printv(NULL);
 
 	if (error)
 		*error = err;
-printg();
 	return data;
 }
 EXPORT_SYMBOL(mmc_start_req);
@@ -678,7 +663,6 @@ int mmc_interrupt_hpi(struct mmc_card *card)
 
 	if (!card->ext_csd.hpi_en) {
 		pr_info("%s: HPI enable bit unset\n", mmc_hostname(card->host));
-printb(1);
 		return 1;
 	}
 
@@ -725,7 +709,6 @@ printb(1);
 
 out:
 	mmc_release_host(card->host);
-printv(err);
 	return err;
 }
 EXPORT_SYMBOL(mmc_interrupt_hpi);
@@ -754,7 +737,6 @@ int mmc_wait_for_cmd(struct mmc_host *host, struct mmc_command *cmd, int retries
 
 	mmc_wait_for_req(host, &mrq);
 
-printv(cmd->error);
 	return cmd->error;
 }
 
@@ -786,7 +768,6 @@ int mmc_stop_bkops(struct mmc_card *card)
 		err = 0;
 	}
 
-printv(err);
 	return err;
 }
 EXPORT_SYMBOL(mmc_stop_bkops);
@@ -799,14 +780,12 @@ int mmc_read_bkops_status(struct mmc_card *card)
 	mmc_claim_host(card->host);
 	err = mmc_get_ext_csd(card, &ext_csd);
 	mmc_release_host(card->host);
-if (err) printv(err);
 	if (err)
 		return err;
 
 	card->ext_csd.raw_bkops_status = ext_csd[EXT_CSD_BKOPS_STATUS];
 	card->ext_csd.raw_exception_status = ext_csd[EXT_CSD_EXP_EVENTS_STATUS];
 	kfree(ext_csd);
-printg();
 	return 0;
 }
 EXPORT_SYMBOL(mmc_read_bkops_status);
@@ -829,7 +808,6 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 	if (mmc_card_sdio(card)) {
 		data->timeout_ns = 1000000000;
 		data->timeout_clks = 0;
-printb(0);
 		return;
 	}
 
@@ -986,8 +964,6 @@ int __mmc_claim_host(struct mmc_host *host, atomic_t *abort)
 	if (pm)
 		pm_runtime_get_sync(mmc_dev(host));
 
-
-printv(stop);
 	return stop;
 }
 EXPORT_SYMBOL(__mmc_claim_host);
@@ -1014,10 +990,8 @@ void mmc_release_host(struct mmc_host *host)
 		host->claimer = NULL;
 		spin_unlock_irqrestore(&host->lock, flags);
 		wake_up(&host->wq);
-#if CONFIG_PM  //ADTRAN
 		pm_runtime_mark_last_busy(mmc_dev(host));
 		pm_runtime_put_autosuspend(mmc_dev(host));
-#endif
 	}
 }
 EXPORT_SYMBOL(mmc_release_host);
@@ -1040,10 +1014,8 @@ EXPORT_SYMBOL(mmc_get_card);
 void mmc_put_card(struct mmc_card *card)
 {
 	mmc_release_host(card->host);
-#ifdef CONFIG_PM  //ADTRAN
 	pm_runtime_mark_last_busy(&card->dev);
 	pm_runtime_put_autosuspend(&card->dev);
-#endif
 }
 EXPORT_SYMBOL(mmc_put_card);
 
@@ -1061,7 +1033,8 @@ static inline void mmc_set_ios(struct mmc_host *host)
 		 ios->power_mode, ios->chip_select, ios->vdd,
 		 ios->bus_width, ios->timing);
 
-	mmc_set_ungated(host);
+	if (ios->clock > 0)
+		mmc_set_ungated(host);
 	host->ops->set_ios(host, ios);
 }
 
@@ -1159,7 +1132,6 @@ int mmc_execute_tuning(struct mmc_card *card)
 	u32 opcode;
 	int err;
 
-if (!host->ops->execute_tuning) printv(0);
 	if (!host->ops->execute_tuning)
 		return 0;
 
@@ -1177,7 +1149,6 @@ if (!host->ops->execute_tuning) printv(0);
 	else
 		mmc_retune_enable(host);
 
-printv(err);
 	return err;
 }
 
@@ -1242,11 +1213,9 @@ static int mmc_vdd_to_ocrbitnum(int vdd, bool low_bits)
 	const int max_bit = ilog2(MMC_VDD_35_36);
 	int bit;
 
-if (vdd < 1650 || vdd > 3600) printv(-EINVAL);
 	if (vdd < 1650 || vdd > 3600)
 		return -EINVAL;
 
-if (vdd >= 1650 && vdd <= 1950) printv(ilog2(MMC_VDD_165_195));
 	if (vdd >= 1650 && vdd <= 1950)
 		return ilog2(MMC_VDD_165_195);
 
@@ -1255,10 +1224,8 @@ if (vdd >= 1650 && vdd <= 1950) printv(ilog2(MMC_VDD_165_195));
 
 	/* Base 2000 mV, step 100 mV, bit's base 8. */
 	bit = (vdd - 2000) / 100 + 8;
-if (bit > max_bit) printv(max_bit);
 	if (bit > max_bit)
 		return max_bit;
-printv(bit);
 	return bit;
 }
 
@@ -1279,19 +1246,16 @@ u32 mmc_vddrange_to_ocrmask(int vdd_min, int vdd_max)
 {
 	u32 mask = 0;
 
-if (vdd_max < vdd_min) printv(0);
 	if (vdd_max < vdd_min)
 		return 0;
 
 	/* Prefer high bits for the boundary vdd_max values. */
 	vdd_max = mmc_vdd_to_ocrbitnum(vdd_max, false);
-if (vdd_max < 0) printv(0);
 	if (vdd_max < 0)
 		return 0;
 
 	/* Prefer low bits for the boundary vdd_min values. */
 	vdd_min = mmc_vdd_to_ocrbitnum(vdd_min, true);
-if (vdd_min < 0) printv(0);
 	if (vdd_min < 0)
 		return 0;
 
@@ -1299,7 +1263,6 @@ if (vdd_min < 0) printv(0);
 	while (vdd_max >= vdd_min)
 		mask |= 1 << vdd_max--;
 
- printv(mask);
 	return mask;
 }
 EXPORT_SYMBOL(mmc_vddrange_to_ocrmask);
@@ -1323,7 +1286,6 @@ int mmc_of_parse_voltage(struct device_node *np, u32 *mask)
 	num_ranges = num_ranges / sizeof(*voltage_ranges) / 2;
 	if (!voltage_ranges || !num_ranges) {
 		pr_info("%s: voltage-ranges unspecified\n", np->full_name);
-printb(-EINVAL);
 		return -EINVAL;
 	}
 
@@ -1337,38 +1299,29 @@ printb(-EINVAL);
 		if (!ocr_mask) {
 			pr_err("%s: voltage-range #%d is invalid\n",
 				np->full_name, i);
-printb(-EINVAL);
 			return -EINVAL;
 		}
 		*mask |= ocr_mask;
 	}
 
-printg();
 	return 0;
 }
 EXPORT_SYMBOL(mmc_of_parse_voltage);
 
-#endif /* CONFIG_OF */
+//#endif /* CONFIG_OF */		// 4_2_4
 
 static int mmc_of_get_func_num(struct device_node *node)
 {
 	u32 reg;
 	int ret;
 
-#if 0 //ADTRAN
 	ret = of_property_read_u32(node, "reg", &reg);
-#else
-	ret = -ENOSYS ;
-#endif
-if (ret < 0) printv(ret);
 	if (ret < 0)
 		return ret;
 
-printv(reg);
 	return reg;
 }
 
-#if 0  //ADTRAN
 struct device_node *mmc_of_find_child_device(struct mmc_host *host,
 		unsigned func_num)
 {
@@ -1384,14 +1337,14 @@ struct device_node *mmc_of_find_child_device(struct mmc_host *host,
 
 	return NULL;
 }
-#else
 
+#else		// 4_2_4
 struct device_node *mmc_of_find_child_device(struct mmc_host *host,
 		unsigned func_num)
 {
 	return NULL;
 }
-#endif
+#endif /* CONFIG_OF */
 
 #ifdef CONFIG_REGULATOR
 
@@ -1413,7 +1366,6 @@ int mmc_regulator_get_ocrmask(struct regulator *supply)
 	int			vdd_mV;
 
 	count = regulator_count_voltages(supply);
-if (count < 0) printv(count);
 	if (count < 0)
 		return count;
 
@@ -1428,7 +1380,6 @@ if (count < 0) printv(count);
 
 	if (!result) {
 		vdd_uV = regulator_get_voltage(supply);
-if (vdd_uV <= 0) printv(vdd_uV);
 		if (vdd_uV <= 0)
 			return vdd_uV;
 
@@ -1436,7 +1387,6 @@ if (vdd_uV <= 0) printv(vdd_uV);
 		result = mmc_vddrange_to_ocrmask(vdd_mV, vdd_mV);
 	}
 
-printv(result);
 	return result;
 }
 EXPORT_SYMBOL_GPL(mmc_regulator_get_ocrmask);
@@ -1493,10 +1443,11 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
 	if (result)
 		dev_err(mmc_dev(mmc),
 			"could not set regulator OCR (%d)\n", result);
-printv(result);
 	return result;
 }
 EXPORT_SYMBOL_GPL(mmc_regulator_set_ocr);
+
+#endif /* CONFIG_REGULATOR */
 
 int mmc_regulator_get_supply(struct mmc_host *mmc)
 {
@@ -1507,7 +1458,6 @@ int mmc_regulator_get_supply(struct mmc_host *mmc)
 	mmc->supply.vqmmc = devm_regulator_get_optional(dev, "vqmmc");
 
 	if (IS_ERR(mmc->supply.vmmc)) {
-if (PTR_ERR(mmc->supply.vmmc) == -EPROBE_DEFER) printb(-EPROBE_DEFER);
 		if (PTR_ERR(mmc->supply.vmmc) == -EPROBE_DEFER)
 			return -EPROBE_DEFER;
 		dev_info(dev, "No vmmc regulator found\n");
@@ -1520,18 +1470,14 @@ if (PTR_ERR(mmc->supply.vmmc) == -EPROBE_DEFER) printb(-EPROBE_DEFER);
 	}
 
 	if (IS_ERR(mmc->supply.vqmmc)) {
-if (PTR_ERR(mmc->supply.vqmmc) == -EPROBE_DEFER) printb(-EPROBE_DEFER);
 		if (PTR_ERR(mmc->supply.vqmmc) == -EPROBE_DEFER)
 			return -EPROBE_DEFER;
 		dev_info(dev, "No vqmmc regulator found\n");
 	}
 
-printg();
 	return 0;
 }
 EXPORT_SYMBOL_GPL(mmc_regulator_get_supply);
-
-#endif /* CONFIG_REGULATOR */
 
 /*
  * Mask off any voltages we don't support and select
@@ -1554,7 +1500,6 @@ u32 mmc_select_voltage(struct mmc_host *host, u32 ocr)
 	ocr &= host->ocr_avail;
 	if (!ocr) {
 		dev_warn(mmc_dev(host), "no support for card's volts\n");
-printb(0);
 		return 0;
 	}
 
@@ -1569,7 +1514,6 @@ printb(0);
 			dev_warn(mmc_dev(host), "exceeding card's volts\n");
 	}
 
-printv(ocr);
 	return ocr;
 }
 
@@ -1588,7 +1532,6 @@ int __mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage)
 	if (err)
 		host->ios.signal_voltage = old_signal_voltage;
 
-printv(err);
 	return err;
 
 }
@@ -1605,7 +1548,6 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
 	 * Send CMD11 only if the request is to switch the card to
 	 * 1.8V signalling.
 	 */
-if (signal_voltage == MMC_SIGNAL_VOLTAGE_330) printv(__mmc_set_signal_voltage(host, signal_voltage));
 	if (signal_voltage == MMC_SIGNAL_VOLTAGE_330)
 		return __mmc_set_signal_voltage(host, signal_voltage);
 
@@ -1613,7 +1555,6 @@ if (signal_voltage == MMC_SIGNAL_VOLTAGE_330) printv(__mmc_set_signal_voltage(ho
 	 * If we cannot switch voltages, return failure so the caller
 	 * can continue without UHS mode
 	 */
-if (!host->ops->start_signal_voltage_switch) printb(-EPERM);
 	if (!host->ops->start_signal_voltage_switch)
 		return -EPERM;
 	if (!host->ops->card_busy)
@@ -1685,7 +1626,6 @@ power_cycle:
 err_command:
 	mmc_host_clk_release(host);
 
-printv(err);
 	return err;
 }
 
@@ -1720,7 +1660,6 @@ int mmc_select_drive_strength(struct mmc_card *card, unsigned int max_dtr,
 
 	*drv_type = 0;
 
-if (!host->ops->select_drive_strength) printv(0);
 	if (!host->ops->select_drive_strength)
 		return 0;
 
@@ -1747,7 +1686,6 @@ if (!host->ops->select_drive_strength) printv(0);
 							  drv_type);
 	mmc_host_clk_release(host);
 
-printv(drive_strength);
 	return drive_strength;
 }
 
@@ -1764,7 +1702,6 @@ printv(drive_strength);
  */
 void mmc_power_up(struct mmc_host *host, u32 ocr)
 {
-if (host->ios.power_mode == MMC_POWER_ON) printv(MMC_POWER_ON);
 	if (host->ios.power_mode == MMC_POWER_ON)
 		return;
 
@@ -1809,7 +1746,6 @@ if (host->ios.power_mode == MMC_POWER_ON) printv(MMC_POWER_ON);
 
 void mmc_power_off(struct mmc_host *host)
 {
-if (host->ios.power_mode == MMC_POWER_OFF) printv(MMC_POWER_OFF);
 	if (host->ios.power_mode == MMC_POWER_OFF)
 		return;
 
@@ -1937,7 +1873,6 @@ static void _mmc_detect_change(struct mmc_host *host, unsigned long delay,
 	spin_unlock_irqrestore(&host->lock, flags);
 #endif
 
-#ifdef CONFIG_PM  //ADTRAN
 	/*
 	 * If the device is configured as wakeup, we prevent a new sleep for
 	 * 5 s to give provision for user space to consume the event.
@@ -1945,7 +1880,6 @@ static void _mmc_detect_change(struct mmc_host *host, unsigned long delay,
 	if (cd_irq && !(host->caps & MMC_CAP_NEEDS_POLL) &&
 		device_can_wakeup(mmc_dev(host)))
 		pm_wakeup_event(mmc_dev(host), 5000);
-#endif
 
 	host->detect_change = 1;
 	mmc_schedule_delayed_work(&host->detect, delay);
@@ -2078,7 +2012,6 @@ static unsigned int mmc_mmc_erase_timeout(struct mmc_card *card,
 	if (mmc_host_is_spi(card->host) && erase_timeout < 1000)
 		erase_timeout = 1000;
 
-printv(erase_timeout);
 	return erase_timeout;
 }
 
@@ -2104,7 +2037,6 @@ static unsigned int mmc_sd_erase_timeout(struct mmc_card *card,
 	if (erase_timeout < 1000)
 		erase_timeout = 1000;
 
-printv(erase_timeout);
 	return erase_timeout;
 }
 
@@ -2112,8 +2044,6 @@ static unsigned int mmc_erase_timeout(struct mmc_card *card,
 				      unsigned int arg,
 				      unsigned int qty)
 {
-if (mmc_card_sd(card)) printv(mmc_sd_erase_timeout(card, arg, qty));
-else printv(mmc_mmc_erase_timeout(card, arg, qty));
 	if (mmc_card_sd(card))
 		return mmc_sd_erase_timeout(card, arg, qty);
 	else
@@ -2234,7 +2164,6 @@ static int mmc_do_erase(struct mmc_card *card, unsigned int from,
 		 (R1_CURRENT_STATE(cmd.resp[0]) == R1_STATE_PRG));
 out:
 	mmc_retune_release(card->host);
-printv(err);
 	return err;
 }
 
@@ -2252,31 +2181,25 @@ int mmc_erase(struct mmc_card *card, unsigned int from, unsigned int nr,
 {
 	unsigned int rem, to = from + nr;
 
-if (!(card->host->caps & MMC_CAP_ERASE) || !(card->csd.cmdclass & CCC_ERASE)) printb(-EOPNOTSUPP);
 	if (!(card->host->caps & MMC_CAP_ERASE) ||
 	    !(card->csd.cmdclass & CCC_ERASE))
 		return -EOPNOTSUPP;
 
-if (!card->erase_size) printb(-EOPNOTSUPP);
 	if (!card->erase_size)
 		return -EOPNOTSUPP;
 
-if (mmc_card_sd(card) && arg != MMC_ERASE_ARG) printb(-EOPNOTSUPP);
 	if (mmc_card_sd(card) && arg != MMC_ERASE_ARG)
 		return -EOPNOTSUPP;
 
-if ((arg & MMC_SECURE_ARGS) && !(card->ext_csd.sec_feature_support & EXT_CSD_SEC_ER_EN)) printb(-EOPNOTSUPP);
 	if ((arg & MMC_SECURE_ARGS) &&
 	    !(card->ext_csd.sec_feature_support & EXT_CSD_SEC_ER_EN))
 		return -EOPNOTSUPP;
 
-if ((arg & MMC_TRIM_ARGS) && !(card->ext_csd.sec_feature_support & EXT_CSD_SEC_GB_CL_EN)) printb(-EOPNOTSUPP);
 	if ((arg & MMC_TRIM_ARGS) &&
 	    !(card->ext_csd.sec_feature_support & EXT_CSD_SEC_GB_CL_EN))
 		return -EOPNOTSUPP;
 
 	if (arg == MMC_SECURE_ERASE_ARG) {
-if (from % card->erase_size || nr % card->erase_size) printb(-EINVAL);
 		if (from % card->erase_size || nr % card->erase_size)
 			return -EINVAL;
 	}
@@ -2286,7 +2209,6 @@ if (from % card->erase_size || nr % card->erase_size) printb(-EINVAL);
 		if (rem) {
 			rem = card->erase_size - rem;
 			from += rem;
-if (!(nr > rem)) printb(0);
 			if (nr > rem)
 				nr -= rem;
 			else
@@ -2297,41 +2219,34 @@ if (!(nr > rem)) printb(0);
 			nr -= rem;
 	}
 
-if (nr == 0) printv(0);
 	if (nr == 0)
 		return 0;
 
 	to = from + nr;
 
-if (to <= from) printb(-EINVAL);
 	if (to <= from)
 		return -EINVAL;
 
 	/* 'from' and 'to' are inclusive */
 	to -= 1;
 
-printv(mmc_do_erase(card, from, to, arg));
 	return mmc_do_erase(card, from, to, arg);
 }
 EXPORT_SYMBOL(mmc_erase);
 
 int mmc_can_erase(struct mmc_card *card)
 {
-if ((card->host->caps & MMC_CAP_ERASE) && (card->csd.cmdclass & CCC_ERASE) && card->erase_size) printv(1);
 	if ((card->host->caps & MMC_CAP_ERASE) &&
 	    (card->csd.cmdclass & CCC_ERASE) && card->erase_size)
 		return 1;
-printv(0);
 	return 0;
 }
 EXPORT_SYMBOL(mmc_can_erase);
 
 int mmc_can_trim(struct mmc_card *card)
 {
-if (card->ext_csd.sec_feature_support & EXT_CSD_SEC_GB_CL_EN) printv(1);
 	if (card->ext_csd.sec_feature_support & EXT_CSD_SEC_GB_CL_EN)
 		return 1;
-printv(0);
 	return 0;
 }
 EXPORT_SYMBOL(mmc_can_trim);
@@ -2342,34 +2257,27 @@ int mmc_can_discard(struct mmc_card *card)
 	 * As there's no way to detect the discard support bit at v4.5
 	 * use the s/w feature support filed.
 	 */
-if (card->ext_csd.feature_support & MMC_DISCARD_FEATURE) printv(1);
 	if (card->ext_csd.feature_support & MMC_DISCARD_FEATURE)
 		return 1;
-printv(0);
 	return 0;
 }
 EXPORT_SYMBOL(mmc_can_discard);
 
 int mmc_can_sanitize(struct mmc_card *card)
 {
-if (!mmc_can_trim(card) && !mmc_can_erase(card)) printv(0);
 	if (!mmc_can_trim(card) && !mmc_can_erase(card))
 		return 0;
-if (card->ext_csd.sec_feature_support & EXT_CSD_SEC_SANITIZE) printv(1);
 	if (card->ext_csd.sec_feature_support & EXT_CSD_SEC_SANITIZE)
 		return 1;
-printv(0);
 	return 0;
 }
 EXPORT_SYMBOL(mmc_can_sanitize);
 
 int mmc_can_secure_erase_trim(struct mmc_card *card)
 {
-if ((card->ext_csd.sec_feature_support & EXT_CSD_SEC_ER_EN) && !(card->quirks & MMC_QUIRK_SEC_ERASE_TRIM_BROKEN)) printv(1);
 	if ((card->ext_csd.sec_feature_support & EXT_CSD_SEC_ER_EN) &&
 	    !(card->quirks & MMC_QUIRK_SEC_ERASE_TRIM_BROKEN))
 		return 1;
-printv(0);
 	return 0;
 }
 EXPORT_SYMBOL(mmc_can_secure_erase_trim);
@@ -2377,13 +2285,10 @@ EXPORT_SYMBOL(mmc_can_secure_erase_trim);
 int mmc_erase_group_aligned(struct mmc_card *card, unsigned int from,
 			    unsigned int nr)
 {
-if (!card->erase_size) printv(0);
 	if (!card->erase_size)
 		return 0;
-if (from % card->erase_size || nr % card->erase_size) printv(0);
 	if (from % card->erase_size || nr % card->erase_size)
 		return 0;
-printv(1);
 	return 1;
 }
 EXPORT_SYMBOL(mmc_erase_group_aligned);
@@ -2417,11 +2322,9 @@ static unsigned int mmc_do_calc_max_discard(struct mmc_card *card,
 		qty += y;
 	} while (y);
 
-if (!qty) printv(0);
 	if (!qty)
 		return 0;
 
-if (qty == 1) printv(1);
 	if (qty == 1)
 		return 1;
 
@@ -2433,7 +2336,6 @@ if (qty == 1) printv(1);
 	else
 		max_discard = --qty * card->erase_size;
 
-printv(max_discard);
 	return max_discard;
 }
 
@@ -2442,7 +2344,6 @@ unsigned int mmc_calc_max_discard(struct mmc_card *card)
 	struct mmc_host *host = card->host;
 	unsigned int max_discard, max_trim;
 
-if (!host->max_busy_timeout) printv(UINT_MAX);
 	if (!host->max_busy_timeout)
 		return UINT_MAX;
 
@@ -2451,7 +2352,6 @@ if (!host->max_busy_timeout) printv(UINT_MAX);
 	 * frequence which can change.  In that case, the best choice is
 	 * just the preferred erase size.
 	 */
-if (mmc_card_mmc(card) && !(card->ext_csd.erase_group_def & 1)) printv(card->pref_erase);
 	if (mmc_card_mmc(card) && !(card->ext_csd.erase_group_def & 1))
 		return card->pref_erase;
 
@@ -2465,7 +2365,6 @@ if (mmc_card_mmc(card) && !(card->ext_csd.erase_group_def & 1)) printv(card->pre
 	}
 	pr_debug("%s: calculated max. discard sectors %u for timeout %u ms\n",
 		 mmc_hostname(host), max_discard, host->max_busy_timeout);
-printv(max_discard);
 	return max_discard;
 }
 EXPORT_SYMBOL(mmc_calc_max_discard);
@@ -2474,14 +2373,12 @@ int mmc_set_blocklen(struct mmc_card *card, unsigned int blocklen)
 {
 	struct mmc_command cmd = {0};
 
-if (mmc_card_blockaddr(card) || mmc_card_ddr52(card)) printv(0);
 	if (mmc_card_blockaddr(card) || mmc_card_ddr52(card))
 		return 0;
 
 	cmd.opcode = MMC_SET_BLOCKLEN;
 	cmd.arg = blocklen;
 	cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC;
-printv(mmc_wait_for_cmd(card->host, &cmd, 5));
 	return mmc_wait_for_cmd(card->host, &cmd, 5);
 }
 EXPORT_SYMBOL(mmc_set_blocklen);
@@ -2496,14 +2393,12 @@ int mmc_set_blockcount(struct mmc_card *card, unsigned int blockcount,
 	if (is_rel_write)
 		cmd.arg |= 1 << 31;
 	cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC;
-printv(mmc_wait_for_cmd(card->host, &cmd, 5));
 	return mmc_wait_for_cmd(card->host, &cmd, 5);
 }
 EXPORT_SYMBOL(mmc_set_blockcount);
 
 static void mmc_hw_reset_for_init(struct mmc_host *host)
 {
-if (!(host->caps & MMC_CAP_HW_RESET) || !host->ops->hw_reset) prints("Just returning");
 	if (!(host->caps & MMC_CAP_HW_RESET) || !host->ops->hw_reset)
 		return;
 	mmc_host_clk_hold(host);
@@ -2515,14 +2410,12 @@ int mmc_hw_reset(struct mmc_host *host)
 {
 	int ret;
 
-if (!host->card) printb(-EINVAL);
 	if (!host->card)
 		return -EINVAL;
 
 	mmc_bus_get(host);
 	if (!host->bus_ops || host->bus_dead || !host->bus_ops->reset) {
 		mmc_bus_put(host);
-printb(-EOPNOTSUPP);
 		return -EOPNOTSUPP;
 	}
 
@@ -2532,7 +2425,6 @@ printb(-EOPNOTSUPP);
 	if (ret != -EOPNOTSUPP)
 		pr_warn("%s: tried to reset card\n", mmc_hostname(host));
 
-printv(ret);
 	return ret;
 }
 EXPORT_SYMBOL(mmc_hw_reset);
@@ -2564,20 +2456,14 @@ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 	mmc_send_if_cond(host, host->ocr_avail);
 
 	/* Order's important: probe SDIO, then SD, then MMC */
-prints("mmc_attach_sdio");
 	if (!mmc_attach_sdio(host))
 		return 0;
-prints("mmc_attach_sd");
 	if (!mmc_attach_sd(host))
 		return 0;
-prints("mmc_attach_mmc");
 	if (!mmc_attach_mmc(host))
 		return 0;
-prints("If we get to here, this is BAD");
-printb(0);
 
 	mmc_power_off(host);
-printb(-EIO);
 	return -EIO;
 }
 
@@ -2585,11 +2471,9 @@ int _mmc_detect_card_removed(struct mmc_host *host)
 {
 	int ret;
 
-if (host->caps & MMC_CAP_NONREMOVABLE) printv(0);
 	if (host->caps & MMC_CAP_NONREMOVABLE)
 		return 0;
 
-if (!host->card || mmc_card_removed(host->card)) printv(1);
 	if (!host->card || mmc_card_removed(host->card))
 		return 1;
 
@@ -2612,7 +2496,6 @@ if (!host->card || mmc_card_removed(host->card)) printv(1);
 		pr_debug("%s: card remove detected\n", mmc_hostname(host));
 	}
 
-printv(ret);
 	return ret;
 }
 
@@ -2623,7 +2506,6 @@ int mmc_detect_card_removed(struct mmc_host *host)
 
 	WARN_ON(!host->claimed);
 
-if (!card) printv(1);
 	if (!card)
 		return 1;
 
@@ -2632,7 +2514,6 @@ if (!card) printv(1);
 	 * The card will be considered unchanged unless we have been asked to
 	 * detect a change or host requires polling to provide card detection.
 	 */
-if (!host->detect_change && !(host->caps & MMC_CAP_NEEDS_POLL)) printv(ret);
 	if (!host->detect_change && !(host->caps & MMC_CAP_NEEDS_POLL))
 		return ret;
 
@@ -2649,7 +2530,6 @@ if (!host->detect_change && !(host->caps & MMC_CAP_NEEDS_POLL)) printv(ret);
 		}
 	}
 
-printv(ret);
 	return ret;
 }
 EXPORT_SYMBOL(mmc_detect_card_removed);
@@ -2665,12 +2545,10 @@ void mmc_rescan(struct work_struct *work)
 		host->trigger_card_event = false;
 	}
 
-if (host->rescan_disable) printv(host->rescan_disable);
 	if (host->rescan_disable)
 		return;
 
 	/* If there is a non-removable card registered, only scan once */
-if ((host->caps & MMC_CAP_NONREMOVABLE) && host->rescan_entered) printv((host->caps & MMC_CAP_NONREMOVABLE) && host->rescan_entered);
 	if ((host->caps & MMC_CAP_NONREMOVABLE) && host->rescan_entered)
 		return;
 	host->rescan_entered = 1;
@@ -2737,7 +2615,9 @@ void mmc_start_host(struct mmc_host *host)
 		mmc_power_off(host);
 	else
 		mmc_power_up(host, host->ocr_avail);
+#ifdef CONFIG_MMC_USE_SLOT_GPIO		// 4_2_4
 	mmc_gpiod_request_cd_irq(host);
+#endif
 	_mmc_detect_change(host, 0, false);
 }
 
@@ -2768,7 +2648,6 @@ void mmc_stop_host(struct mmc_host *host)
 		mmc_power_off(host);
 		mmc_release_host(host);
 		mmc_bus_put(host);
-printv(host->bus_ops && !host->bus_dead);
 		return;
 	}
 	mmc_bus_put(host);
@@ -2790,7 +2669,6 @@ int mmc_power_save_host(struct mmc_host *host)
 
 	if (!host->bus_ops || host->bus_dead) {
 		mmc_bus_put(host);
-printb(-EINVAL);
 		return -EINVAL;
 	}
 
@@ -2801,7 +2679,6 @@ printb(-EINVAL);
 
 	mmc_power_off(host);
 
-printv(ret);
 	return ret;
 }
 EXPORT_SYMBOL(mmc_power_save_host);
@@ -2818,7 +2695,6 @@ int mmc_power_restore_host(struct mmc_host *host)
 
 	if (!host->bus_ops || host->bus_dead) {
 		mmc_bus_put(host);
-printb(-EINVAL);
 		return -EINVAL;
 	}
 
@@ -2827,7 +2703,6 @@ printb(-EINVAL);
 
 	mmc_bus_put(host);
 
-printv(ret);
 	return ret;
 }
 EXPORT_SYMBOL(mmc_power_restore_host);
@@ -2849,7 +2724,6 @@ int mmc_flush_cache(struct mmc_card *card)
 					mmc_hostname(card->host), err);
 	}
 
-printv(err);
 	return err;
 }
 EXPORT_SYMBOL(mmc_flush_cache);
@@ -2906,7 +2780,6 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 
 	}
 
-printg();
 	return 0;
 }
 #endif
@@ -2932,8 +2805,7 @@ static int __init mmc_init(void)
 {
 	int ret;
 
-	workqueue = create_singlethread_workqueue("kmmcd");
-if (!workqueue) printb(-ENOMEM);
+	workqueue = alloc_ordered_workqueue("kmmcd", 0);
 	if (!workqueue)
 		return -ENOMEM;
 
@@ -2949,7 +2821,6 @@ if (!workqueue) printb(-ENOMEM);
 	if (ret)
 		goto unregister_host_class;
 
-printg();
 	return 0;
 
 unregister_host_class:
@@ -2959,7 +2830,6 @@ unregister_bus:
 destroy_workqueue:
 	destroy_workqueue(workqueue);
 
-printb(ret);
 	return ret;
 }
 

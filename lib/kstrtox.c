@@ -15,7 +15,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/math64.h>
-//#include <linux/export.h>  //ADTRAN
+#include <linux/module.h>		// 4_2_4 for EXPORT_SYMBOL
 #include <linux/types.h>
 #include <asm/uaccess.h>
 #include "kstrtox.h"

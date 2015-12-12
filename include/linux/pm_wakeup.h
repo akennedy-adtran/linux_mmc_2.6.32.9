@@ -75,4 +75,7 @@ static inline int device_can_wakeup(struct device *dev)
 
 #endif /* !CONFIG_PM */
 
+/* 4_2_4 */
+static inline void pm_wakeup_event(struct device *dev, unsigned int msec) {}
+
 #endif /* _LINUX_PM_WAKEUP_H */

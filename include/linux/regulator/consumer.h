@@ -183,6 +183,20 @@ static inline struct regulator *__must_check regulator_get(struct device *dev,
 	 */
 	return (struct regulator *)id;
 }
+
+/* 4_2_4 */
+static inline struct regulator *__must_check
+devm_regulator_get_optional(struct device *dev, const char *id)
+{
+	return ERR_PTR(-ENODEV);
+}
+
+static inline int regulator_is_supported_voltage(struct regulator *regulator,
+				   int min_uV, int max_uV)
+{
+	return -EINVAL;
+}
+
 static inline void regulator_put(struct regulator *regulator)
 {
 }

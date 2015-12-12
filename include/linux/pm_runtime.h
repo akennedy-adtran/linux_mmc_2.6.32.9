@@ -111,4 +111,14 @@ static inline void pm_runtime_disable(struct device *dev)
 	__pm_runtime_disable(dev, true);
 }
 
+/* 4_2_4 */
+static inline void pm_runtime_use_autosuspend(struct device *dev) {}
+static inline void pm_runtime_set_autosuspend_delay(struct device *dev,
+						int delay) {}
+static inline void pm_runtime_mark_last_busy(struct device *dev) {}
+static inline int pm_runtime_put_autosuspend(struct device *dev)
+{
+	return 0;
+}
+
 #endif

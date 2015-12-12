@@ -11,3 +11,7 @@ config MMC_CLKGATE
 	  support handling this in order for it to be of any use.
 
 	  If unsure, say N.
+
+config MMC_USE_SLOT_GPIO
+	bool
+	default y if !CPU_XLP
