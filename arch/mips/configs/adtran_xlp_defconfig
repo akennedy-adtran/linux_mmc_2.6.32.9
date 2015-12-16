@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32.9
-# Sat Dec 12 11:01:43 2015
+# Wed Dec 16 10:59:47 2015
 #
 CONFIG_MIPS=y
 
@@ -1220,7 +1220,7 @@ CONFIG_USB_SERIAL_FTDI_SIO=y
 # CONFIG_UWB is not set
 CONFIG_MMC=y
 # CONFIG_MMC_DEBUG is not set
-CONFIG_MMC_CLKGATE=y
+# CONFIG_MMC_CLKGATE is not set
 
 #
 # MMC/SD/SDIO Card Drivers
