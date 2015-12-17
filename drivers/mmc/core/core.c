@@ -2450,16 +2450,16 @@ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 	 * if the card is being re-initialized, just send it.  CMD52
 	 * should be ignored by SD/eMMC cards.
 	 */
-	sdio_reset(host);
+//	sdio_reset(host);	// LMC removed, maybe add quirk disable SDIO?
 	mmc_go_idle(host);
 
-	mmc_send_if_cond(host, host->ocr_avail);
+//	mmc_send_if_cond(host, host->ocr_avail);	// LMC removed
 
 	/* Order's important: probe SDIO, then SD, then MMC */
-	if (!mmc_attach_sdio(host))
-		return 0;
-	if (!mmc_attach_sd(host))
-		return 0;
+//	if (!mmc_attach_sdio(host))		// LMC removed
+//		return 0;
+//	if (!mmc_attach_sd(host))		// LMC removed
+//		return 0;
 	if (!mmc_attach_mmc(host))
 		return 0;
 

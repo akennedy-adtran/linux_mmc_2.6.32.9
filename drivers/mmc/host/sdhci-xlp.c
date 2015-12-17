@@ -55,10 +55,7 @@
 //#define XLP_SDHCI_DEBUG_REGS			// Show all register read/writes (very verbose!)
 
 /* Module parameters */
-static int fubar = 0;				// TODO DELETE
-module_param(fubar, int, 0444);		// TODO DELETE
-
-static int slot0_is_emmc = 0;
+static int slot0_is_emmc;
 module_param(slot0_is_emmc, int, 0444);
 MODULE_PARM_DESC(slot0_is_emmc, "   Set to 1 if slot 0 is connected to an eMMC device");
 
@@ -70,7 +67,7 @@ static int slot1_enable;
 module_param(slot1_enable, int, 0444);
 MODULE_PARM_DESC(slot1_enable, "    Set to 1 to enable the second host controller slot");
 
-static int slot1_is_emmc = 0;
+static int slot1_is_emmc;
 module_param(slot1_is_emmc, int, 0444);
 MODULE_PARM_DESC(slot1_is_emmc, "   Set to 1 if slot 1 is connected to an eMMC device");
 
@@ -97,6 +94,8 @@ MODULE_PARM_DESC(slot1_read_only, " Set to 1 to force slot 1 write protect state
 #define HC_MMC_CAPCFG1_S1			(0xC7 << 2)
 #define HC_MMC_INIT_PRESET_CFG_S1	(0xC8 << 2)
 #define HC_MMC_DEF_PRESET_CFG_S1	(0xC9 << 2)
+
+#define SDHCI_POWER_RESET			(1 << 4)
 
 #define XLP_SLOT_SIZE				0x100
 #define XLP_NUM_SD_SLOT				2
@@ -139,18 +138,12 @@ MODULE_PARM_DESC(slot1_read_only, " Set to 1 to force slot 1 write protect state
  * 1) The cmd and data lines are not getting cleared by hardware on writing
  *    0x2 and 0x4 to MMC_SWRESET [2,1] register, if the card is not present
  *    in the slot. Avoid reset if the card is not present.
- * 2) Experiment: Controller does not provide transfer-complete interrupt
- *    when not busy 
- * 3) Experiment: Stop command (CMD12) can set Transfer Complete when not
- *    using MMC_RSP_BUSY
  */
 #define XLP_SDHCI_QUIRKS					\
 		(  SDHCI_QUIRK_NO_CARD_NO_RESET		\
-		 | SDHCI_QUIRK_NO_BUSY_IRQ			\
 		)
-#define XLP_SDHCI_QUIRKS2					\
-		(  SDHCI_QUIRK2_STOP_WITH_TC		\
-		)
+#define XLP_SDHCI_QUIRKS2	0
+
 #else
 /* Quirks for 2.6.32 MMC core:
  * 1) The cmd and data lines are not getting cleared by hardware on writing 0x2 and
@@ -164,6 +157,7 @@ MODULE_PARM_DESC(slot1_read_only, " Set to 1 to force slot 1 write protect state
 		 | SDHCI_QUIRK_NONSTANDARD_CLOCK	\
 		)
 #define XLP_SDHCI_QUIRKS2	0
+
 #endif
 
 static struct pci_driver sdhci_xlp_driver;
@@ -171,6 +165,7 @@ static struct pci_driver sdhci_xlp_driver;
 struct xlp_sdhci_chip {
 	struct sdhci_host	*host[XLP_NUM_SD_SLOT];
 	void __iomem		*ioaddr;
+	struct pci_dev		*pdev;
 	uint16_t			 num_slots;
 };
 
@@ -232,6 +227,39 @@ static u8 xlp_readb(struct sdhci_host *host, int reg) {
 	data = *mmio;
 	SDHCI_DEBUG_REGS(KERN_CONT "0x      %02x\n", data);
 	return data;
+}
+
+static int xlp_enable_dma(struct sdhci_host *host)
+{
+	unsigned long *priv = (unsigned long *)sdhci_priv(host);
+	struct pci_dev *pdev = (struct pci_dev *)priv[0];
+	int rv = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
+
+	if(rv) {
+		dev_err(&pdev->dev, "%s Failed to set 32b DMA mask\n",
+				mmc_hostname(host->mmc));
+		host->flags &= ~(SDHCI_USE_SDMA | SDHCI_USE_ADMA);
+		return rv;
+	}
+
+	pci_set_master(pdev);
+
+	SDHCI_DEBUG("DMA Enabled for %s\n", mmc_hostname(host->mmc));
+	return 0;
+}
+
+static void xlp_hw_reset(struct sdhci_host *host)
+{
+	u8 data = xlp_readb(host, SDHCI_POWER_CONTROL);
+
+	if(!(data & SDHCI_POWER_ON)) return;
+
+	SDHCI_DEBUG("Issuing hardware reset to %s\n", mmc_hostname(host->mmc));
+	xlp_writeb(host, data | SDHCI_POWER_RESET, SDHCI_POWER_CONTROL);
+	udelay(10);		// eMMC minimum 1us
+	xlp_writeb(host, data, SDHCI_POWER_CONTROL);
+
+	usleep_range(300, 1000);	// eMMC minimum 200us
 }
 
 /* Host clock control functions - see above quirk
@@ -368,6 +396,8 @@ static struct sdhci_ops xlp_sdhci_ops = {
 	.set_clock         = sdhci_set_clock,
 	.set_bus_width     = sdhci_set_bus_width,
 	.set_uhs_signaling = sdhci_set_uhs_signaling,
+	.hw_reset          = xlp_hw_reset,
+	.enable_dma        = xlp_enable_dma,
 	.get_max_clock     = xlp_get_max_clock,
 	.write_l           = xlp_writel,
 	.write_w           = xlp_writew,
@@ -399,15 +429,24 @@ static int probe_slot(struct xlp_sdhci_chip *chip,
 
 	SDHCI_DEBUG("%s for slot number %d\n", __func__, sltno);
 
-	/* No private data needed - we already did that */
-	if(pdev->dev.parent) sd_host = sdhci_alloc_host(pdev->dev.parent, 0);
-	else                 sd_host = sdhci_alloc_host(&pdev->dev, 0);
+	/* We don't need sdhci_alloc_host to allocate space for our private
+	 * data (struct xlp_sdhci_chip) since that is done elsewhere. However
+	 * we DO want to save a pointer to the PCI device struct so we need to
+	 * allocate at least enough bytes for a pointer. Since the private
+	 * data area is cacheline aligned in the struct definition, might as
+	 * well have sdhci_alloc_host allocate an entire cache line.
+	 */
+	if(pdev->dev.parent)
+		sd_host = sdhci_alloc_host(pdev->dev.parent, XLP_CACHELINE_SIZE);
+	else
+		sd_host = sdhci_alloc_host(&pdev->dev, XLP_CACHELINE_SIZE);
 	if (IS_ERR(sd_host)) {
 		dev_err(&pdev->dev, "sdhci_alloc_host failed for slot %d\n", sltno);
 		return PTR_ERR(sd_host);
 	}
 	SDHCI_DEBUG_VERBOSE("  Allocated host struct at 0x%p\n", sd_host);
 
+	sd_host->private[0] = (unsigned long)pdev;
 	sd_host->ioaddr = chip->ioaddr + PCIE_HDR_OFFSET + (sltno * XLP_SLOT_SIZE);
 	sd_host->hw_name = "xlp-sdhci";
 	sd_host->ops = &xlp_sdhci_ops;
@@ -419,52 +458,12 @@ static int probe_slot(struct xlp_sdhci_chip *chip,
 	 * core code doesn't do this automagically.
 	 */
 	BUG_ON(sd_host->mmc == NULL);
-	sd_host->mmc->caps |= MMC_CAP_BUS_WIDTH_TEST;	// XLP supports CMD14/CMD19
+	/* XLP supports CMD14/CMD19 and hardware reset pin to SD/MMC card */
+	sd_host->mmc->caps |= MMC_CAP_HW_RESET | MMC_CAP_BUS_WIDTH_TEST;
 
 	if(((sltno == 0) && slot0_is_emmc) ||
 	   ((sltno == 1) && slot1_is_emmc))
-		sd_host->mmc->caps |= MMC_CAP_NONREMOVABLE | MMC_CAP_WAIT_WHILE_BUSY;
-
-	/* TODO DELETE */
-	printk("FUBAR LEVEL %d: ", fubar);		
-	switch(fubar) {
-	case 0:
-		printk(KERN_CONT "Nothing extra\n");
-		sd_host->mmc->caps &= ~(MMC_CAP_WAIT_WHILE_BUSY);
-		sd_host->quirks    &= ~(SDHCI_QUIRK_NO_BUSY_IRQ);
-		sd_host->quirks2   &= ~(SDHCI_QUIRK2_STOP_WITH_TC);
-		break;
-	case 1:
-		printk(KERN_CONT "MMC_CAP_WAIT_WHILE_BUSY\n");
-		sd_host->quirks    &= ~(SDHCI_QUIRK_NO_BUSY_IRQ);
-		sd_host->quirks2   &= ~(SDHCI_QUIRK2_STOP_WITH_TC);
-		break;
-	case 2:
-		printk(KERN_CONT "SDHCI_QUIRK_NO_BUSY_IRQ\n");
-		sd_host->mmc->caps &= ~(MMC_CAP_WAIT_WHILE_BUSY);
-		sd_host->quirks2   &= ~(SDHCI_QUIRK2_STOP_WITH_TC);
-		break;
-	case 3:
-		printk(KERN_CONT "MMC_CAP_WAIT_WHILE_BUSY + SDHCI_QUIRK_NO_BUSY_IRQ\n");
-		sd_host->quirks2   &= ~(SDHCI_QUIRK2_STOP_WITH_TC);
-		break;
-	case 4:
-		printk(KERN_CONT "SDHCI_QUIRK2_STOP_WITH_TC\n");
-		sd_host->mmc->caps &= ~(MMC_CAP_WAIT_WHILE_BUSY);
-		sd_host->quirks    &= ~(SDHCI_QUIRK_NO_BUSY_IRQ);
-		break;
-	case 5:
-		printk(KERN_CONT "MMC_CAP_WAIT_WHILE_BUSY + SDHCI_QUIRK2_STOP_WITH_TC\n");
-		sd_host->quirks    &= ~(SDHCI_QUIRK_NO_BUSY_IRQ);
-		break;
-	case 6:
-		printk(KERN_CONT "SDHCI_QUIRK_NO_BUSY_IRQ + SDHCI_QUIRK2_STOP_WITH_TC\n");
-		sd_host->mmc->caps &= ~(MMC_CAP_WAIT_WHILE_BUSY);
-		break;
-	default:
-		printk(KERN_CONT "MMC_CAP_WAIT_WHILE_BUSY + SDHCI_QUIRK_NO_BUSY_IRQ + SDHCI_QUIRK2_STOP_WITH_TC\n");
-		break;
-	}
+		sd_host->mmc->caps |= MMC_CAP_NONREMOVABLE;
 
 	SDHCI_DEBUG_VERBOSE("  Slot Virt Base = 0x%p\n", sd_host->ioaddr);
 	SDHCI_DEBUG("  Capabilities register 0 val = 0x%08X\n",
@@ -521,7 +520,7 @@ static int __devinit sdhci_xlp_probe(struct pci_dev *pdev,
 		return ret;
 	}
 
-	chip = kzalloc(sizeof(struct xlp_sdhci_chip), GFP_KERNEL);
+	chip = devm_kzalloc(&pdev->dev, sizeof(struct xlp_sdhci_chip), GFP_KERNEL);
 	if(chip == NULL) {
 		dev_err(&pdev->dev, "can't allocate memory\n");
 		ret = -ENOMEM;
@@ -584,8 +583,8 @@ perr3:
 	SDHCI_DEBUG("  Calling iounmap for virtual address 0x%p\n", base);
 	iounmap(base);
 perr2:
-	SDHCI_DEBUG_VERBOSE("  Calling kfree for chip struct at 0x%p\n", chip);
-	kfree(chip);
+	SDHCI_DEBUG_VERBOSE("  Calling devm_kfree for chip struct at 0x%p\n", chip);
+	devm_kfree(&pdev->dev, chip);
 perr1:
 	SDHCI_DEBUG("  Calling pci_disable_device\n");
 	pci_disable_device(pdev);
@@ -629,8 +628,8 @@ static void __devexit sdhci_xlp_remove(struct pci_dev *pdev)
 		/* Clean-up */
 		SDHCI_DEBUG_VERBOSE("  Calling iounmap for virtual address 0x%p\n", chip->ioaddr);
 		iounmap(chip->ioaddr);
-		SDHCI_DEBUG_VERBOSE("  Calling kzfree for chip struct at 0x%p\n", chip);
-		kzfree(chip);
+		SDHCI_DEBUG_VERBOSE("  Calling devm_kfree for chip struct at 0x%p\n", chip);
+		devm_kfree(&pdev->dev, chip);
 	}
 	pci_set_drvdata(pdev, NULL);
 	SDHCI_DEBUG("  Calling pci_release_region\n");
