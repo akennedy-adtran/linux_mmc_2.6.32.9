@@ -55,7 +55,10 @@
 //#define XLP_SDHCI_DEBUG_REGS			// Show all register read/writes (very verbose!)
 
 /* Module parameters */
-static int slot0_is_emmc;
+static int fubar = 0;				// TODO DELETE
+module_param(fubar, int, 0444);		// TODO DELETE
+
+static int slot0_is_emmc = 0;
 module_param(slot0_is_emmc, int, 0444);
 MODULE_PARM_DESC(slot0_is_emmc, "   Set to 1 if slot 0 is connected to an eMMC device");
 
@@ -66,6 +69,10 @@ MODULE_PARM_DESC(slot0_read_only, " Set to 1 to force slot 0 write protect state
 static int slot1_enable;
 module_param(slot1_enable, int, 0444);
 MODULE_PARM_DESC(slot1_enable, "    Set to 1 to enable the second host controller slot");
+
+static int slot1_is_emmc = 0;
+module_param(slot1_is_emmc, int, 0444);
+MODULE_PARM_DESC(slot1_is_emmc, "   Set to 1 if slot 1 is connected to an eMMC device");
 
 static int slot1_read_only;
 module_param(slot1_read_only, int, 0444);
@@ -129,12 +136,20 @@ MODULE_PARM_DESC(slot1_read_only, " Set to 1 to force slot 1 write protect state
 
 #ifdef MMC_CORE_4_2_4
 /* Quirks for 4.2.4 MMC core:
- * 1) The cmd and data lines are not getting cleared by hardware on writing 0x2 and
- *    0x4 to MMC_SWRESET [2,1] register, if the card is not present in the slot.
- *    Avoid reset if the card is not present.
+ * 1) The cmd and data lines are not getting cleared by hardware on writing
+ *    0x2 and 0x4 to MMC_SWRESET [2,1] register, if the card is not present
+ *    in the slot. Avoid reset if the card is not present.
+ * 2) Experiment: Controller does not provide transfer-complete interrupt
+ *    when not busy 
+ * 3) Experiment: Stop command (CMD12) can set Transfer Complete when not
+ *    using MMC_RSP_BUSY
  */
 #define XLP_SDHCI_QUIRKS					\
 		(  SDHCI_QUIRK_NO_CARD_NO_RESET		\
+		 | SDHCI_QUIRK_NO_BUSY_IRQ			\
+		)
+#define XLP_SDHCI_QUIRKS2					\
+		(  SDHCI_QUIRK2_STOP_WITH_TC		\
 		)
 #else
 /* Quirks for 2.6.32 MMC core:
@@ -148,14 +163,15 @@ MODULE_PARM_DESC(slot1_read_only, " Set to 1 to force slot 1 write protect state
 		(  SDHCI_QUIRK_NO_CARD_NO_RESET		\
 		 | SDHCI_QUIRK_NONSTANDARD_CLOCK	\
 		)
+#define XLP_SDHCI_QUIRKS2	0
 #endif
 
 static struct pci_driver sdhci_xlp_driver;
 
 struct xlp_sdhci_chip {
-	struct sdhci_host      *host[XLP_NUM_SD_SLOT];
-	void __iomem           *ioaddr;
-	uint16_t                num_slots;
+	struct sdhci_host	*host[XLP_NUM_SD_SLOT];
+	void __iomem		*ioaddr;
+	uint16_t			 num_slots;
 };
 
 /* Use our I/O accessors since the kernel accessors expect little endian.
@@ -317,16 +333,13 @@ static void xlp_setup_hc(struct xlp_sdhci_chip *chip)
 
 	capcfg0 = XLP_SDHCI_CAPABILITIES;
 	/* Cap 1: Bit 1 = SDR50 support, bit 13 = Programmable Clock Multiplier support */
-	/* TODO SDR50 mode (set bit 0 to 1) might be supported / might work (HS mode does not) */
 	capcfg1 = (1 << 0) | (1 << 13);
 
 	xlp_writel(&dummy, capcfg0 | (slot0_is_emmc << 27), HC_MMC_CAPCFG0_S0);
 	xlp_writel(&dummy, capcfg1, HC_MMC_CAPCFG1_S0);
 
-	/* Set-up capabilities registers for slot 1 (even if not used). Currently driver
-     * Does not support an eMMC device on slot 1, only on slot 0.
-	 */
-	xlp_writel(&dummy, capcfg0, HC_MMC_CAPCFG0_S1);
+	/* Set-up capabilities registers for slot 1 (even if not used) */
+	xlp_writel(&dummy, capcfg0 | (slot1_is_emmc << 27), HC_MMC_CAPCFG0_S1);
 	xlp_writel(&dummy, capcfg1, HC_MMC_CAPCFG1_S1);
 
 	/* Enable host controller */
@@ -399,7 +412,59 @@ static int probe_slot(struct xlp_sdhci_chip *chip,
 	sd_host->hw_name = "xlp-sdhci";
 	sd_host->ops = &xlp_sdhci_ops;
 	sd_host->irq = pdev->irq;
-	sd_host->quirks = XLP_SDHCI_QUIRKS;
+	sd_host->quirks  = XLP_SDHCI_QUIRKS;
+	sd_host->quirks2 = XLP_SDHCI_QUIRKS2;
+
+	/* If eMMC device, set some MMC caps accordingly since the
+	 * core code doesn't do this automagically.
+	 */
+	BUG_ON(sd_host->mmc == NULL);
+	sd_host->mmc->caps |= MMC_CAP_BUS_WIDTH_TEST;	// XLP supports CMD14/CMD19
+
+	if(((sltno == 0) && slot0_is_emmc) ||
+	   ((sltno == 1) && slot1_is_emmc))
+		sd_host->mmc->caps |= MMC_CAP_NONREMOVABLE | MMC_CAP_WAIT_WHILE_BUSY;
+
+	/* TODO DELETE */
+	printk("FUBAR LEVEL %d: ", fubar);		
+	switch(fubar) {
+	case 0:
+		printk(KERN_CONT "Nothing extra\n");
+		sd_host->mmc->caps &= ~(MMC_CAP_WAIT_WHILE_BUSY);
+		sd_host->quirks    &= ~(SDHCI_QUIRK_NO_BUSY_IRQ);
+		sd_host->quirks2   &= ~(SDHCI_QUIRK2_STOP_WITH_TC);
+		break;
+	case 1:
+		printk(KERN_CONT "MMC_CAP_WAIT_WHILE_BUSY\n");
+		sd_host->quirks    &= ~(SDHCI_QUIRK_NO_BUSY_IRQ);
+		sd_host->quirks2   &= ~(SDHCI_QUIRK2_STOP_WITH_TC);
+		break;
+	case 2:
+		printk(KERN_CONT "SDHCI_QUIRK_NO_BUSY_IRQ\n");
+		sd_host->mmc->caps &= ~(MMC_CAP_WAIT_WHILE_BUSY);
+		sd_host->quirks2   &= ~(SDHCI_QUIRK2_STOP_WITH_TC);
+		break;
+	case 3:
+		printk(KERN_CONT "MMC_CAP_WAIT_WHILE_BUSY + SDHCI_QUIRK_NO_BUSY_IRQ\n");
+		sd_host->quirks2   &= ~(SDHCI_QUIRK2_STOP_WITH_TC);
+		break;
+	case 4:
+		printk(KERN_CONT "SDHCI_QUIRK2_STOP_WITH_TC\n");
+		sd_host->mmc->caps &= ~(MMC_CAP_WAIT_WHILE_BUSY);
+		sd_host->quirks    &= ~(SDHCI_QUIRK_NO_BUSY_IRQ);
+		break;
+	case 5:
+		printk(KERN_CONT "MMC_CAP_WAIT_WHILE_BUSY + SDHCI_QUIRK2_STOP_WITH_TC\n");
+		sd_host->quirks    &= ~(SDHCI_QUIRK_NO_BUSY_IRQ);
+		break;
+	case 6:
+		printk(KERN_CONT "SDHCI_QUIRK_NO_BUSY_IRQ + SDHCI_QUIRK2_STOP_WITH_TC\n");
+		sd_host->mmc->caps &= ~(MMC_CAP_WAIT_WHILE_BUSY);
+		break;
+	default:
+		printk(KERN_CONT "MMC_CAP_WAIT_WHILE_BUSY + SDHCI_QUIRK_NO_BUSY_IRQ + SDHCI_QUIRK2_STOP_WITH_TC\n");
+		break;
+	}
 
 	SDHCI_DEBUG_VERBOSE("  Slot Virt Base = 0x%p\n", sd_host->ioaddr);
 	SDHCI_DEBUG("  Capabilities register 0 val = 0x%08X\n",
