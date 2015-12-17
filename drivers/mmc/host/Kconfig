@@ -346,11 +346,11 @@ config MMC_SDHCI_ST
 
 config MMC_SDHCI_XLP
 	tristate "SDHCI support on Broadcom XLP SoC"
-	depends on MMC_SDHCI && !MMC_SDHCI_PLTFM && !MMC_SDHCI_OF
+	depends on CPU_XLP
 	select MMC_SDHCI_IO_ACCESSORS
 	help
 	  Secure Digital Host Controller Interface
-	  for the XLP SoCs.
+	  for the Broadcom XLP SoCs.
 
 config MMC_OMAP
 	tristate "TI OMAP Multimedia Card Interface support"
