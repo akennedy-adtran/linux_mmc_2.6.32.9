@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32.9
-# Wed Dec 16 10:59:47 2015
+# Thu Dec 17 12:07:57 2015
 #
 CONFIG_MIPS=y
 
@@ -534,7 +534,7 @@ CONFIG_MTD_CFI_UTIL=y
 # CONFIG_MTD_COMPLEX_MAPPINGS is not set
 # CONFIG_MTD_PHYSMAP is not set
 # CONFIG_MTD_XLR is not set
-CONFIG_MTD_XLP=y
+# CONFIG_MTD_XLP is not set
 # CONFIG_MTD_INTEL_VR_NOR is not set
 # CONFIG_MTD_PLATRAM is not set
 
