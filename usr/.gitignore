@@ -9,3 +9,6 @@ initramfs_data.cpio.lzma
 initramfs_list
 include
 */etc/passwd
+
+# XLP InitRAMFS source files
+rootfs.xlp
