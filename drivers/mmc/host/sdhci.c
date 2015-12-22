@@ -1248,10 +1248,6 @@ clock_set:
 		mdelay(1);
 	}
 
-	/* TODO LMC DELETE */
-	printk("sdhci.c:%d Setting clock to %d KHz\n", __LINE__,
-			host->mmc->actual_clock / 1000);
-
 	clk |= SDHCI_CLOCK_CARD_EN;
 	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
 }
