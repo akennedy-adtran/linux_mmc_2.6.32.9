@@ -405,11 +405,7 @@ int mmc_get_ext_csd(struct mmc_card *card, u8 **new_ext_csd)
 	 * As the ext_csd is so large and mostly unused, we don't store the
 	 * raw block in mmc_card.
 	 */
-#if defined(CONFIG_MMC_SDHCI_XLP) || defined(CONFIG_MMC_SDHCI_XLP_MODULE)
-	ext_csd = kzalloc(512, GFP_KERNEL | GFP_DMA);
-#else
 	ext_csd = kzalloc(512, GFP_KERNEL);
-#endif
 	if (!ext_csd)
 		return -ENOMEM;
 
@@ -679,11 +675,7 @@ mmc_send_bus_test(struct mmc_card *card, struct mmc_host *host, u8 opcode,
 	/* dma onto stack is unsafe/nonportable, but callers to this
 	 * routine normally provide temporary on-stack buffers ...
 	 */
-#if defined(CONFIG_MMC_SDHCI_XLP) || defined(CONFIG_MMC_SDHCI_XLP_MODULE)
-	data_buf = kmalloc(len, GFP_KERNEL | GFP_DMA);
-#else
 	data_buf = kmalloc(len, GFP_KERNEL);
-#endif
 	if (!data_buf)
 		return -ENOMEM;
 

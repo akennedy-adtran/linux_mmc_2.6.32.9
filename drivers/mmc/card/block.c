@@ -2224,12 +2224,7 @@ static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 {
 	sector_t size;
 
-	/* LMC This is not quite correct (IMHO). It's correct for a
-	 * modern high-capacity card (> 4GB) but not for older cards
-	 * which can be 4GB and still byte addressed.
-	 */
-//	if (!mmc_card_sd(card) && mmc_card_blockaddr(card)) {
-	if (!mmc_card_sd(card) && (card->ext_csd.rev >= 1)) {
+	if (!mmc_card_sd(card) && mmc_card_blockaddr(card)) {
 		/*
 		 * The EXT_CSD sector count is in number or 512 byte
 		 * sectors.

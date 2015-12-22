@@ -226,11 +226,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 			bouncesz = host->max_blk_count * 512;
 
 		if (bouncesz > 512) {
-#if defined(CONFIG_MMC_SDHCI_XLP) || defined(CONFIG_MMC_SDHCI_XLP_MODULE)
-			mqrq_cur->bounce_buf = kmalloc(bouncesz, GFP_KERNEL | GFP_DMA);
-#else
 			mqrq_cur->bounce_buf = kmalloc(bouncesz, GFP_KERNEL);
-#endif
 			if (!mqrq_cur->bounce_buf) {
 				pr_warn("%s: unable to allocate bounce cur buffer\n",
 					mmc_card_name(card));

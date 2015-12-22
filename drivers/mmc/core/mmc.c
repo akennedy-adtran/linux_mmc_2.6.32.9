@@ -367,24 +367,19 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	 */
 	card->ext_csd.rev = ext_csd[EXT_CSD_REV];
 
-	/* LMC This doesn't seem quite right. A card with EXT_CSD_REV = 1
-	 * will have the sector count below. Such a card might be 4GB and
-	 * not be sector addressed.
-	 */
 	card->ext_csd.raw_sectors[0] = ext_csd[EXT_CSD_SEC_CNT + 0];
 	card->ext_csd.raw_sectors[1] = ext_csd[EXT_CSD_SEC_CNT + 1];
 	card->ext_csd.raw_sectors[2] = ext_csd[EXT_CSD_SEC_CNT + 2];
 	card->ext_csd.raw_sectors[3] = ext_csd[EXT_CSD_SEC_CNT + 3];
-	if (card->ext_csd.rev >= 1) {
+	if (card->ext_csd.rev >= 2) {
 		card->ext_csd.sectors =
 			ext_csd[EXT_CSD_SEC_CNT + 0] << 0 |
 			ext_csd[EXT_CSD_SEC_CNT + 1] << 8 |
 			ext_csd[EXT_CSD_SEC_CNT + 2] << 16 |
 			ext_csd[EXT_CSD_SEC_CNT + 3] << 24;
 
-		/* EXT_CSD rev 2 cards with density > 2GiB are sector addressed */
-		if ((card->ext_csd.sectors > (2u * 1024 * 1024 * 1024) / 512)
-			&& (card->ext_csd.rev >= 2))
+		/* Cards with density > 2GiB are sector addressed */
+		if (card->ext_csd.sectors > (2u * 1024 * 1024 * 1024) / 512)
 			mmc_card_set_blockaddr(card);
 	}
 
@@ -1326,7 +1321,6 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	int err;
 	u32 cid[4];
 	u32 rocr;
-	int bus_width;	// LMC
 
 	BUG_ON(!host);
 	WARN_ON(!host->claimed);
@@ -1522,13 +1516,6 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			card->ext_csd.power_off_notification = EXT_CSD_POWER_ON;
 	}
 
-	/* LMC Not sure why the code was written the way it was.
-	 * Bus width is independent of the timing mode, though
-	 * certain timing modes depend on bus width > 1.
-	 */
-	/* Select the desired bus width optionally */
-	bus_width = mmc_select_bus_width(card);
-
 	/*
 	 * Select timing interface
 	 */
@@ -1545,7 +1532,9 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		if (err)
 			goto free_card;
 	} else if (mmc_card_hs(card)) {
-		if (!IS_ERR_VALUE(bus_width)) {		// LMC moved before mmc_select_timing
+		/* Select the desired bus width optionally */
+		err = mmc_select_bus_width(card);
+		if (!IS_ERR_VALUE(err)) {
 			err = mmc_select_hs_ddr(card);
 			if (err)
 				goto free_card;

@@ -1097,18 +1097,6 @@ static void sdhci_finish_command(struct sdhci_host *host)
 		}
 	}
 
-	/* TODO LMC DELETE */
-//#define LMC
-#ifdef LMC
-	if(host->cmd->flags & MMC_RSP_136)
-		printk("%4d: Response = 0x%08X 0x%08X 0x%08X 0x%08X\n", __LINE__,
-				host->cmd->resp[0],	host->cmd->resp[1],
-				host->cmd->resp[2], host->cmd->resp[3]);
-	else
-		printk("%4d: Response = 0x%08X\n", __LINE__,
-				host->cmd->resp[0]);
-#endif
-
 	host->cmd->error = 0;
 
 	/* Finished CMD23, now send actual command. */
@@ -1260,6 +1248,10 @@ clock_set:
 		mdelay(1);
 	}
 
+	/* TODO LMC DELETE */
+	printk("sdhci.c:%d Setting clock to %d KHz\n", __LINE__,
+			host->mmc->actual_clock / 1000);
+
 	clk |= SDHCI_CLOCK_CARD_EN;
 	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
 }
@@ -1409,12 +1401,6 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	mmiowb();
 	spin_unlock_irqrestore(&host->lock, flags);
-
-	/* TODO LMC DELETE */
-#ifdef LMC
-	printk("%4d: CMD%02u, arg = 0x%08X, flags 0x%03X\n",
-			__LINE__, mrq->cmd->opcode, mrq->cmd->arg, mrq->cmd->flags);
-#endif
 }
 
 void sdhci_set_bus_width(struct sdhci_host *host, int width)

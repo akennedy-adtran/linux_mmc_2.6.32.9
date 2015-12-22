@@ -44,7 +44,6 @@
 #include <asm/netlogic/xlp.h>
 
 #define XLP_SOC_PCI_DRIVER 	"XLP SoC Driver"
-#define DEV_IRT_INFO			0x3D
 
 #define XLP_MAX_DEVICE			8
 #define XLP_MAX_FUNC			8
@@ -202,7 +201,7 @@ static int __init xlp_find_pci_dev(void)
 				}
 
 
-				irt = (nlm_hal_read_32bit_reg(mmio, DEV_IRT_INFO) & 0xFFFF);
+				irt = (nlm_hal_read_32bit_reg(mmio, (XLP_PCIE_DEV_IRT_INFO >> 2)) & 0xFFFF);
 				irq = xlp_irt_to_irq(0, irt);
 				pres[0].start = irq;
 				pres[0].end   = irq;

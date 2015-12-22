@@ -260,11 +260,7 @@ struct mmc_card *mmc_alloc_card(struct mmc_host *host, struct device_type *type)
 {
 	struct mmc_card *card;
 
-#if defined(CONFIG_MMC_SDHCI_XLP) || defined(CONFIG_MMC_SDHCI_XLP_MODULE)
-	card = kzalloc(sizeof(struct mmc_card), GFP_KERNEL | GFP_DMA);
-#else
 	card = kzalloc(sizeof(struct mmc_card), GFP_KERNEL);
-#endif
 	if (!card)
 		return ERR_PTR(-ENOMEM);
 
