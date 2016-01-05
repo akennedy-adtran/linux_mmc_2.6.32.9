@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2014 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * Redistribution and use in source and binary forms, with or without
@@ -101,17 +101,14 @@ static void __init xlp_init_uart(int port_id)
 }
 #endif /* CONFIG_SERIAL_8250 */
 
-/* The ID column in the table below is incremented every time a device
- * matches the PCI-e devid.  For PCI-e devices that generate multiple platform
- * devices (e.g. XLP2xx I2C) exception code in the handler for this table takes
- * care of that.  struct fields:
- *
+/* The ID column in the table below is incremented every
+ * time a device matches the PCI-e devid. struct fields:
  *  PCI-e devid,		name,	  name_len, id */
 static struct dev2drv dev2drv_table[] __initdata = {
 	{XLP_DEVID_UART,	"serial8250",	11,  0},
-	{XLP_DEVID_I2C,		"i2c-xlp",		8,   0},	// XLP8xx/XLP4xx/XLP3xx
-	{XLP2XX_DEVID_I2C,	"i2c-xlp",		8,   0},	// XLP2xx/XLP1xx - 4 busses
+#ifdef CONFIG_SPI_XLP							// TODO convert to PCI driver
 	{XLP_DEVID_SPI,		"spi-xlp",		8,   0},
+#endif
 	{XLP_DEVID_NOR,		"nor-xlp",		8,   0},
 	{XLP_DEVID_NAND,	"nand-xlp",		9,   0}
 };
@@ -131,7 +128,7 @@ static int __init get_dev2drv(uint32_t devid)
 /* TODO - Read fdt to get this info, add BCM65500 platform driver detection */
 static int __init xlp_find_pci_dev(void)
 {
-	uint16_t i, j, base_id, id, num_devices, maxdevice=0;
+	uint16_t i, j, id, maxdevice=0;
 	int idx;
 	uint64_t mmio;
 	uint32_t val, devid, irt, irq;
@@ -151,7 +148,7 @@ static int __init xlp_find_pci_dev(void)
 
 		for (j=0; j<XLP_MAX_FUNC; j++) {
 
-			mmio = nlm_hal_get_dev_base(0, 0, i, j);
+			mmio = nlm_hal_get_dev_base(NODE_0, BUS_0, i, j);
 			val  = nlm_hal_read_32bit_reg(mmio, 0);
 
 			if(val == 0xFFFFFFFF)
@@ -170,68 +167,43 @@ static int __init xlp_find_pci_dev(void)
 			if(!((i>8 && (devid == XLP_DEVID_NAND) ) || (i<8)))
 				continue;
 
-			num_devices = 1;
+			id = dev2drv_table[idx].id++;
 
-			/* Handle PCI-e devices with multiple platform devices */
-			if (devid == XLP2XX_DEVID_I2C) {
-				if (is_nlm_xlp108() || is_nlm_xlp104() || is_nlm_xlp101())
-					num_devices = 2;
-				else
-					num_devices = 4;
+			/* Funny UART exception */
+			if (devid == XLP_DEVID_UART)
+				id += PLAT8250_DEV_PLATFORM;
+
+			pplatdev = platform_device_alloc((const char*)dev2drv_table[idx].drvname, id);
+			if (!pplatdev) {
+				printk(KERN_WARNING "platform_device_alloc failed\n");
+				continue;
 			}
 
-			while(num_devices--) {		// Handle multiple IDs per PCI device
-
-				base_id = dev2drv_table[idx].id++;
-				id = base_id;
-
-				/* Funny UART exception */
-				if (devid == XLP_DEVID_UART)
-					id += PLAT8250_DEV_PLATFORM;
-
-				pplatdev = platform_device_alloc((const char*)dev2drv_table[idx].drvname, id);
-				if (!pplatdev) {
-					printk(KERN_WARNING "platform_device_alloc failed\n");
-					continue;
-				}
-
-				if(devid == XLP_DEVID_UART) {
-					pplatdev->dev.platform_data = &xlp_uart_port[base_id];
-					xlp_init_uart(base_id);
-				}
-
-
-				irt = (nlm_hal_read_32bit_reg(mmio, (XLP_PCIE_DEV_IRT_INFO >> 2)) & 0xFFFF);
-				irq = xlp_irt_to_irq(0, irt);
-				pres[0].start = irq;
-				pres[0].end   = irq;
-				pres[0].flags = IORESOURCE_IRQ;
-
-				/* XLP2xx I2C devices share I/O memory - so let the platform driver manage
-				 * it instead of each platform device (I2C bus).
-				 */
-				if(devid == XLP2XX_DEVID_I2C) {
-
-					printk(KERN_DEBUG "%12s.%d (PCIe B/D/F = 0/0x%02X/%d), IRQ = %3d\n",
-							dev2drv_table[idx].drvname, base_id, devid, j, irq);
-
-					platform_device_add_resources(pplatdev, pres, 1);
-				} else {
-					pres[1].start = mmio;
-					pres[1].end   = mmio + 0xFFF;
-					pres[1].flags = IORESOURCE_MEM;
-
-					printk(KERN_DEBUG "%12s.%d (PCIe B/D/F = 0/0x%02X/%d), IRQ = %3d, "
-							"mem = 0x%llX-0x%llX,\n",
-							dev2drv_table[idx].drvname, base_id, devid, j, irq,
-							mmio, mmio + 0xFFF);
-
-					platform_device_add_resources(pplatdev, pres, 2);
-				}
-				pplatdev->dev.dma_mask = &xlp_dev_dmamask;
-				pplatdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-				platform_device_add(pplatdev);
+			if(devid == XLP_DEVID_UART) {
+				pplatdev->dev.platform_data = &xlp_uart_port[id];
+				xlp_init_uart(id);
 			}
+
+			/* Set-up I/O Memory and IRQ resources */
+			irt = (nlm_hal_read_32bit_reg(mmio, (XLP_PCIE_DEV_IRT_INFO >> 2)) & 0xFFFF);
+			irq = xlp_irt_to_irq(NODE_0, irt);
+			pres[0].start = irq;
+			pres[0].end   = irq;
+			pres[0].flags = IORESOURCE_IRQ;
+
+			pres[1].start = mmio;
+			pres[1].end   = mmio + 0xFFF;
+			pres[1].flags = IORESOURCE_MEM;
+
+			platform_device_add_resources(pplatdev, pres, 2);
+			pplatdev->dev.dma_mask = &xlp_dev_dmamask;
+			pplatdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+			platform_device_add(pplatdev);
+
+			printk(KERN_DEBUG "%12s.%d (PCIe 00:%02u.%u, DevID = 0x%04X), IRQ = %3d, "
+					"Mem = 0x%llX-0x%llX,\n",
+					dev2drv_table[idx].drvname, id, i, j, devid, irq,
+					mmio, mmio + 0xFFF);
 		}
 	}
 

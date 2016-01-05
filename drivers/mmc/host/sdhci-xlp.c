@@ -431,21 +431,16 @@ static int __devinit sdhci_xlp_probe(struct pci_dev *pdev,
 	if(chip == NULL) {
 		dev_err(&pdev->dev, "can't allocate memory\n");
 		ret = -ENOMEM;
-		goto perr1;
+		goto perr;
 	}
 	SDHCI_DEBUG_VERBOSE("  Allocated chip struct at 0x%p\n", chip);
 	chip->num_slots = slot1_enable ? 2 : 1;
 
 	/* Get I/O memory region for this device by bus, device, function */
 	physbase = nlm_hal_get_dev_base(NODE_0, BUS_0, pcie_devn, pcie_fn);
-	SDHCI_DEBUG("  Calling ioremap_nocache for 0x%llx\n", physbase);
-	base = ioremap_nocache(physbase, PAGE_SIZE);
-	if (!base) {
-		dev_err(&pdev->dev, "cannot remap I/O\n");
-		ret = -ENOMEM;
-		goto perr2;
-	}
-	SDHCI_DEBUG("   I/O Virtual Base = 0x%p\n", base);
+	SDHCI_DEBUG("  PCI-E config phys base = 0x%llx\n", physbase);
+	base = xlp_pci_config_base + (physbase - XLP_PCI_ECONFIG_BASE);
+	SDHCI_DEBUG("    Virtual base = 0x%p\n", base);
 	chip->ioaddr = base;
 
 	/* Get PIC IRT entry from PCI-e header, convert to IRQ */
@@ -464,10 +459,7 @@ static int __devinit sdhci_xlp_probe(struct pci_dev *pdev,
 
 	SDHCI_DEBUG("  Requesting PCI I/O memory region\n");
 	ret = pci_request_region(pdev, 0, sdhci_xlp_driver.name);
-	if (ret) {
-		dev_err(&pdev->dev, "can't request region\n");
-		goto perr3;
-	}
+	if (ret) dev_warn(&pdev->dev, "can't request region\n");
 
 	pci_set_drvdata(pdev, chip);
 
@@ -486,13 +478,9 @@ static int __devinit sdhci_xlp_probe(struct pci_dev *pdev,
 	pci_set_drvdata(pdev, NULL);
 	SDHCI_DEBUG("  Calling pci_release_region\n");
 	pci_release_region(pdev, 0);
-perr3:
-	SDHCI_DEBUG("  Calling iounmap for virtual address 0x%p\n", base);
-	iounmap(base);
-perr2:
 	SDHCI_DEBUG_VERBOSE("  Calling devm_kfree for chip struct at 0x%p\n", chip);
 	devm_kfree(&pdev->dev, chip);
-perr1:
+perr:
 	SDHCI_DEBUG("  Calling pci_disable_device\n");
 	pci_disable_device(pdev);
 
@@ -531,8 +519,6 @@ static void __devexit sdhci_xlp_remove(struct pci_dev *pdev)
 		pci_write_config_dword(pdev, HC_SYSCTRL, HC_RESET | HC_CLK_DISABLE);
 
 		/* Clean-up */
-		SDHCI_DEBUG_VERBOSE("  Calling iounmap for virtual address 0x%p\n", chip->ioaddr);
-		iounmap(chip->ioaddr);
 		SDHCI_DEBUG_VERBOSE("  Calling devm_kfree for chip struct at 0x%p\n", chip);
 		devm_kfree(&pdev->dev, chip);
 	}

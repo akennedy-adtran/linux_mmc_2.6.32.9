@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2012 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * Redistribution and use in source and binary forms, with or without
@@ -54,7 +54,10 @@
 #include <asm/mach-netlogic/mmu.h>
 
 extern int pci_probe_only;
-static void *pci_config_base;
+
+void __iomem *xlp_pci_config_base;
+EXPORT_SYMBOL(xlp_pci_config_base);
+
 static const volatile void *pci_io_base;
 
 int xlp_intx_enable(u8, int);
@@ -659,33 +662,30 @@ static void pcie_controller_init_done(void)
 	}
 	/* Configure controllers for running cpu type */
 	if (is_nlm_xlp8xx()) {
-		printk(KERN_DEBUG "Initializing PCIe for xlp8xx/4xx\n");
+		printk(KERN_DEBUG "Initializing PCIe for XLP8xx/4xx\n");
 		xlp_8xx_pcie_controller_init();
 	} else if (is_nlm_xlp2xx()) {
-		printk(KERN_DEBUG "Initializing PCIe for xlp2xx\n");
+		printk(KERN_DEBUG "Initializing PCIe for XLP2xx/1xx\n");
 		xlp_2xx_pcie_controller_init();
-	} else if (is_nlm_xlp3xx_L(XLP_REVISION_ANY)) {
-		printk(KERN_DEBUG "Initializing PCIe for xlp3xx_L\n");
-		xlp_3xx_pcie_controller_init(CPU_EXTPID_XLP_3XX_L);
-	} else if (is_nlm_xlp3xx_LP(XLP_REVISION_ANY)) {
-		printk(KERN_DEBUG "Initializing PCIe for xlp3xx_LP\n");
-		xlp_3xx_pcie_controller_init(CPU_EXTPID_XLP_3XX_LP);
-	} else if (is_nlm_xlp3xx_LP2(XLP_REVISION_ANY)) {
-		printk(KERN_DEBUG "Initializing PCIe for xlp3xx_LP2\n");
-		xlp_3xx_pcie_controller_init(CPU_EXTPID_XLP_3XX_LP2);
-	} else if (is_nlm_xlp3xx_B(XLP_REVISION_ANY)) {
-		printk(KERN_DEBUG "Initializing PCIe for xlp3xx\n");
-		/* ordinary 3xx and 8xx has same controller init seq. */
-		xlp_8xx_pcie_controller_init();
+	} else if (is_nlm_xlp3xx()) {
+		uint32_t epid = efuse_cfg0() >> 4 & 0xf;
+		if(epid) {
+			printk(KERN_DEBUG "Initializing PCIe for XLP3xxL\n");
+			xlp_3xx_pcie_controller_init(epid);
+		} else {
+			printk(KERN_DEBUG "Initializing PCIe for XLP3xx\n");
+			/* ordinary 3xx and 8xx has same controller init seq. */
+			xlp_8xx_pcie_controller_init();
+		}
 	} else {
-		panic("Can't configure PCIe controller for unknown CPU type\n");
+		panic("Can't configure PCIe controller for unknown XLP CPU type\n");
 	}
 }
 
 static inline __u32 pci_cfg_read_32bit(__u32 addr)
 {
 	__u32 temp = 0;
-    __u32 *p = (__u32 *) (pci_config_base + (addr & ~3));
+    __u32 *p = (__u32 *) (xlp_pci_config_base + (addr & ~3));
 
 	temp = *p;
 
@@ -694,29 +694,29 @@ static inline __u32 pci_cfg_read_32bit(__u32 addr)
 
 static inline __u16 pci_cfg_read_16bit(__u32 addr)
 {
-    return *((__u16*)(pci_config_base + (addr & ~1)));
+    return *((__u16*)(xlp_pci_config_base + (addr & ~1)));
 }
 
 static inline __u8 pci_cfg_read_8bit(__u32 addr)
 {
-    return *((__u8 *)(pci_config_base + (addr & ~0)));
+    return *((__u8 *)(xlp_pci_config_base + (addr & ~0)));
 }
 
 static inline void pci_cfg_write_32bit(__u32 addr, __u32 data)
 {
-        __u32 *p = (__u32 *)(pci_config_base + (addr & ~3));
+        __u32 *p = (__u32 *)(xlp_pci_config_base + (addr & ~3));
 
 	*p = data;
 }
 
 static inline void pci_cfg_write_16bit(__u32 addr, __u16 data)
 {
-    *((__u16*)(pci_config_base + (addr & ~1))) = data;
+    *((__u16*)(xlp_pci_config_base + (addr & ~1))) = data;
 }
 
 static inline void pci_cfg_write_8bit(__u32 addr, __u8 data)
 {
-    *((__u8 *)(pci_config_base + (addr & ~0))) = data;
+    *((__u8 *)(xlp_pci_config_base + (addr & ~0))) = data;
 }
 
 static int pci_bus_status = 0;
@@ -804,22 +804,27 @@ static struct pci_ops xlp_pci_ops = {
 /*
  * XLP PCIE Controller
  */
-#define DEFAULT_XLP_PCI_ECONFIG_BASE	(0x18000000ULL)
-#define DEFAULT_XLP_PCI_ECONFIG_SIZE	(32 << 20)
-#define DEFAULT_XLP_PCI_CONFIG_BASE	(0x1c000000ULL)
-#define DEFAULT_XLP_PCI_CONFIG_SIZE	(32 << 20)
+static struct resource xlp_pcie_cfg_resource = {
+	.name			= "XLP PCI-E config",
+	.start			= XLP_PCI_ECONFIG_BASE,
+	.end			= XLP_PCI_ECONFIG_BASE + XLP_PCI_ECONFIG_SIZE - 1,
+	.flags			= IORESOURCE_MEM
+};
+
 static struct resource xlp_mem_resource = {
 	.name           = "XLP PCI MEM",
-	.start          = 0xd0000000ULL,          /* 256MB PCI mem @ 0xd000_0000 */
+	.start          = 0xd0000000ULL,	// 256MB PCI mem @ 0xd000_0000
 	.end            = 0xdfffffffULL,
-	.flags          = IORESOURCE_MEM,
+	.flags          = IORESOURCE_MEM
 };
+
 static struct resource xlp_io_resource = {
 	.name           = "XLP IO MEM",
-	.start          = 0x14000000UL,         /* 32MB PCI IO @ 0x1400_0000 */
+	.start          = 0x14000000UL,		// 32MB PCI IO @ 0x1400_0000
 	.end            = 0x15ffffffUL,
-	.flags          = IORESOURCE_IO,
+	.flags          = IORESOURCE_IO
 };
+
 struct pci_controller xlp_controller = {
 	.index          = 0,
 	.pci_ops        = &xlp_pci_ops,
@@ -1152,31 +1157,37 @@ static int __init pcibios_init(void)
 {
 	unsigned long phys = 0;
 	unsigned long size = 0;
+	int ret;
 
 	if (xlp_nopci) return 0;
 
 	/* Bootloader assigns PCI resources */
 	pci_probe_only = 1;
 
-	/* Map the PCIX CFG space */
-	pci_config_base = ioremap(DEFAULT_XLP_PCI_ECONFIG_BASE, DEFAULT_XLP_PCI_CONFIG_SIZE);
-	if (!pci_config_base) {
-		printk(KERN_ERR "Unable to map PCI config space!\n");
+	/* Map the PCI-e CFG space */
+	ret = request_resource(&iomem_resource, &xlp_pcie_cfg_resource);
+	xlp_pci_config_base = ioremap_nocache(XLP_PCI_ECONFIG_BASE, XLP_PCI_ECONFIG_SIZE);
+	if (!xlp_pci_config_base) {
+		printk(KERN_ERR "%s: Unable to map PCI-E config space!\n", __func__);
 		return 1;
 	}
+	printk(KERN_DEBUG "%s: PCI-E config phys=0x%08x, size=0x%08x, vaddr=0x%p\n",
+			__func__,
+			(unsigned)XLP_PCI_ECONFIG_BASE, (unsigned)XLP_PCI_ECONFIG_SIZE,
+			xlp_pci_config_base);
 
 	phys = xlp_io_resource.start;
 	size = xlp_io_resource.end - xlp_io_resource.start + 1;
 
 	pci_io_base = ioremap(phys, size);
 	if (!pci_io_base) {
-		printk(KERN_WARNING "[%s]: Unable to IO-Remap phys=%lx, size=%lx\n",
-		       __FUNCTION__, phys, size);
+		printk(KERN_WARNING "%s: Unable to IO-Remap phys=0x%08x, size=0x%08x\n",
+		       __FUNCTION__, (unsigned)phys, (unsigned)size);
 		/* Eventually this is going to panic() */
 	}
 	else {
-		printk(KERN_DEBUG "[%s]: IO-Remapped phys=%lx, size=%lx to vaddr=%p\n",
-		       __FUNCTION__, phys, size, pci_io_base);
+		printk(KERN_DEBUG "%s: PCI I/O area phys=0x%08x, size=0x%08x, vaddr=0x%p\n",
+		       __FUNCTION__, (unsigned)phys, (unsigned)size, pci_io_base);
 	}
 	set_io_port_base((unsigned long) pci_io_base);
 	xlp_controller.io_map_base = (unsigned long) pci_io_base;
@@ -1186,7 +1197,7 @@ static int __init pcibios_init(void)
 	ioport_resource.start =  0;
 	ioport_resource.end   = ~0;
 
-	printk(KERN_DEBUG "Registering XLP PCIE Controller. \n");
+	printk(KERN_DEBUG "Registering XLP PCIE Controller\n");
 	/* Setting up controller specific data */
 	pcie_controller_init_done();
 	register_pci_controller(&xlp_controller);

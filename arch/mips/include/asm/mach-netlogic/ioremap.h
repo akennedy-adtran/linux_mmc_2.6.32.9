@@ -25,20 +25,8 @@
 #define NETLOGIC_UNCACHED_START 0x10000000UL
 #define NETLOGIC_UNCACHED_END 0x20000000UL
 
-static inline int valid_phys_addr_range(unsigned long addr, size_t count)
-{
-	/* for now return valid */
-	return 1;
-}
-
-static inline int valid_mmap_phys_addr_range(unsigned long pfn, size_t size) 
-{
-	/* for now return valid */
-	return 1;
-}
-
-//extern inline int valid_phys_addr_range(unsigned long addr, size_t count);
-//extern inline int valid_mmap_phys_addr_range(unsigned long pfn, size_t size);
+extern inline int valid_phys_addr_range(unsigned long addr, size_t count);
+extern inline int valid_mmap_phys_addr_range(unsigned long pfn, size_t size);
 /*
  * Allow physical addresses to be fixed up to help peripherals located
  * outside the low 32-bit range -- generic pass-through version.

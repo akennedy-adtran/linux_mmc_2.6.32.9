@@ -75,6 +75,9 @@
 #define XLP_PCIE_REGION_SIZE	0x1000
 #define XLP_PCIE_DEV_IRT_INFO	(0x3D << 2)
 
+#define XLP_PCI_ECONFIG_BASE	(0x18000000ULL)
+#define XLP_PCI_ECONFIG_SIZE	(32 << 20)
+
 struct smp_boot_info_percpu {
   volatile unsigned long ready;
   volatile unsigned long sp;
@@ -91,7 +94,9 @@ extern struct smp_boot_info smp_boot;
 extern void prom_boot_cpus_secondary(void *);
 extern cpumask_t phys_cpu_present_map;
 extern int is_nlm_xlp2xx_compat;
+extern void *xlp_pci_config_base;
 
 extern char cpu_model_info[MAX_CPU_REV_LEN];
 extern char* get_cpu_info(void);
+
 #endif /*_ASM_XLP_H */ 

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2014 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,13 +32,8 @@
 
 struct i2c_xlp_data
 {
-	int	bus;
-	int	speed;	/* KHz */
-	int	xfer_timeout;
-	int	ack_timeout;
-	unsigned long iobase;
+	void __iomem *iobase;
 	struct i2c_adapter adap;
-	struct resource *ioarea;
 };
 
 extern int xlp_i2c_read(struct i2c_xlp_data *priv, uint8_t slave_addr, uint32_t slave_offset,
