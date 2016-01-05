@@ -234,7 +234,11 @@ static int mmc_read_ssr(struct mmc_card *card)
 		return 0;
 	}
 
+#if defined(CONFIG_64BIT) && defined(CONFIG_CPU_XLP)
+	ssr = kmalloc(64, GFP_KERNEL | GFP_DMA);
+#else
 	ssr = kmalloc(64, GFP_KERNEL);
+#endif
 	if (!ssr)
 		return -ENOMEM;
 
@@ -293,7 +297,11 @@ static int mmc_read_switch(struct mmc_card *card)
 
 	err = -EIO;
 
+#if defined(CONFIG_64BIT) && defined(CONFIG_CPU_XLP)
+	status = kmalloc(64, GFP_KERNEL | GFP_DMA);
+#else
 	status = kmalloc(64, GFP_KERNEL);
+#endif
 	if (!status) {
 		pr_err("%s: could not allocate a buffer for "
 			"switch capabilities.\n",
@@ -359,7 +367,11 @@ int mmc_sd_switch_hs(struct mmc_card *card)
 
 	err = -EIO;
 
+#if defined(CONFIG_64BIT) && defined(CONFIG_CPU_XLP)
+	status = kmalloc(64, GFP_KERNEL | GFP_DMA);
+#else
 	status = kmalloc(64, GFP_KERNEL);
+#endif
 	if (!status) {
 		pr_err("%s: could not allocate a buffer for "
 			"switch capabilities.\n", mmc_hostname(card->host));
