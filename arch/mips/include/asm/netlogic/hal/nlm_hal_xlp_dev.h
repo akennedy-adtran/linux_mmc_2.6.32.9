@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2014 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * This software is available to you under a choice of one of two
@@ -59,166 +59,59 @@
 #define XLP_PCIE_DEV_BLK_SIZE			0x8000 /* 4k per function  and 8 function in a dev block */
 #define XLP_PCIE_BUS_BLK_SIZE			(256 * XLP_PCIE_DEV_BLK_SIZE)
 
-/*XLP8XX/4XX B0 and A2 supported apis*/
-#define CHIP_PROCESSOR_ID_XLP_8XX		0
+#define CHIP_PROCESSOR_XLP				0x0C
+
+/* XLP8XX/4XX B0 and A2 supported major device IDs */
 #define CHIP_PROCESSOR_ID_XLP_8_4_XX	0x10
 #define CHIP_PROCESSOR_ID_XLP_3XX		0x11
 #define CHIP_PROCESSOR_ID_XLP_2XX		0x12
-#define CHIP_PROCESSOR_ID_XLP_1XX		0x13
-#define CHIP_PROCESSOR_ID_XLP_9XX		0x15
 
-/*XLP 8XX  A0,A1,A2 chip support*/
-#define CHIP_PROCESSOR_ID_XLP_832		CHIP_PROCESSOR_ID_XLP_8_4_XX
-#define CHIP_PROCESSOR_ID_XLP_816		0x14
-#define CHIP_PROCESSOR_ID_XLP_432		0x90
-#define CHIP_PROCESSOR_ID_XLP_416		0x94
-#define CHIP_PROCESSOR_ID_XLP_408		0x95
-#define CHIP_PROCESSOR_ID_XLP_208		0xB5
-#define CHIP_PROCESSOR_ID_XLP_204		0xB7
-#define CHIP_PROCESSOR_ID_XLP_104		0xF7
-
-/*Software Revision Number			XLP8XX  XLP3XX	XLP2xx	*/
-#define XLP_REVISION_A0		0x00 /*	0		0		0		*/
-#define XLP_REVISION_A1		0x01 /*	1		1		1		*/
-#define XLP_REVISION_A2		0x02 /*	2						*/
-#define XLP_REVISION_B0		0x03 /*	3		2		2		*/
-#define XLP_REVISION_B1		0x04 /*	4		3		3		*/
-#define XLP_REVISION_B2		0x05 /*	5		4				*/
+/*Software Revision Number		XLP8XX  XLP3XX	XLP2xx	*/
+#define XLP_REVISION_A0			0x00 /*	0		0		0		*/
+#define XLP_REVISION_A1			0x01 /*	1		1		1		*/
+#define XLP_REVISION_A2			0x02 /*	2						*/
+#define XLP_REVISION_B0			0x03 /*	3		2		2		*/
+#define XLP_REVISION_B1			0x04 /*	4		3		3		*/
+#define XLP_REVISION_B2			0x05 /*	5		4				*/
 
 /* Local defines for Storm and Firefly B0 (neither has A2) */
-#define XLP2XX_REVISION_B0  0x02
-#define XLP3XX_REVISION_B0  0x02
-
-#define XLP_REVISION_AX		0xAF
-#define XLP_REVISION_BX		0xBF
-#define XLP_REVISION_INV	0xFE
-#ifndef XLP_REVISION_ANY
-#define XLP_REVISION_ANY	0xFF
-#endif
-
-/*XLP 3XX EXTPID type */
-/*xlp3xx Base
- *--------
- *xlp316   4x4 16 threads
- *xlp308   2x4  8 threads
- *xlp304   1x4  4 threads
- *xlp208a  2x4  8 trheads
- *xlp108a  2x4  8 trheads
- *xlp204a  1x4  4 trheads
- *xlp104a  1x4  4 trheads
- *xlp202a  2x1  2 trheads
- *xlp201a  1x1  1 trheads
- *xlp101a  1x1  1 trheads
- */
-#define CPU_EXTPID_XLP_3XX_NONE		0x00
-#define CPU_EXTPID_XLP_3XX_BASE		0x00
-
+#define XLP2XX_REVISION_B0			0x02
+#define XLP3XX_REVISION_B0			0x02
 #define CPU_EXTPID_XLP_3XX_L		0x01
 #define CPU_EXTPID_XLP_3XX_LP		0x02
 #define CPU_EXTPID_XLP_3XX_LP2		0x03
 
-#define CPU_EXTPID_XLP_208a			0x06
-#define CPU_EXTPID_XLP_108a			0x07
-#define CPU_EXTPID_XLP_204a			0x05
-#define CPU_EXTPID_XLP_104a			0x04
-#define CPU_EXTPID_XLP_202a			0x08
-#define CPU_EXTPID_XLP_201a			0x09
-#define CPU_EXTPID_XLP_101a			0x0A
-
-#define CPU_EXTPID_XLP_3XX_MAX		0x0F
-
-#define CPU_EXTPID_XLP_3XX_INV		0xFE  	 /* invalid */
-#define CPU_EXTPID_XLP_3XX_ANY		0xFF	 /* Any 3XX */
-
 #ifndef __ASSEMBLY__
-#ifndef __XLP_CHIPID_MACROS__
-#define __XLP_CHIPID_MACROS__
 
-extern int is_nlm_xlp(unsigned int chipid, unsigned int rev, unsigned int ext);
+/* Processor family functions */
+/* get_proc_id returns one of CHIP_PROCESSOR_ID_XLP... above */
+static inline uint32_t get_proc_id(void)
+{
+	uint32_t prid;
+	__asm__ __volatile__ (		\
+		 ".set push\n"			\
+		 ".set noat\n"			\
+		 ".set noreorder\n"		\
+		 "mfc0 %0, $15, 0\n"	\
+		 ".set pop\n"			\
+		: "=r" (prid));
+	return(prid >> 8) & 0xFF;
+}
 
-/* 16 bits Software CPU ID Encoding rule:
- * [15:12]: xlp family: 2, 3, 8, 9
- * [11:04]: num of cores
- * [ 3: 0]: num of threads per core
- */
+static inline int is_nlm_xlp8xx(void)
+{
+	return(get_proc_id() == CHIP_PROCESSOR_ID_XLP_8_4_XX);
+}
 
-#ifndef is_nlm_xlp8xx
-#define is_nlm_xlp8xx()			( is_nlm_xlp(0x8000, XLP_REVISION_ANY, 0) || is_nlm_xlp(0x4000, XLP_REVISION_ANY, 0))
-#endif /* is_nlm_xlp8xx */
+static inline int is_nlm_xlp3xx(void)
+{
+	return(get_proc_id() == CHIP_PROCESSOR_ID_XLP_3XX);
+}
 
-#define is_nlm_xlp8xx_ax()		( is_nlm_xlp(0x8000, XLP_REVISION_AX,  0) || is_nlm_xlp(0x4000, XLP_REVISION_AX, 0))
-#define is_nlm_xlp8xx_b0()		( is_nlm_xlp(0x8000, XLP_REVISION_B0,  0) || is_nlm_xlp(0x4000, XLP_REVISION_B0, 0))
-#define is_nlm_xlp8xx_b1()		( is_nlm_xlp(0x8000, XLP_REVISION_B1,  0) || is_nlm_xlp(0x4000, XLP_REVISION_B1, 0))
-#define is_nlm_xlp8xx_bx()		( is_nlm_xlp(0x8000, XLP_REVISION_BX,  0) || is_nlm_xlp(0x4000, XLP_REVISION_BX, 0))
-#define is_nlm_xlp832_ax()		( is_nlm_xlp(0x8084, XLP_REVISION_AX,  0))
-
-#define is_nlm_xlp8xx_832()		is_nlm_xlp(0x8084, XLP_REVISION_ANY, 0)
-#define is_nlm_xlp8xx_824()		is_nlm_xlp(0x8064, XLP_REVISION_ANY, 0)
-#define is_nlm_xlp8xx_816()		is_nlm_xlp(0x8044, XLP_REVISION_ANY, 0)
-
-#define is_nlm_xlp8xx_432()		is_nlm_xlp(0x4084, XLP_REVISION_ANY, 0)
-#define is_nlm_xlp8xx_424()		is_nlm_xlp(0x4064, XLP_REVISION_ANY, 0)
-#define is_nlm_xlp8xx_416()		is_nlm_xlp(0x4044, XLP_REVISION_ANY, 0)
-#define is_nlm_xlp8xx_408()		is_nlm_xlp(0x8024, XLP_REVISION_ANY, 0)
-
-#define is_nlm_xlp3xx_B(rev)	( is_nlm_xlp(0x3000, rev, CPU_EXTPID_XLP_3XX_BASE))
-#define is_nlm_xlp316_B(rev)	( is_nlm_xlp(0x3044, rev, CPU_EXTPID_XLP_3XX_BASE))
-#define is_nlm_xlp312_B(rev)	( is_nlm_xlp(0x3034, rev, CPU_EXTPID_XLP_3XX_BASE))
-#define is_nlm_xlp308_B(rev)	( is_nlm_xlp(0x3024, rev, CPU_EXTPID_XLP_3XX_BASE))
-#define is_nlm_xlp304_B(rev)	( is_nlm_xlp(0x3014, rev, CPU_EXTPID_XLP_3XX_BASE))
-
-#define is_nlm_xlp3xx_L(rev)	( is_nlm_xlp(0x3000, rev, CPU_EXTPID_XLP_3XX_L))
-#define is_nlm_xlp316_L(rev)	( is_nlm_xlp(0x3044, rev, CPU_EXTPID_XLP_3XX_L))
-#define is_nlm_xlp312_L(rev)	( is_nlm_xlp(0x3034, rev, CPU_EXTPID_XLP_3XX_L))
-#define is_nlm_xlp308_L(rev)	( is_nlm_xlp(0x3024, rev, CPU_EXTPID_XLP_3XX_L))
-#define is_nlm_xlp304_L(rev)	( is_nlm_xlp(0x3014, rev, CPU_EXTPID_XLP_3XX_L))
-
-#define is_nlm_xlp3xx_LP(rev)	( is_nlm_xlp(0x3000, rev, CPU_EXTPID_XLP_3XX_LP))
-#define is_nlm_xlp316_LP(rev)	( is_nlm_xlp(0x3044, rev, CPU_EXTPID_XLP_3XX_LP))
-#define is_nlm_xlp312_LP(rev)	( is_nlm_xlp(0x3034, rev, CPU_EXTPID_XLP_3XX_LP))
-#define is_nlm_xlp308_LP(rev)	( is_nlm_xlp(0x3024, rev, CPU_EXTPID_XLP_3XX_LP))
-#define is_nlm_xlp304_LP(rev)	( is_nlm_xlp(0x3014, rev, CPU_EXTPID_XLP_3XX_LP))
-
-#define is_nlm_xlp3xx_LP2(rev)	( is_nlm_xlp(0x3000, rev, CPU_EXTPID_XLP_3XX_LP2))
-#define is_nlm_xlp316_LP2(rev)	( is_nlm_xlp(0x3044, rev, CPU_EXTPID_XLP_3XX_LP2))
-#define is_nlm_xlp312_LP2(rev)	( is_nlm_xlp(0x3034, rev, CPU_EXTPID_XLP_3XX_LP2))
-#define is_nlm_xlp308_LP2(rev)	( is_nlm_xlp(0x3024, rev, CPU_EXTPID_XLP_3XX_LP2))
-#define is_nlm_xlp304_LP2(rev)	( is_nlm_xlp(0x3014, rev, CPU_EXTPID_XLP_3XX_LP2))
-
-#define is_nlm_xlp316_rev(rev)	(is_nlm_xlp316_B(rev) || is_nlm_xlp316_L(rev) || is_nlm_xlp316_LP(rev) || is_nlm_xlp316_LP2(rev))
-#define is_nlm_xlp312_rev(rev)	(is_nlm_xlp312_B(rev) || is_nlm_xlp312_L(rev) || is_nlm_xlp312_LP(rev) || is_nlm_xlp312_LP2(rev))
-#define is_nlm_xlp308_rev(rev)	(is_nlm_xlp308_B(rev) || is_nlm_xlp308_L(rev) || is_nlm_xlp308_LP(rev) || is_nlm_xlp308_LP2(rev))
-#define is_nlm_xlp304_rev(rev)	(is_nlm_xlp304_B(rev) || is_nlm_xlp304_L(rev) || is_nlm_xlp304_LP(rev) || is_nlm_xlp304_LP2(rev))
-
-#define is_nlm_xlp316()			is_nlm_xlp316_rev(XLP_REVISION_ANY)
-#define is_nlm_xlp312()			is_nlm_xlp312_rev(XLP_REVISION_ANY)
-#define is_nlm_xlp308()			is_nlm_xlp308_rev(XLP_REVISION_ANY)
-#define is_nlm_xlp304()			is_nlm_xlp304_rev(XLP_REVISION_ANY)
-
-#define is_nlm_xlp3xx_rev(rev)	(is_nlm_xlp(0x3000, rev, CPU_EXTPID_XLP_3XX_ANY))
-#define is_nlm_xlp3xx()			is_nlm_xlp3xx_rev(XLP_REVISION_ANY)
-#define is_nlm_xlp3xx_ax()		is_nlm_xlp3xx_rev(XLP_REVISION_AX)
-#define is_nlm_xlp3xx_bx()		is_nlm_xlp3xx_rev(XLP_REVISION_BX)
-#define is_nlm_xlp3xx_b0()		is_nlm_xlp3xx_rev(XLP3XX_REVISION_B0)
-
-#define is_nlm_xlp3xx_208a()	( is_nlm_xlp(0x3024, XLP_REVISION_ANY, CPU_EXTPID_XLP_208a))
-#define is_nlm_xlp3xx_108a()	( is_nlm_xlp(0x3024, XLP_REVISION_ANY, CPU_EXTPID_XLP_108a))
-
-#define is_nlm_xlp3xx_204a()	( is_nlm_xlp(0x3014, XLP_REVISION_ANY, CPU_EXTPID_XLP_204a))
-#define is_nlm_xlp3xx_104a()	( is_nlm_xlp(0x3014, XLP_REVISION_ANY, CPU_EXTPID_XLP_104a))
-
-#define is_nlm_xlp3xx_202a()	( is_nlm_xlp(0x3021, XLP_REVISION_ANY, CPU_EXTPID_XLP_202a))
-#define is_nlm_xlp3xx_201a()	( is_nlm_xlp(0x3011, XLP_REVISION_ANY, CPU_EXTPID_XLP_201a))
-#define is_nlm_xlp3xx_101a()	( is_nlm_xlp(0x3011, XLP_REVISION_ANY, CPU_EXTPID_XLP_101a))
-
-#define is_nlm_xlp3xx_lite()	(is_nlm_xlp3xx() && (!is_nlm_xlp3xx_B(XLP_REVISION_ANY)) )
-
-#define is_nlm_xlp2xx()			is_nlm_xlp(0x2000, XLP_REVISION_ANY, 0)
-#define is_nlm_xlp2xx_ax()		is_nlm_xlp(0x2000, XLP_REVISION_AX, 0)
-#define is_nlm_xlp2xx_b0()		is_nlm_xlp(0x2000, XLP_REVISION_B0, 0)
-#define is_nlm_xlp2xx_bx()		is_nlm_xlp(0x2000, XLP_REVISION_BX, 0)
-
-#endif /*__XLP_CHIPID_MACROS__ */
+static inline int is_nlm_xlp2xx(void)
+{
+	return(get_proc_id() == CHIP_PROCESSOR_ID_XLP_2XX);
+}
 
 #endif /* __ASSEMBLY__ */
 
@@ -807,6 +700,7 @@ enum poe_cfg_reg {
 	FATAL_ERR_MASK			= 0x182,
 	BIU_CONFIG				= 0x183,
 	BIU_TIMEOUT				= 0x184,
+	POE_CACHE_ALLOC_EN		= 0x185,
 	ENQUED_MSG_SENT			= 0x190,
 	ENQUED_MSG_CNT			= 0x191,
 	DIST_THRESHOLD0			= 0x200,
@@ -1680,10 +1574,8 @@ enum {
 	#define EXT_G_MDIO_CMD_RDS				0x00040000
 	#define EXT_G_MDIO_CMD_SC				0x00080000
 	#define EXT_G_MDIO_MMRST				0x00100000
-	#define EXT_G_MDIO_DIV					0x0000001E		// For Eagle Ax/B0, Storm Ax (all now obsolete)
-	#define EXT_G_MDIO_DIV_WITH_HW_DIV64_11	0x00000011		// For Eagle B1/B2, Storm B0/B1/B2, Firefly A0/A1
-	#define EXT_G_MDIO_DIV_2XX_SLOW			0x00000012		// For Firefly Bx, NAE at <= 375 MHz
-	#define EXT_G_MDIO_DIV_2XX_FAST			0x0000001A		// For Firefly Bx, NAE at  > 375 MHz
+	#define EXT_G_MDIO_DIV_POS				0
+	#define EXT_G_MDIO_ADD_DIV_POS			2
 
 #define EXT_G0_MDIO_CTRL_DATA				0x1E
 #define EXT_G1_MDIO_CTRL_DATA				0x22

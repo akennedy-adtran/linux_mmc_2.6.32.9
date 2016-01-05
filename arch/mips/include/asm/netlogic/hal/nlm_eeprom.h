@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2014 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * This software is available to you under a choice of one of two
@@ -56,18 +56,10 @@
 #define UPD_OFF     		(SN_OFF + SN_LEN)
 #define UPD_LEN     		0x08	// Increase to 8
 
-#ifdef CONFIG_NLM_XLP_EEPROM
 #define NLM_EEPROM_LEN		(2 * (MAGIC_LEN + MAC_LEN))
 #define NLM_EEPROM_MAGIC	((MAGIC_BYTE0 << 8) | MAGIC_BYTE1)
 extern int nlm_eeprom_get_mac_addr(unsigned char *mac, int interface);
 extern void nlm_eeprom_set_mac_addr(unsigned char *mac, int interface);
 extern void nlm_eeprom_dump(unsigned char *data, int offset, int len);
-
-#else
-#define nlm_eeprom_get_mac_addr(...)	0
-#define nlm_eeprom_set_mac_addr(...)
-#define nlm_eeprom_dump(...)
-
-#endif /* CONFIG_NLM_XLP_EEPROM */
 
 #endif /* _NLM_EEPROM_H */

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2013 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * This software is available to you under a choice of one of two
@@ -209,16 +209,14 @@ int xlp_cpld_init(uint32_t cs)
 
 void set_gbu_frequency(int node, int frequency)
 {
-	const uint64_t mhz = 1000000;
-	uint64_t set_freq;
-	if(is_nlm_xlp2xx()) {
-		set_freq = nlm_hal_xlp2xx_set_clkdev_frq(XLP2XX_CLKDEVICE_GBU, frequency * mhz);
-	}
-	else {
+	const uint32_t mhz = 1000000;
+	uint32_t set_freq;
+	if(is_nlm_xlp2xx())
+		set_freq = nlm_hal_set_soc_freq(node, XLP2XX_CLKDEVICE_NOR, frequency * mhz);
+	else
 		set_freq = nlm_hal_set_soc_freq(node, DFS_DEVICE_NOR, frequency * mhz);
-	}
-	NLM_HAL_DO_DIV(set_freq,mhz);
-	nlm_print("GBU Frequency set to %dMHz\n", (int)set_freq);
+	NLM_HAL_DO_DIV(set_freq, mhz);
+	nlm_print("GBU Frequency set to %u MHz\n", set_freq);
 }
 
 void nlm_hal_cpld_init(int node)

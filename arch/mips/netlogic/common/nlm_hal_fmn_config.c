@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2014 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * This software is available to you under a choice of one of two
@@ -83,7 +83,7 @@ extern cpumask_t fdt_cpumask;
 #endif
 
 static unsigned int *tmp_credit_arr, *tmp_spill_arr, *tmp_pages_arr;
-static unsigned int max_qs, max_nodes, cpus_per_core;
+static unsigned int max_qs, max_nodes;
 
 /* Table of sending stations mapping an ennumerated handle (station name) to a pretty
  * string, base station ID, and credit configuration table to all system-wide recipients.
@@ -141,113 +141,178 @@ static void __init update_fmn_config(int msg_blk, int msg_handle, int b_stid, in
 	def_dest_cfg[msg_blk].e_stid = e_stid;
 	def_dest_cfg[msg_blk].valid = valid;
 }
-	
-/* Determine number of enabled cores and present SOC accelerator blocks.  Adjust
- * default sender and receiver tables accordingly.  This function should be called
- * before copying either array to fmn_node_cfg. */
-static unsigned int __init update_eagle(void)
+
+#ifndef NLM_HAL_XLP2
+/* Determine present SOC accelerator blocks.  Adjust default sender and receiver tables
+ * accordingly.  This function should be called before copying either array to fmn_node_cfg.
+ */
+static void __init update_eagle(void)
 {
 	unsigned int defeature;
-	defeature = bitcount((efuse_cfg1() >> 9) & 0xF);		// Disabled compression pipes
-	if(defeature)
+
+	/* If CMP clock is enabled, check for defeatured pipes; Otherwise disable */
+	if(nlm_hal_get_soc_freq(NODE_0, DFS_DEVICE_CMP)) {
+		defeature = bitcount((efuse_cfg1() >> 9) & 0xF);
+		if(defeature == 4)
+			update_fmn_config(XLP_MSG_BLK_CMP, XLP_MSG_HANDLE_CMP,
+					XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
+		else if(defeature)
+			update_fmn_config(XLP_MSG_BLK_CMP, XLP_MSG_HANDLE_CMP,
+					XLP_CMP_VC_BASE, XLP_CMP_VC_LIMIT - defeature, 1);
+	} else
 		update_fmn_config(XLP_MSG_BLK_CMP, XLP_MSG_HANDLE_CMP,
-				XLP_CMP_VC_BASE, XLP_CMP_VC_LIMIT - defeature, 1);
-	defeature = bitcount((efuse_cfg1() >> 14) & 0xFFF);		// Disabled crypto pipes
-	if(defeature)
+				XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
+
+	/* If SAE clock is enabled, check for defeatured pipes; Otherwise disable */
+	if(nlm_hal_get_soc_freq(NODE_0, DFS_DEVICE_SAE)) {
+		defeature = bitcount((efuse_cfg1() >> 14) & 0xFFF);
+		if(defeature == 12)
+			update_fmn_config(XLP_MSG_BLK_CRYPTO, XLP_MSG_HANDLE_CRYPTO,
+					XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
+		else if(defeature)
+			update_fmn_config(XLP_MSG_BLK_CRYPTO, XLP_MSG_HANDLE_CRYPTO,
+					XLP_CRYPTO_VC_BASE, XLP_CRYPTO_VC_LIMIT - defeature, 1);
+	} else
 		update_fmn_config(XLP_MSG_BLK_CRYPTO, XLP_MSG_HANDLE_CRYPTO,
-				XLP_CRYPTO_VC_BASE, XLP_CRYPTO_VC_LIMIT - defeature, 1);
-	defeature = bitcount(efuse_cfg2() & 0x1FF);				// Disabled RSA pipes
-	if(defeature)
+				XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
+
+	/* If RSA clock is enabled, check for defeatured pipes; Otherwise disable */
+	if(nlm_hal_get_soc_freq(NODE_0, DFS_DEVICE_RSA)) {
+		defeature = bitcount(efuse_cfg2() & 0x1FF);
+		if(defeature == 9)
+			update_fmn_config(XLP_MSG_BLK_RSA_ECC, XLP_MSG_HANDLE_RSA_ECC,
+					XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
+		else if(defeature)
+			update_fmn_config(XLP_MSG_BLK_RSA_ECC, XLP_MSG_HANDLE_RSA_ECC,
+					XLP_RSA_ECC_VC_BASE, XLP_RSA_ECC_VC_LIMIT - defeature, 1);
+	} else
 		update_fmn_config(XLP_MSG_BLK_RSA_ECC, XLP_MSG_HANDLE_RSA_ECC,
-				XLP_RSA_ECC_VC_BASE, XLP_RSA_ECC_VC_LIMIT - defeature, 1);
-	return (8 - bitcount(efuse_cfg0() & 0xFF));
+				XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
 }
 
-static unsigned int __init update_storm(void)
+static void __init update_storm(void)
 {
 	unsigned int defeature;
+
+	/* Update number of PopQs for Storm */
 	update_fmn_config(XLP_MSG_BLK_POPQ, XLP_MSG_HANDLE_INVALID,
 			XLP_POPQ_VC_BASE, XLP_3XX_POPQ_VC_LIMIT, 1);
-	if(((efuse_cfg2() >> 11) & 0x1) == 0)					// Enable RegEx
+
+	/* Enable RegEx if SOC clock is enabled and defeature bit is not set */
+	if(nlm_hal_get_soc_freq(NODE_0, DFS_DEVICE_REGEX_FAST) &&
+	   nlm_hal_get_soc_freq(NODE_0, DFS_DEVICE_REGEX_SLOW) &&
+	   (((efuse_cfg2() >> 11) & 0x1) == 0))
 		update_fmn_config(XLP_MSG_BLK_REGX, XLP_MSG_HANDLE_REGX,
 				XLP_3XX_REGEX_VC_BASE, XLP_3XX_REGEX_VC_LIMIT, 1);
-	defeature = bitcount(efuse_cfg2() & 0xF);				// Disabled RSA pipes
-	update_fmn_config(XLP_MSG_BLK_RSA_ECC, XLP_MSG_HANDLE_RSA_ECC,
-			XLP_3XX_RSA_ECC_VC_BASE, XLP_3XX_RSA_ECC_VC_LIMIT - defeature, 1);
-	defeature = bitcount((efuse_cfg1() >> 14) & 0xF);		// Disabled crypto pipes
-	update_fmn_config(XLP_MSG_BLK_CRYPTO, XLP_MSG_HANDLE_CRYPTO,
-			XLP_3XX_CRYPTO_VC_BASE, XLP_3XX_CRYPTO_VC_LIMIT - defeature, 1);
+
+	/* If RSA clock is enabled, check for defeatured pipes; Otherwise disable */
+	if(nlm_hal_get_soc_freq(NODE_0, DFS_DEVICE_RSA)) {
+		defeature = bitcount(efuse_cfg2() & 0xF);
+		if(defeature == 4)
+			update_fmn_config(XLP_MSG_BLK_RSA_ECC, XLP_MSG_HANDLE_RSA_ECC,
+					XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
+		else
+			update_fmn_config(XLP_MSG_BLK_RSA_ECC, XLP_MSG_HANDLE_RSA_ECC,
+					XLP_3XX_RSA_ECC_VC_BASE, XLP_3XX_RSA_ECC_VC_LIMIT - defeature, 1);
+	} else
+		update_fmn_config(XLP_MSG_BLK_RSA_ECC, XLP_MSG_HANDLE_RSA_ECC,
+				XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
+
+	/* If SAE clock is enabled, check for defeatured pipes; Otherwise disable */
+	if(nlm_hal_get_soc_freq(NODE_0, DFS_DEVICE_SAE)) {
+		defeature = bitcount((efuse_cfg1() >> 14) & 0xF);
+		if(defeature == 4)
+			update_fmn_config(XLP_MSG_BLK_CRYPTO, XLP_MSG_HANDLE_CRYPTO,
+					XLP_3XX_CRYPTO_VC_BASE, XLP_3XX_CRYPTO_VC_LIMIT - defeature, 1);
+		else
+			update_fmn_config(XLP_MSG_BLK_CRYPTO, XLP_MSG_HANDLE_CRYPTO,
+					XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
+	} else
+		update_fmn_config(XLP_MSG_BLK_CRYPTO, XLP_MSG_HANDLE_CRYPTO,
+				XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
+
+	/* Storm doesn't have compression engine - disable it */
 	update_fmn_config(XLP_MSG_BLK_CMP, XLP_MSG_HANDLE_CMP,
 			XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
+
+	/* Update POE and NAE station addresses for Storm */
 	update_fmn_config(XLP_MSG_BLK_POE, XLP_MSG_HANDLE_POE,
 			XLP_3XX_POE_VC_BASE, XLP_3XX_POE_VC_LIMIT, 1);
 	update_fmn_config(XLP_MSG_BLK_NAE, XLP_MSG_HANDLE_NAE_0,
 			XLP_3XX_NET_TX_VC_BASE, XLP_3XX_NET_TX_VC_LIMIT, 1);
 	update_fmn_config(XLP_MSG_BLK_FREEIN, XLP_MSG_HANDLE_INVALID,
 			XLP_3XX_NET_RX_VC_BASE, XLP_3XX_NET_RX_VC_LIMIT, 1);
-	if(((efuse_cfg2() >> 10) & 0x1) == 0) {					// Enable SRIO
-		if (is_nlm_xlp3xx_bx())
-			update_fmn_config(XLP_MSG_BLK_SRIO, XLP_MSG_HANDLE_SRIO,
-					XLP_3XX_SRIO_VC_BASE, XLP_3XX_B0_SRIO_VC_LIMIT, 1);
-		else
-			update_fmn_config(XLP_MSG_BLK_SRIO, XLP_MSG_HANDLE_SRIO,
-					XLP_3XX_SRIO_VC_BASE, XLP_3XX_SRIO_VC_LIMIT, 1);
-	}
-	return (4 - bitcount(efuse_cfg0() & 0x0F));
-}
 
-static unsigned int __init update_firefly(void)
+	/* If SRIO is not defeatured, enable it */
+	if(((efuse_cfg2() >> 10) & 0x1) == 0)
+		update_fmn_config(XLP_MSG_BLK_SRIO, XLP_MSG_HANDLE_SRIO,
+				XLP_3XX_SRIO_VC_BASE, XLP_3XX_B0_SRIO_VC_LIMIT, 1);
+}
+#endif
+
+#ifndef NLM_HAL_XLP1
+static void __init update_firefly(void)
 {
 	update_fmn_config(XLP_MSG_BLK_POPQ, XLP_MSG_HANDLE_INVALID,
 			XLP_POPQ_VC_BASE, XLP_2XX_POPQ_VC_LIMIT, 1);
-	if (nlm_xlp2xx_has_rsa())
+
+	/* Enable RegEx if SOC clock is enabled and defeature bit is not set */
+	if(nlm_hal_get_soc_freq(NODE_0, XLP2XX_CLKDEVICE_RGXF) &&
+	   nlm_hal_get_soc_freq(NODE_0, XLP2XX_CLKDEVICE_RGXS) &&
+	   nlm_xlp2xx_has_regx())
+		update_fmn_config(XLP_MSG_BLK_REGX, XLP_MSG_HANDLE_REGX,
+				XLP_2XX_REGEX_VC_BASE, XLP_2XX_REGEX_VC_LIMIT, 1);
+
+	/* If RSA clock is enabled, check not defeatured; Otherwise disable */
+	if(nlm_hal_get_soc_freq(NODE_0, XLP2XX_CLKDEVICE_RSA) && nlm_xlp2xx_has_rsa())
 		update_fmn_config(XLP_MSG_BLK_RSA_ECC, XLP_MSG_HANDLE_RSA_ECC,
 				XLP_2XX_RSA_ECC_VC_BASE, XLP_2XX_RSA_ECC_VC_LIMIT, 1);
 	else
 		update_fmn_config(XLP_MSG_BLK_RSA_ECC, XLP_MSG_HANDLE_RSA_ECC,
-				XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
-	if (nlm_xlp2xx_has_crypto())
+			XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
+
+	/* If SAE clock is enabled, check not defeatured; Otherwise disable */
+	if(nlm_hal_get_soc_freq(NODE_0, XLP2XX_CLKDEVICE_SAE) && nlm_xlp2xx_has_crypto())
 		update_fmn_config(XLP_MSG_BLK_CRYPTO, XLP_MSG_HANDLE_CRYPTO,
 				XLP_2XX_CRYPTO_VC_BASE, XLP_2XX_CRYPTO_VC_LIMIT, 1);
 	else
 		update_fmn_config(XLP_MSG_BLK_CRYPTO, XLP_MSG_HANDLE_CRYPTO,
 				XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
-	if (nlm_xlp2xx_has_cmp())
+
+	/* If CMP clock is enabled, check not defeatured; Otherwise disable */
+	if(nlm_hal_get_soc_freq(NODE_0, XLP2XX_CLKDEVICE_CMP) && nlm_xlp2xx_has_cmp())
 		update_fmn_config(XLP_MSG_BLK_CMP, XLP_MSG_HANDLE_CMP,
 				XLP_2XX_CDE_VC_BASE, XLP_2XX_CDE_VC_LIMIT, 1);
 	else
 		update_fmn_config(XLP_MSG_BLK_CMP, XLP_MSG_HANDLE_CMP,
 				XLP_INVALID_STATION, XLP_INVALID_STATION, 0);
+
+	/* Update POE and NAE station addresses for Firefly */
 	update_fmn_config(XLP_MSG_BLK_POE, XLP_MSG_HANDLE_POE,
 			XLP_2XX_POE_VC_BASE, XLP_2XX_POE_VC_LIMIT, 1);
 	update_fmn_config(XLP_MSG_BLK_NAE, XLP_MSG_HANDLE_NAE_0,
 			XLP_2XX_NET_TX_VC_BASE, XLP_2XX_NET_TX_VC_LIMIT, 1);
 	update_fmn_config(XLP_MSG_BLK_FREEIN, XLP_MSG_HANDLE_INVALID,
 			XLP_2XX_NET_RX_VC_BASE, XLP_2XX_NET_RX_VC_LIMIT, 1);
-	if (nlm_xlp2xx_has_regx())
-		update_fmn_config(XLP_MSG_BLK_REGX, XLP_MSG_HANDLE_REGX,
-				XLP_2XX_REGEX_VC_BASE, XLP_2XX_REGEX_VC_LIMIT, 1);
-	return (2 - bitcount(efuse_cfg0() & 0x03));
 }
+#endif
 
 static int __init update_defaults(void)
 {
-	int i, nvcs, ncores;
-	uint32_t pid=get_proc_id();
+	int i;
+	unsigned int ncores = num_xlp_cores();
+	unsigned int nvcs = MAX_VC_PERTHREAD * NLM_MAX_CPUS_PER_CORE * ncores;
 
-	if((pid == 0 ) || (pid==CHIP_PROCESSOR_ID_XLP_8_4_XX))
-		ncores = update_eagle();
-	else if (pid == CHIP_PROCESSOR_ID_XLP_3XX)
-		ncores = update_storm();
-	else if (pid == CHIP_PROCESSOR_ID_XLP_2XX)
-		ncores = update_firefly();
-	else {
-		nlm_print(KERN_ERR "FMN Error: Unknown processor ID\n");
-		return -1;
-	}
+#ifndef NLM_HAL_XLP2
+	if(is_nlm_xlp8xx()) update_eagle();
+	if(is_nlm_xlp3xx()) update_storm();
+#endif
+#ifndef NLM_HAL_XLP1
+	if(is_nlm_xlp2xx()) update_firefly();
+#endif
 
-	cpus_per_core = NLM_MAX_CPUS_PER_CORE - ((efuse_cfg0() >> 28) & 0x3);
-	FMN_DEBUG_PRINTK("Configuring FMN for %d cores, %d CPUs per core\n", ncores, cpus_per_core);
+	FMN_DEBUG_PRINTK("Configuring FMN for %d cores, %d CPUs per core\n",
+			ncores, num_xlp_threads());
 
 	nvcs = MAX_VC_PERTHREAD * NLM_MAX_CPUS_PER_CORE * ncores;
 	def_dest_cfg[XLP_MSG_BLK_CPU].e_stid = nvcs - 1;
@@ -378,6 +443,7 @@ static void __init fmn_update_credit(int s_node, int s_stn, int d_node)
 	unsigned int d_stn, did, credits;
 	struct fmn_receiver *receiver;
 	struct fmn_sender *sender = &(nlm_node_cfg.fmn_cfg[s_node]->senders[s_stn]);
+	unsigned int cpus_per_core = num_xlp_threads();
 
 	/* Zero out the temporary array since it gets re-used */
 	for(did = 0; did <= max_qs; did++)
@@ -452,6 +518,7 @@ static void __init fmn_update_qsize(int d_node)
 {
 	unsigned int did, d_stn;
 	struct fmn_receiver *receiver;
+	unsigned int cpus_per_core = num_xlp_threads();
 
 	/* Zero out the temporary arrays */
 	for(did = 0; did <= max_qs; did++) {
@@ -1029,10 +1096,6 @@ void __init nlm_hal_fmn_init(void *fdt, int node)
 	/* Parse FDT settings and overrides */
 	if (parse_fdt_fmn_config(fdt) < 0)
 		return;
-
-	if(!is_nlm_xlp2xx()) {
-		nlm_hal_soc_clock_enable(node, DFS_DEVICE_RSA);
-	}
 
 #ifdef FMN_DEBUG_MORE
 	dump_fmn_config(node);

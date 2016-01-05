@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2014 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * This software is available to you under a choice of one of two
@@ -80,7 +80,7 @@ typedef enum soc_dfs_device {
 	XLP2XX_CLKDEVICE_CMP	= 0x14,
 	XLP2XX_CLKDEVICE_NAND	= 0x15,
 	XLP2XX_CLKDEVICE_MMC	= 0x16,
-	XLP2XX_CLKDEVICE_GBU	= 0x17,
+	XLP2XX_CLKDEVICE_NOR	= 0x17,
 	XLP2XX_CLKDEVICE_RGXF	= 0x18,
 	XLP2XX_CLKDEVICE_RGXS	= 0x19,
 	XLP2XX_CLKDEVICE_USB	= 0x1a,
@@ -89,20 +89,6 @@ typedef enum soc_dfs_device {
 
 	INVALID_DFS_DEVICE = 0xFF
 } soc_device_id_t;
-
-/* So u-boot can configure SOC accelerator frequencies */
-#ifdef CONFIG_NETL2XX
-#define MAX_SKUS			3		// Number of speed grades
-#define MAX_SOC_DEVS		13		// Number of devices in the speed grade SOC speed table
-#endif
-#ifdef CONFIG_NETL3XX
-#define MAX_SKUS			2
-#define MAX_SOC_DEVS		14
-#endif
-#ifdef CONFIG_NETL8XX
-#define MAX_SKUS			2
-#define MAX_SOC_DEVS		11
-#endif
 
 #ifdef NLM_HAL_LINUX_KERNEL 
 #define NLM_HAL_DO_DIV(n, base)   if(base) { do_div((n), (base)); }
@@ -128,48 +114,38 @@ typedef enum xlp_pll_type {
 } xlp_pll_type_t;
 
 typedef enum xlp2xx_clkdev_sel{
-	SEL_REF_CLK	=0x0,
-	SEL_DEV0PLL	=0x1,
-	SEL_DEV1PLL	=0x2,
-	SEL_DEV2PLL	=0x3
+	SEL_REF_CLK	= 0x0,
+	SEL_DEV0PLL	= 0x1,
+	SEL_DEV1PLL	= 0x2,
+	SEL_DEV2PLL	= 0x3
 } xlp2xx_clkdev_sel_t;
 
 typedef enum xlp2xx_clkdev_div{
-	DIV_BYPASS	=0x0,
-	DIV_DIV2	=0x1,
-	DIV_DIV4	=0x2,
-	DIV_DIV8	=0x3
+	DIV_BYPASS	= 0x0,
+	DIV_DIV2	= 0x1,
+	DIV_DIV4	= 0x2,
+	DIV_DIV8	= 0x3
 } xlp2xx_clkdev_div_t;
 
-extern uint8_t nlm_hal_get_soc_clock_state(int node, soc_device_id_t device);
-extern void nlm_hal_soc_clock_enable(int node, soc_device_id_t device);
-extern void nlm_hal_soc_clock_disable(int node, soc_device_id_t device);
-extern void nlm_hal_soc_clock_reset(int node, soc_device_id_t device);
-
-/* XLP1xx APIs */
+/* XLP-I APIs */
 extern const char* nlm_hal_get_dev_name(soc_device_id_t dev);
 extern const char* nlm_hal_get_pll_name(xlp_pll_type_t pll);
-extern uint32_t nlm_hal_get_soc_dfs_val(int node, soc_device_id_t device);
-extern uint64_t nlm_hal_get_pll_freq(int node, xlp_pll_type_t pll);
-extern uint64_t nlm_hal_get_soc_freq(int node, soc_device_id_t device);
-extern uint64_t nlm_hal_set_soc_freq(int node, soc_device_id_t device, uint64_t freq);
-extern uint64_t nlm_hal_get_core_freq(int node, uint8_t core);
-extern uint64_t nlm_hal_set_core_freq(int node, uint8_t core, uint64_t freq);
-extern unsigned long long nlm_hal_cpu_freq(void);
+extern uint16_t nlm_hal_get_soc_dfs_val(int node, soc_device_id_t device);
+extern uint32_t nlm_hal_get_pll_freq(int node, xlp_pll_type_t pll);
+extern uint32_t nlm_hal_get_soc_freq(int node, soc_device_id_t device);
+extern uint32_t nlm_hal_set_soc_freq(int node, soc_device_id_t device, uint32_t freq);
+extern uint32_t nlm_hal_get_core_freq(int node, int core);
+extern uint32_t nlm_hal_set_core_freq(int node, int core, uint32_t freq);
+extern uint32_t nlm_hal_cpu_freq(void);
 extern int nlm_hal_is_ref_clk_133MHz(void);
-extern uint64_t nlm_hal_get_ref_clk_freq(void);
+extern uint32_t nlm_hal_get_ref_clk_freq(void);
 extern unsigned int nlm_hal_get_xlp_pit_tick_rate(void);
 
-/* XLP2xx APIs*/
+/* XLP-II APIs */
 extern const char* nlm_hal_xlp2xx_get_dev_name(soc_device_id_t dev);
 extern const char* nlm_hal_xlp2xx_get_pll_name(xlp2xx_pll_type_t pll);
-extern uint64_t xlp2xx_get_ref_clk(uint64_t* ref_clk_num, uint32_t* ref_clk_den);
-extern void nlm_hal_xlp2xx_dev_pll_cfg(soc_device_id_t dev_type,
-		xlp2xx_clkdev_sel_t dev_pll_sel, xlp2xx_clkdev_div_t div);
-extern uint64_t nlm_hal_xlp2xx_set_pllfreq_dyn(xlp2xx_pll_type_t pll_type, uint64_t freq);
-extern uint64_t nlm_hal_xlp2xx_get_pllfreq_dyn(xlp2xx_pll_type_t pll_type);
-extern uint64_t nlm_hal_xlp2xx_set_clkdev_frq(soc_device_id_t dev_type, uint64_t freq);
-extern uint64_t nlm_hal_xlp2xx_get_clkdev_frq(soc_device_id_t dev_type);
+extern uint32_t nlm_hal_xlp2xx_set_pllfreq_dyn(xlp2xx_pll_type_t pll_type, uint32_t freq);
+extern uint32_t nlm_hal_xlp2xx_get_pllfreq_dyn(xlp2xx_pll_type_t pll_type);
 
 #define NLM_HALT_IF(cond) while(cond) { \
 				nlm_print("ERROR: %s\n", __FUNCTION__); \
@@ -181,3 +157,4 @@ extern uint64_t nlm_hal_xlp2xx_get_clkdev_frq(soc_device_id_t dev_type);
 #define XLP_ENABLE  0
 
 #endif /* _NLH_SYS_H */
+

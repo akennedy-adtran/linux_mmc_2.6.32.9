@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2014 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * This software is available to you under a choice of one of two
@@ -33,8 +33,8 @@
  *
  * #BRCM_4# */
 
-#ifndef _NLM_HAL_NAE_H_
-#define _NLM_HAL_NAE_H_
+#ifndef __NLM_HAL_NAE_H__
+#define __NLM_HAL_NAE_H__
 #ifdef NLM_LINUX_KERNEL
 #include <linux/netdevice.h>
 #endif
@@ -127,30 +127,30 @@
 #define NETIOR_CMPLX_4_INIT_CREDIT	18
 
 struct nae_complex_config {
-	uint32_t num_free_desc[MAX_PORTS_PERBLOCK];
-	uint32_t free_desc_size[MAX_PORTS_PERBLOCK];
-	uint32_t intf_fifo_size[MAX_PORTS_PERBLOCK];
-	uint32_t prsr_seq_fifo_size[MAX_PORTS_PERBLOCK];
-	uint32_t rx_buf_size[MAX_PORTS_PERBLOCK];
-	uint32_t ucore_mask[MAX_PORTS_PERBLOCK];	
-	uint32_t ext_phy_addr[MAX_PORTS_PERBLOCK];
-	uint32_t ext_phy_bus[MAX_PORTS_PERBLOCK];
-	uint32_t mgmt[MAX_PORTS_PERBLOCK];
-	uint32_t disable[MAX_PORTS_PERBLOCK];			// Allow disable of a port in DTS
-	uint32_t rx_ctxt_base[MAX_PORTS_PERBLOCK];		// Allow arbitrary selection of context
-	uint32_t tx_ctxt_base[MAX_PORTS_PERBLOCK];
-	uint32_t loopback[MAX_PORTS_PERBLOCK];
-	uint32_t num_channels[MAX_PORTS_PERBLOCK];
-	uint32_t num_rx_channels[MAX_PORTS_PERBLOCK];	// From 2.3.1
-	uint32_t num_tx_channels[MAX_PORTS_PERBLOCK];	// From 2.3.1
-	uint32_t num_lanes;
-	uint32_t lane_rate;
-	uint32_t higig_mode;
-	uint32_t xgmii_speed;
-	uint32_t vlan_pri_en;
-	uint32_t msec_port_enable;
+	uint16_t num_free_desc[MAX_PORTS_PERBLOCK];
+	uint16_t free_desc_size[MAX_PORTS_PERBLOCK];
+	uint16_t intf_fifo_size[MAX_PORTS_PERBLOCK];
+	uint16_t prsr_seq_fifo_size[MAX_PORTS_PERBLOCK];
+	uint16_t rx_buf_size[MAX_PORTS_PERBLOCK];
+	uint16_t ucore_mask[MAX_PORTS_PERBLOCK];
+	uint16_t ext_phy_mode[MAX_PORTS_PERBLOCK];
+	uint16_t ext_phy_addr[MAX_PORTS_PERBLOCK];
+	uint16_t ext_phy_bus[MAX_PORTS_PERBLOCK];
+	uint16_t mgmt[MAX_PORTS_PERBLOCK];
+	uint16_t disable[MAX_PORTS_PERBLOCK];			// Allow disable of a port in DTS
+	uint16_t rx_ctxt_base[MAX_PORTS_PERBLOCK];		// Allow arbitrary selection of context
+	uint16_t tx_ctxt_base[MAX_PORTS_PERBLOCK];
+	uint16_t loopback[MAX_PORTS_PERBLOCK];
+	uint16_t num_channels[MAX_PORTS_PERBLOCK];
+	uint16_t num_rx_channels[MAX_PORTS_PERBLOCK];	// From 2.3.1
+	uint16_t num_tx_channels[MAX_PORTS_PERBLOCK];	// From 2.3.1
+	uint16_t num_lanes;
+	uint16_t lane_rate;
+	uint16_t higig_mode;
+	uint16_t xgmii_speed;
+	uint16_t vlan_pri_en;
+	uint16_t msec_port_enable;
 };
-
 
 struct poe_statistics {
 	uint64_t ooo_msg_count;
@@ -162,8 +162,8 @@ struct poe_statistics {
 };
 
 
-/* Temporarily specifying these sizes here. 
-   These will be moved to FDT soon 
+/* Temporarily specifying these sizes here.
+   These will be moved to FDT soon
 */
 
 static inline uint32_t nlm_stg2_fifo_sz(void)
@@ -359,10 +359,10 @@ static __inline__ uint32_t flow_base_mask_config(unsigned int interface, unsigne
 	return ((base & 0xffff) << 16) | ((cmd & 0x1) << 15) | ((mask & 0x1f) << 8) | (interface & 0x1f);
 }
 
-uint32_t nlm_hal_get_frin_total_queue(int node);
-uint32_t nlm_hal_get_frin_queue_base(int node);
+int nlm_hal_get_frin_total_queue(int node);
+int nlm_hal_get_frin_queue_base(int node);
 extern int nlm_hal_init_poe_distvec(int node, int vec, uint32_t cm0, uint32_t cm1, uint32_t cm2, uint32_t cm3, uint32_t vcmask);
-extern void nlm_hal_init_poe_ext_storage(int node, 
+extern void nlm_hal_init_poe_ext_storage(int node,
 					 uint64_t fbp_base_phys,
 					 uint64_t fbp_base_virt,
 					 uint64_t msg_base_phys,
@@ -370,17 +370,13 @@ extern void nlm_hal_init_poe_ext_storage(int node,
 
 extern int nlm_hal_load_ucore(int node, int ucore_mask, unsigned int *opcodes, int num_opcodes);
 
-#ifdef NLM_HAL_LINUX_KERNEL
-extern uint32_t nlm_get_max_ports(void);
-#endif
-
-/* Removed nlm_hal_init_if() - no longer used */
-extern int nlm_hal_open_if(int node, int intf_type, int intf, int tx_ctxt_base, int vlan_pri_en);
-extern int nlm_hal_close_if(int node, int intf_type, int intf);
+extern int nlm_hal_init_if(int node, int port);
 extern void nlm_hal_init_ingress(int node, unsigned int desc_size);
+extern void nlm_hal_init_egress(int node);
 
-extern void nlm_hal_init_ext_phy(int node, int intf);
-extern void nlm_hal_ext_phy_an(int node, int intf);
+extern struct nlm_hal_ext_phy *get_phy_info(int inf);
+extern int  nlm_hal_init_ext_phy(int node, int intf);
+extern int  nlm_hal_ext_phy_an(int node, int intf);
 extern int  nlm_hal_status_ext_phy(int node, int intf, struct nlm_hal_mii_info *mii_info);
 extern void nlm_hal_restart_an(int node, int intf, struct nlm_hal_mii_info *mii_info);
 
@@ -390,7 +386,7 @@ extern int nlm_read_poe_statistics(int node, struct poe_statistics *stats);
 
 extern void nlm_hal_prepad_enable(int node, int size);
 extern void nlm_hal_reset_1588_accum(int node);
-extern void nlm_hal_1588_ld_freq_mul(int node, uint32_t ptp_inc_den, uint32_t ptp_inc_num, 
+extern void nlm_hal_1588_ld_freq_mul(int node, uint32_t ptp_inc_den, uint32_t ptp_inc_num,
 					uint32_t ptp_inc_intg);
 extern void nlm_hal_1588_ld_offs(int node, uint32_t ptp_off_hi, uint32_t ptp_off_lo);
 extern void nlm_hal_1588_ld_user_val(int node, uint32_t user_val_hi, uint32_t user_val_lo);
@@ -410,14 +406,16 @@ enum NAE_REG_CMD {
 };
 
 enum if_link {
-	LINK_DOWN=0,
+	LINK_DOWN = 0,
 	LINK_UP
 };
 
+/* DO NOT CHANGE ENUM VALUES */
 enum if_speed {
+	SPEED_UNKNOWN = -1,
 	SPEED_10M = 0,
-	SPEED_100M,
-	SPEED_1000M
+	SPEED_100M = 1,
+	SPEED_1000M = 2
 };
 
 
@@ -507,37 +505,27 @@ extern int xlp3xx_8xxb0_nae_lane_reset_txpll(int node, int block, int lane_ctrl,
  */
 extern void nlm_hal_mdio_init(int node);
 extern void nlm_hal_sgmii_pcs_init(int node, int sgmii_cplx_mask);
-extern void nlm_hal_config_sgmii_if(int node, int inf);
 
 extern void nlm_hal_sgmii_phy_init(int node);
 
-extern int nlm_hal_init_nae(void *fdt, int dom_id);
 extern void nlm_hal_reset_nae_ownership(void *fdt, int dom_id);
 extern void reset_nae_mgmt(int node);
-extern int nlm_hal_nae_drain_frin_fifo_descs(int node, int inf);
 extern int nlm_hal_write_ucore_shared_mem(int node, unsigned int *data, int words);
-
-/* Functions below now take absolute inteface number (will convert to block + index as needed */
-extern void nlm_hal_mac_disable(int node, int intf, int intf_type);
-extern void nlm_hal_mac_enable(int node, int intf, int intf_type);
 
 extern uint16_t nlm_hal_get_hwport(int node, uint32_t context);
 
-extern int nlm_hal_set_sgmii_framesize(int node, int intf, uint32_t size);
-extern int nlm_hal_set_xaui_framesize(int node, int block, uint32_t tx_size, uint32_t rx_size);
-#ifdef NLM_HAL_LINUX_KERNEL 
+#ifdef NLM_HAL_LINUX_KERNEL
 extern int nlm_hal_set_ilk_framesize(int node, int intf, int port, uint32_t size);
 extern int nlm_hal_get_ilk_mac_stats(int node, int intf, int port, void *data);
 #endif
 
-extern int nlm_config_vfbid_table(int node, uint32_t start, uint32_t num_entries, uint32_t *vfbid_tbl);
 extern void nlm_hal_msec_tx_default_config(int node, unsigned int port_enable, unsigned int preamble_len, unsigned int packet_num, unsigned int pn_thrshld);
 extern void nlm_hal_msec_rx_default_config(int node, unsigned int port_enable, unsigned int preamble_len, unsigned int packet_num, unsigned int replay_win_size);
 extern void nlm_hal_msec_rx_mem_config(int node, int port, int index, uint64_t sci, unsigned char *key, uint64_t sci_mask);
 extern void nlm_hal_msec_rx_config(int node, unsigned int port_enable, unsigned int preamble_len, unsigned int packet_num, unsigned int replay_win_size);
 extern void nlm_hal_msec_tx_mem_config(int node, int context, int tci, uint64_t sci, unsigned char *key);
 extern void nlm_hal_msec_tx_config(int node, unsigned int port_enable, unsigned int preamble_len, unsigned int packet_num, unsigned int pn_thrshld);
-extern int nlm_hal_retrieve_shared_freein_fifo_info(void *fdt, 
+extern int nlm_hal_retrieve_shared_freein_fifo_info(void *fdt,
 		int shared_dom_id, int *owner_replenish, char **paddr_info, int *paddr_info_len,
 		char **desc_info, int *desc_info_len);
 extern unsigned int nlm_hal_retrieve_freein_fifo_mask(void *fdt, int node, int dom_id);
@@ -630,5 +618,5 @@ static inline uint32_t nlm_hal_ptp_timer_lo(int node, int inf_num)
 
 extern uint32_t nlm_hal_get_rtc(int node, uint32_t* p_val_hi, uint32_t* p_val_lo);
 
-#endif /*#ifndef _NLM_HAL_NAE_H_ */
+#endif /* __NLM_HAL_NAE_H__ */
 

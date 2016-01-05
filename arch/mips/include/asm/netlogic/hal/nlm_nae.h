@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2014 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * This software is available to you under a choice of one of two
@@ -82,92 +82,87 @@ enum higig_mode{
 #define NLM_NAE_RXAUI_MODE_BROADCOM	2
 #define NLM_NAE_RXAUI_MODE_MARVELL	3
 
-/* SGMII MDIO Phy address to use when the SGMII port is directly connected */
-#define SGMII_DIRECT_ATTACH			99
-
 struct nlm_hal_nae_port {
-	int      valid;
-	int      mgmt;
-//	int      num_free_desc;
-	int      txq_base;
-	int      rxq;
-	int      hw_port_id;
-	int      vlan_pri_en;
-	int      iftype;
-	uint32_t rx_ctxt_base;		// Allow arbitrary specification of base context per-port
-	uint32_t tx_ctxt_base;
-	uint32_t num_rx_channels;	// From 2.3.1
-	uint32_t num_tx_channels;
-	uint32_t rx_buf_size;
-	uint32_t intf_fifo_size;
-//	uint32_t free_desc_size;
-	uint32_t prsr_seq_fifo_size;
-	uint32_t rx_slots_reqd;
-	uint32_t tx_slots_reqd;
-	uint32_t ucore_mask;
-	uint32_t ext_phy_addr;
-	uint32_t ext_phy_bus;
-	uint32_t rxaui_scrambler;	/* 0: disable scrambler ; 1: enable scrambler */
-	uint32_t rxaui_mode;		/* 0: broadcom mode; 1: marvell */
-	uint32_t xaui_mode;			/* 0: XPACK PHY; 1: NLP1042 PHY */
-	int      loopback;
-	int      autoneg_done;		// Added for u-boot - only do auto-negotiation once when port is first opened
+	uint16_t	valid;
+	uint16_t	mgmt;
+	uint16_t	hw_port_id;
+	uint16_t	ext_phy_mode;		// Added for SGMII interface in 1000BASE-X mode
+	uint16_t	ext_phy_addr;
+	uint16_t	ext_phy_bus;
+	uint16_t	vlan_pri_en;
+	uint16_t	iftype;
+	uint16_t	txq_base;
+	uint16_t	rxq;
+	uint16_t	rx_ctxt_base;		// Allow arbitrary specification of base context per-port
+	uint16_t	tx_ctxt_base;
+	uint16_t	num_rx_channels;	// From 2.3.1
+	uint16_t	num_tx_channels;
+	uint16_t	rx_buf_size;
+	uint16_t	intf_fifo_size;
+	uint16_t	prsr_seq_fifo_size;
+	uint16_t	rx_slots_reqd;
+	uint16_t	tx_slots_reqd;
+	uint16_t	ucore_mask;
+	uint16_t	rxaui_scrambler;	// 0: disable scrambler ; 1: enable scrambler
+	uint16_t	rxaui_mode;			// 0: Broadcom mode; 1: Marvell mode
+	uint16_t	xaui_mode;			// 0: XPACK PHY; 1: NLP1042 PHY
+	uint16_t	loopback;
 };
 
 struct nlm_hal_nae_config {
-	int fb_vc;
-	int rx_vc;
-	int frin_queue_base;
-	int frin_total_queue;
-	int num_ports;
-	uint32_t flags;
-	int rx_cal_slots;
-	int tx_cal_slots;
+	struct nlm_hal_nae_port ports[MAX_NAE_PORTS_PERNODE];
+	uint16_t	fb_vc;
+	uint16_t	rx_vc;
+	uint16_t	frin_queue_base;
+	uint16_t	frin_total_queue;
+	uint16_t	num_ports;
+	uint16_t	flags;
+	uint16_t	rx_cal_slots;
+	uint16_t	tx_cal_slots;
 	/* onchip descs per queue: value is taken from array for all 
 	   queues upto 0-17 */
-	int freein_fifo_onchip_num_descs[MAX_NAE_FREEIN_DESCS_QUEUE];
+	uint16_t	freein_fifo_onchip_num_descs[MAX_NAE_FREEIN_DESCS_QUEUE];
 	/* spill descs per queue, it will be added with the onchip size  */
-	int freein_fifo_spill_num_descs; 
-	uint64_t freein_spill_base;
-	uint64_t freein_spill_size;
-	struct nlm_hal_nae_port ports[MAX_NAE_PORTS_PERNODE];
-	uint32_t cntx2port[MAX_NAE_CONTEXTS_PERNODE];
-	uint32_t num_lanes[XLP_MAX_INTERLAKEN_IF];
-	uint32_t lane_rate[XLP_MAX_INTERLAKEN_IF];
+	uint16_t	freein_fifo_spill_num_descs; 
+	uint64_t	freein_spill_base;
+	uint32_t	freein_spill_size;
+	uint16_t	cntx2port[MAX_NAE_CONTEXTS_PERNODE];
+	uint16_t	num_lanes[XLP_MAX_INTERLAKEN_IF];
+	uint16_t	lane_rate[XLP_MAX_INTERLAKEN_IF];
 	/*egress fifo  */
-	uint32_t stg2fifo_base;
-	uint32_t ehfifo_base;
-	uint32_t froutfifo_base;
-	uint32_t msfifo_base;
-	uint32_t pktfifo_base;
-	uint32_t pktlenfifo_base;
+	uint16_t	stg2fifo_base;
+	uint16_t	ehfifo_base;
+	uint16_t	froutfifo_base;
+	uint16_t	msfifo_base;
+	uint16_t	pktfifo_base;
+	uint16_t	pktlenfifo_base;
 	/* NAE complex map */
-	uint32_t sgmii_complex_map;
-	uint32_t xaui_complex_map;
-	uint32_t higig_mode[MAX_NAE_CPLX_PER_NODE];
-	uint32_t xgmii_speed[MAX_NAE_CPLX_PER_NODE];
-	uint32_t rxaui_complex_map;
-	uint32_t ilk_complex_map;
+	uint16_t	sgmii_complex_map;
+	uint16_t	xaui_complex_map;
+	uint16_t	higig_mode[MAX_NAE_CPLX_PER_NODE];
+	uint16_t	xgmii_speed[MAX_NAE_CPLX_PER_NODE];
+	uint16_t	rxaui_complex_map;
+	uint16_t	ilk_complex_map;
 	/* total queues used = num_contexts */
-	uint32_t num_tx_contexts;		// From 2.3.1
-	uint32_t num_rx_contexts;
+	uint16_t	num_tx_contexts;		// From 2.3.1
+	uint16_t	num_rx_contexts;
 
 	/* I am the owner or not, who initialize the node */
-	int owned;
+	uint16_t	owned;
 	/* Freein fifo mask. Out of the max rx fifos, domain ownership
 	of rx-fifos. */
-	uint32_t freein_fifo_dom_mask;
+	uint32_t	freein_fifo_dom_mask;
 
 	/* vfbtable id offset, software freeback and hardware freebaack */
-	uint32_t vfbtbl_sw_offset;
-	uint32_t vfbtbl_sw_nentries;
-	uint32_t vfbtbl_hw_offset;
-	uint32_t vfbtbl_hw_nentries;
+	uint16_t	vfbtbl_sw_offset;
+	uint16_t	vfbtbl_sw_nentries;
+	uint16_t	vfbtbl_hw_offset;
+	uint16_t	vfbtbl_hw_nentries;
 
 	/* port fifo mode enabled/disabled */
-	unsigned int port_fifo_en;
+	uint16_t	port_fifo_en;
 	
-	uint32_t msec_port_enable;
+	uint16_t	msec_port_enable;
 	unsigned char sectag_offset[MAX_NAE_PORTS_PERNODE];
 	unsigned char sectag_len[MAX_NAE_PORTS_PERNODE];
 	unsigned char icv_len[MAX_NAE_PORTS_PERNODE];
@@ -203,8 +198,7 @@ enum if_type {
 };
 
 extern int nlm_hal_write_ucore_shared_mem(int node, unsigned int *data, int words);
-extern int nlm_config_vfbid_table(int node, uint32_t start, uint32_t num_entries, uint32_t *vfbid_tbl);
-extern uint32_t *cntx2port[];
+extern uint16_t *cntx2port[];
 extern int nlm_hal_restart_ucore(int node, void *fdt);
 extern void nlm_hal_derive_cpu_to_freein_fifo_map(int node, unsigned int phys_cpu_map,
 		unsigned int freein_fifo_mask, unsigned int *cpu_2_freein_fifo_map);
@@ -216,4 +210,6 @@ extern void nlm_hal_read_nae_ucore_sram_mem(int node, int ucoreid, unsigned int 
 extern void nlm_hal_disable_xaui_flow_control(int node, int block);
 
 #endif
-#endif
+
+#endif /* __NLM_NAE_H__ */
+

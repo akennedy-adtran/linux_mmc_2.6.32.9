@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2014 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * This software is available to you under a choice of one of two
@@ -121,35 +121,30 @@ unsigned long xlp_sys_base[NLM_MAX_NODES];
 unsigned long xlp_regex_base_pcie;
 unsigned long xlp_regex_base_pcim;
 
-struct nlm_node_config  nlm_node_cfg;
+struct nlm_node_config nlm_node_cfg;
 
 static int reg_num_phys;
-void sgmii_scan_phys(int node);
-void  nlm_hal_sata_firmware_init(void);
-void register_phy(int node, int inf, int* hw_portid);
 
-static int mvl_get_phy_status(struct nlm_hal_ext_phy *phy, struct nlm_hal_mii_info* mii_info, int node);
-static void mvl_start_an(struct nlm_hal_ext_phy *phy, int node);
-static void mvl_init_phy(struct nlm_hal_ext_phy *phy, int node);
+extern void nae_ext_mdio_wait(void);
 
-static int  bcm_get_phy_status(struct nlm_hal_ext_phy *phy, struct nlm_hal_mii_info* mii_info, int node);
-static void bcm_start_an(struct nlm_hal_ext_phy *phy, int node);
-static void bcm_init_phy(struct nlm_hal_ext_phy *phy, int node);
+static int  mvl_get_phy_status(struct nlm_hal_ext_phy *phy,
+		struct nlm_hal_mii_info* mii_info, int node);
+static void mvl_restart_an(struct nlm_hal_ext_phy *phy, int node);
+static int  mvl_init_phy(struct nlm_hal_ext_phy *phy, int node);
 
-static int  xmc_get_phy_status(struct nlm_hal_ext_phy *phy, struct nlm_hal_mii_info* mii_info, int node);
-static void xmc_start_an(struct nlm_hal_ext_phy *phy, int node);
-static void xmc_init_phy(struct nlm_hal_ext_phy *phy, int node);
+static int  bcm_get_phy_status(struct nlm_hal_ext_phy *phy,
+		struct nlm_hal_mii_info* mii_info, int node);
+static void bcm_restart_an(struct nlm_hal_ext_phy *phy, int node);
+static int  bcm_init_phy(struct nlm_hal_ext_phy *phy, int node);
+static int  xmc_init_phy(struct nlm_hal_ext_phy *phy, int node);
 
-void nlm_hal_init_ext_phy(int node, int inf);
-
-struct nlm_hal_ext_phy * get_phy_info(int inf);
 #define MAX_PHYS 18
 /*PHYs */
 static struct nlm_hal_ext_phy known_ext_phys[] = {
-		{"mvs103656", 0xc97, 0, 0, 0, 0, mvl_get_phy_status, mvl_start_an, mvl_init_phy},
-		{"bcm5461s", 0x60c1, 0, 0, 0, 0, bcm_get_phy_status, bcm_start_an, bcm_init_phy},
-		{"bcm5482", 0xbcb2, 0, 0, 0, 0, xmc_get_phy_status, xmc_start_an, xmc_init_phy},
-		{"bcm5416", 0x5e74, 0, 0, 0, 0, bcm_get_phy_status, bcm_start_an, bcm_init_phy},
+		{"mvs88e1114", 0x0c97, 0, 0, 0, 0, mvl_get_phy_status, mvl_restart_an, mvl_init_phy},
+		{"bcm5461s",   0x60c1, 0, 0, 0, 0, bcm_get_phy_status, bcm_restart_an, bcm_init_phy},
+		{"bcm5482s",   0xbcb2, 0, 0, 0, 0, bcm_get_phy_status, bcm_restart_an, xmc_init_phy},
+		{"bcm5416",    0x5e74, 0, 0, 0, 0, bcm_get_phy_status, bcm_restart_an, bcm_init_phy},
 		{"", 0, 0, 0, 0, 0, NULL, NULL, NULL}
 };
 static struct nlm_hal_ext_phy regs_ext_phys[MAX_PHYS];
@@ -197,12 +192,6 @@ __inline__ void nlm_hal_xlp_pcie_rc_init(void)
 	}
 }
 
-/* PCI Enumeration */
-__inline__ void nlm_hal_enumerate_pci(void)
-{
-}
-
-#ifndef NLM_HAL_XLOADER
 /* Basic Reg access
  */
 
@@ -312,7 +301,7 @@ __inline__ void nlm_hal_write_64bit_reg(uint64_t base, int index, uint64_t val)
 {
 	nlh_write_cfg_reg64(base +  (index << 3) , val);
 }
-#endif /*NLM_HAL_XLOADER*/
+
 /*
  *    Generic Devices
  */
@@ -332,7 +321,7 @@ __inline__ void nlm_hal_write_64bit_reg(uint64_t base, int index, uint64_t val)
 */
 __inline__ uint64_t nlm_hal_get_dev_base(int node, int bus, int dev, int func)
 {
-	uint64_t base = xlp_io_base & 0x1fffffff;
+	uint64_t base = xlp_io_base & 0x1fffffffULL;
 
 	return (uint64_t)  (base +
 			    (bus << 20) +
@@ -483,7 +472,7 @@ __inline__ int nlm_hal_is_xlp_le(void)
  **/
 int nlm_hal_get_fdt_freq(void *fdt, int type)
 {
-	int freq;
+	uint32_t freq;
 	int ret = 250;  /* Set the default frequency to 250 */
 	char path_str[50];
 
@@ -498,7 +487,7 @@ int nlm_hal_get_fdt_freq(void *fdt, int type)
 		else
 			ret = freq;
 #ifdef FREQ_DEBUG
-		nlm_print("nae frequency is %d\n", ret);
+		nlm_print("NAE frequency is %d\n", ret);
 #endif
 		break;
 	case NLM_RSA:
@@ -508,7 +497,7 @@ int nlm_hal_get_fdt_freq(void *fdt, int type)
 		else
 			ret = freq;
 #ifdef FREQ_DEBUG
-		nlm_print("rsa frequency is %d\n", ret);
+		nlm_print("RSA frequency is %d\n", ret);
 #endif
 		break;
 	case NLM_SAE:
@@ -518,7 +507,7 @@ int nlm_hal_get_fdt_freq(void *fdt, int type)
 		else
 			ret = freq;
 #ifdef FREQ_DEBUG
-		nlm_print("sae frequency is %d\n", ret);
+		nlm_print("SAE frequency is %d\n", ret);
 #endif
 		break;
 	case NLM_DTRE:
@@ -528,7 +517,7 @@ int nlm_hal_get_fdt_freq(void *fdt, int type)
 		else
 			ret = freq;
 #ifdef FREQ_DEBUG
-		nlm_print("sae frequency is %d\n", ret);
+		nlm_print("DTRE frequency is %d\n", ret);
 #endif
 		break;
 	case NLM_CDE:
@@ -538,7 +527,7 @@ int nlm_hal_get_fdt_freq(void *fdt, int type)
 		else
 			ret = freq;
 #ifdef FREQ_DEBUG
-		nlm_print("sae frequency is %d\n", ret);
+		nlm_print("CDE frequency is %d\n", ret);
 #endif
 		break;
 	default:
@@ -575,15 +564,11 @@ void nlm_hal_init(void)
 
 #ifdef NLM_HAL_LINUX_KERNEL
 	printk("Initializing XLP Hardware Abstraction Library\n");
-
 #endif
-	nlm_hal_enumerate_pci();
-
 	nlm_node_cfg.valid = 1;
 	nlm_node_cfg.num_nodes = 1;
 
- 	for(node = 0; node < NLM_MAX_NODES; node++)
-	{
+ 	for(node = 0; node < NLM_MAX_NODES; node++) {
 		/*nlm_node_cfg.nae_cfg[node] = NULL; */
 		nlm_node_cfg.nae_cfg[node] = NULL;
 		nlm_node_cfg.fmn_cfg[node] = NULL;
@@ -991,33 +976,58 @@ unsigned long tlb_size_to_mask(unsigned long size)
 }
 #endif
 
-#if 0
-static void dump_phy_regs(int node, int inf)
+/* Convenience functions */
+static inline uint16_t phy_read(int node, unsigned int bus,
+		unsigned int phyaddr, unsigned int reg)
 {
-	nlm_nae_config_ptr nae_cfg = nlm_node_cfg.nae_cfg[node];
-	int j = 0;
-	for(;j<nae_cfg->num_ports;j++){
-		if(nae_cfg->ports[j].hw_port_id == inf)
-			break;
-	}
-
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, nae_cfg->ports[j].ext_phy_bus, BLOCK_7, LANE_CFG, nae_cfg->ports[j].ext_phy_addr, 22, 0x0);
-	nlm_print("Page0 Control Reg %x\n",nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, nae_cfg->ports[j].ext_phy_bus, BLOCK_7, LANE_CFG, nae_cfg->ports[j].ext_phy_addr, 0));
-	nlm_print("Page0 Status Reg %x\n",nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, nae_cfg->ports[j].ext_phy_bus, BLOCK_7, LANE_CFG, nae_cfg->ports[j].ext_phy_addr, 1));
-	nlm_print("Page0 ExtStatus Reg %x\n",nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, nae_cfg->ports[j].ext_phy_bus, BLOCK_7, LANE_CFG, nae_cfg->ports[j].ext_phy_addr, 17));
-
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, nae_cfg->ports[j].ext_phy_bus, BLOCK_7, LANE_CFG, nae_cfg->ports[j].ext_phy_addr, 22, 0x2);
-	nlm_print("Page %x\n",nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, nae_cfg->ports[j].ext_phy_bus, BLOCK_7, LANE_CFG, nae_cfg->ports[j].ext_phy_addr, 22));
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, nae_cfg->ports[j].ext_phy_bus, BLOCK_7, LANE_CFG, nae_cfg->ports[j].ext_phy_addr, 22, 0x2);
-
-	nlm_print("Page2 Control Reg %x\n",nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, nae_cfg->ports[j].ext_phy_bus, BLOCK_7, LANE_CFG, nae_cfg->ports[j].ext_phy_addr, 0));
-	nlm_print("Page2 media Reg %x\n",nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, nae_cfg->ports[j].ext_phy_bus, BLOCK_7, LANE_CFG, nae_cfg->ports[j].ext_phy_addr, 10));
-	nlm_print("Page2 Reg26 (Bypass) %x\n",nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, nae_cfg->ports[j].ext_phy_bus, BLOCK_7, LANE_CFG, nae_cfg->ports[j].ext_phy_addr, 26));
-	nlm_print("Page2 SGMII sync %x\n",nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, nae_cfg->ports[j].ext_phy_bus, BLOCK_7, LANE_CFG, nae_cfg->ports[j].ext_phy_addr, 17));
-
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, nae_cfg->ports[j].ext_phy_bus, BLOCK_7, LANE_CFG, nae_cfg->ports[j].ext_phy_addr, 22, 0x0);
+	return nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus,
+			BLOCK_7, LANE_CFG, phyaddr, reg);
 }
-#endif
+
+static inline void phy_write(int node, unsigned int bus,
+		unsigned int phyaddr, unsigned int reg, uint16_t data)
+{
+	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus,
+			BLOCK_7, LANE_CFG, phyaddr, reg, data);
+}
+
+/* PHY Registers */
+/* Broadcom */
+#define BCM_SHADOW_REG_18		0x18
+#define BCM_SHADOW_REG_1C		0x1C
+#define BCM_AUX_STATUS_REG		0x19
+/* Shadow registers accessed through register 0x1C */
+#define BCM_SPARE_CTRL1_REG		0x02
+#define BCM_CLK_ALIGN_CTRL_REG	0x03
+#define BCM_LED_SEL1_REG		0x0D
+#define BCM_LED_SEL2_REG		0x0E
+#define BCM_LED_GPIO_CTRL_REG	0x0F
+#define BCM_PRI_SERDES_CTRL_REG	0x16
+#define BCM_1000BASEX_CTRL2_REG	0x17
+#define BCM_MODE_CTRL_REG		0x1F
+
+/* Marvell */
+#define MVL_PAGE_SEL_REG		22
+#define MVL_CTRL1_REG			16
+#define MVL_CTRL2_REG			26
+
+static inline uint16_t read_bcm_shadow_reg(int node, unsigned int bus,
+		unsigned int phyaddr, unsigned int reg)
+{
+	uint16_t val = reg << 10;
+
+	/* Set shadow register address for read, only return bits 9:0 */
+	phy_write(node, bus, phyaddr, BCM_SHADOW_REG_1C, val);
+	return phy_read(node, bus, phyaddr, BCM_SHADOW_REG_1C) & 0x3FF;
+}
+
+static inline void write_bcm_shadow_reg(int node, unsigned int bus,
+		unsigned int phyaddr, unsigned int reg, uint16_t data)
+{
+	uint16_t val = (1 << 15) | (reg << 10) | (data & 0x3FF);
+
+	phy_write(node, bus, phyaddr, BCM_SHADOW_REG_1C, val);
+}
 
 /**
 * @brief nlm_hal_init_ext_phy function initializes the external PHY of an interface.
@@ -1026,19 +1036,34 @@ static void dump_phy_regs(int node, int inf)
 * @param [in] inf Interface number
 *
 * @return
-* 	- none
+* 	- 0 if the phy was successfully initialized
+*   - -1 if the phy was not successfully initialized
 *
 * @ingroup hal_nae
 *
 */
-void nlm_hal_init_ext_phy(int node, int inf)
+int nlm_hal_init_ext_phy(int node, int inf)
 {
+	int int_inf;
+	uint16_t val;
+	uint8_t phy_mode;
 	struct nlm_hal_ext_phy *this_phy=NULL;
+
 	this_phy = get_phy_info(inf);
-	if(!this_phy)
-		return;
-	this_phy->ext_phy_init(this_phy, node);
-	return;
+	if(!this_phy) return -1;
+	int_inf = this_phy->inf;
+	phy_mode = this_phy->phy_mode;
+
+	/* Soft-reset XLP PCS, enable AN if Phy operating mode is SGMII-Copper. Note per
+	 * XLP datasheet, MII_Advertise register power-on reset value is 0x0000 - must
+	 * set selector field to CSMA.
+	 */
+	nlm_hal_mdio_write(NODE_0, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, inf, MII_ADVERTISE, ADVERTISE_CSMA);
+	if(phy_mode) val = BMCR_RESET | BMCR_SPEED1000 | BMCR_FULLDPLX;		// 1000BASE-X modes
+	else         val = BMCR_RESET | BMCR_ANENABLE;						// Copper mode
+	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, MII_BMCR, val);
+	PHY_DEBUG("%s: Port %d SGMII PCS wrote 0x%04X to MII_BMCR\n", __func__, int_inf, val);
+	return this_phy->ext_phy_init(this_phy, node);
 }
 
 /**
@@ -1047,113 +1072,126 @@ void nlm_hal_init_ext_phy(int node, int inf)
 * Note - XMC board support broken due to quick changes for DSL BSP - must add #define to revert
 * this to support XMC
 *
-* @param[in] phy	:nlm_hal_ext_phy struct pointing to the BROADCOM PHY
+* @param [in] phy nlm_hal_ext_phy struct pointing to the BROADCOM PHY
 * @param [in] node Node number
 *
 * @return
-* 	- none
+* 	- 0 if the phy was successfully initialized
+*   - -1 if the phy was not successfully initialized
 *
 * @ingroup hal_nae
 *
 */
-static void xmc_init_phy(struct nlm_hal_ext_phy *phy, int node)
+static int xmc_init_phy(struct nlm_hal_ext_phy *phy, int node)
 {
-	int bus = phy->ext_mdio_bus;
-	int phyaddr = phy->phy_addr;
+	unsigned int bus = phy->ext_mdio_bus;
+	unsigned int phyaddr = phy->phy_addr;
 	int int_inf = phy->inf;
-	uint16_t status;
+	uint16_t phymode, status;
 
-	PHY_DEBUG("[%s] for BCM5482: bus %d phyaddr %d interface %d\n", __func__, bus, phyaddr, int_inf);
-
-	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x04, 0x01); /* selector field */
-	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x00, 0); /* disable XLP AN */
-	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x00, 0x8000); /* soft reset */
-
-	/* XMC board has INTFSEL[1:0] = 01 which selects fiber and power down modes*/
+	PHY_DEBUG("%s: bus %d phyaddr %d interface %d\n", __func__, bus, phyaddr, int_inf);
 
 #ifdef NLM_HAL_XMC_SUPPORT
-	/* setup for SGMII-Copper mode */
-	status = 0xfc0c; /* SGMII mode, copper registers */
-	PHY_DEBUG("writing phyaddr %d reg 0x1c =0x%x \n", phyaddr, status);
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, status);
+	/* XMC board has INTFSEL[1:0] = 01 which selects fiber and power down modes,
+	 * so setup for SGMII-Copper mode.
+	 */
+	status = read_bcm_shadow_reg(node, bus, phyaddr, BCM_MODE_CTRL_REG);
+	/* Bits 3 and 9 are reserved, write as 1 and 0 */
+	status &= 0x1FC;	// Clear bit 0 for copper registers
+	status |= 0x00C;	// SGMII mode (bits 2:1 = 10)
+	write_bcm_shadow_reg(node, bus, phyaddr, BCM_MODE_CTRL_REG, status);
 
-	/* power up copper side*/
-	status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x0);
-	status &= ~(1<<11);
-	PHY_DEBUG("writing phyaddr %d reg 0 =0x%x \n", phyaddr, status);
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x0, status); /* Normal Operation */
+	/* Power up copper side */
+	status = phy_read(node, bus, phyaddr, MII_BMCR);
+	status &= ~BMCR_PDOWN;
+	PHY_DEBUG("writing phyaddr %d BMCR = 0x%04X\n", phyaddr, status);
+	phy_write(node, bus, phyaddr, MII_BMCR, status);
 	nlm_mdelay(100);
 #else
-	/* Read Mode Control register - register 0x1c shadow register 0x1f - bits 2:1 are phy mode */
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0x7c00);
-	status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c);
-	if((status & 0x6) == 2)			// Fiber mode - RGMII<->primary serdes in 1000BASE-X mode
-		phy->basex = 1;
-	else if((status & 0x6) != 4) {	// SGMII mode - Cu<->primary serdes in SGMII mode
-		nlm_print("Unsupported BCM5482 operating mode (phy %d)\n", phyaddr);
-		return;
+	/* Read Mode Control shadow register 0x1F - bits 2:1 are phy mode.
+	 * Verify we are in one of two supported modes (1 = SGMII-RGMII, 2 = SGMII-Copper).
+	 */
+	status = read_bcm_shadow_reg(node, bus, phyaddr, BCM_MODE_CTRL_REG);
+	phymode = (status & 0x006) >> 1;
+	if((phymode == 0) || (phymode == 3)) {
+		nlm_print("SGMII Interface %d: Unsupported BCM5482S operating mode %d (phy %d)\n",
+				int_inf, phymode, phyaddr);
+		return -1;
 	}
 #endif
 
 	/* Turn off Signal Detect Enable on 1000BASE-X side */
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0xd800);
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0xdc00);
+	write_bcm_shadow_reg(node, bus, phyaddr, BCM_PRI_SERDES_CTRL_REG, 0x000);
+	write_bcm_shadow_reg(node, bus, phyaddr, BCM_1000BASEX_CTRL2_REG, 0x000);
 
-	if(phy->basex == 0) {	// Assume SGMII<->Cu mode
-		/* Setup LED control */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0x8801); /* spare control 1, enable link led mode */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0xb4e5); /* LED Selector 1, LED3 off, LED1 SLAVE (LINK) */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0xb83e); /* LED Selector 2, LED2 ACTIVITY, LED4 off */
+	if(phymode == 2) {		// SGMII - Copper mode
+		/* Setup PHY LED control */
+		/* Set bit 1: Enable Link LED */
+		write_bcm_shadow_reg(node, bus, phyaddr, BCM_SPARE_CTRL1_REG, 0x001);
+		/* LED3 (bits 7:4) = 0xE (off), LED1 (bits 3:0) = 0x5 (SLAVE - link) */
+		write_bcm_shadow_reg(node, bus, phyaddr, BCM_LED_SEL1_REG, 0x0E5);
+		/* LED2 (bits 7:4) = 0x3 (ACTIVITY), LED4 (bits 3:0) = 0xE (off) */
+		write_bcm_shadow_reg(node, bus, phyaddr, BCM_LED_SEL2_REG, 0x03E);
 
-		/*switch to 1000Base-X registers mode*/
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0x7c00);
-		status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c);
-		/* Bits 3 and 9 are reserved, write as 1 and 0 */
-		status |= 1 | (1 << 3) | (1 << 15);
-		status &= ~(1 << 9);
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, status);
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x0, 0x100); /* Disable AN and power up SGMII side*/
-		nlm_mdelay(100);
+		/* Select copper registers (clear bit 0) */
+		status = read_bcm_shadow_reg(node, bus, phyaddr, BCM_MODE_CTRL_REG);
+		status &= 0x1FE;	// Bit 9 reserved, write as 0
+		status |= 0x008;	// Bit 3 reserved, write as 1
+		write_bcm_shadow_reg(node, bus, phyaddr, BCM_MODE_CTRL_REG, status);
 
-		status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x0);
-		status |= (1 << 12); /* Enable AN on SGMII side of PHY */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x0, status);
+		/* Setup AN advertising */
+		status = ADVERTISE_ALL | ADVERTISE_CSMA;
+		phy_write(node, bus, phyaddr, MII_ADVERTISE, status);
+		status = ADVERTISE_1000FULL | ADVERTISE_1000HALF;
+		phy_write(node, bus, phyaddr, MII_CTRL1000, status);
 
-		status = nlm_hal_mdio_read(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x0);
-		status |= (1 << 12); /* Enable XLP AN */
-		nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x0, status);
+		/* Enable and restart AN in MII control register */
+		status = BMCR_ANENABLE | BMCR_ANRESTART;
+		phy_write(node, bus, phyaddr, MII_BMCR, status);
+		PHY_DEBUG("%s: Phy %d wrote 0x%04x to copper MII control register\n",
+				__func__, phyaddr, status);
 
-	} else { // Assume RGMII<->1000BASE-X mode
+	} else {	// SGMII - RGMII mode
 		PHY_DEBUG("%s: Phy %d configuring for RGMII-1000BASE-X mode\n", __func__, phyaddr);
-
 		/* Disable LEDs */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0xb4ee); /* LED Selector 1, LED1 & 3 off */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0xb8ee); /* LED Selector 2, LED2 & 4 off */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0xbc09); /* LED GPIO Control - disable LED */
+		/* LED Selector 1 reg 0x0D: LED3 (bits 7:4), LED1 (bits 3:0) = 0xE (off) */
+		write_bcm_shadow_reg(node, bus, phyaddr, BCM_LED_SEL1_REG, 0xEE);
+		/* LED Selector 2 reg 0x0E: LED2 (bits 7:4), LED4 (bits 3:0) = 0xE (off) */
+		write_bcm_shadow_reg(node, bus, phyaddr, BCM_LED_SEL2_REG, 0xEE);
+		/* LED GPIO Control reg 0x0F: Disable LED2 & 1 (set bits 3 & 0) */
+		write_bcm_shadow_reg(node, bus, phyaddr, BCM_LED_GPIO_CTRL_REG, 0x09);
+
+		/* Switch to 1000BASE-X registers: Mode Control reg 0x1F set bit 0 */
+		status = read_bcm_shadow_reg(node, bus, phyaddr, BCM_MODE_CTRL_REG);
+		status &= 0x1FF;	// Bit 9 reserved, write as 0
+		status |= 0x009;	// Bit 3 reserved, write as 1
+		write_bcm_shadow_reg(node, bus, phyaddr, BCM_MODE_CTRL_REG, status);
+
+		/* Disable auto-negotiation, set 1000Mbps, full duplex */
+		phy_write(node, bus, phyaddr, MII_BMCR, BMCR_FULLDPLX | BMCR_SPEED1000);
 
 #if 1
 		/* Disable RGMII TX Delay (DSL Customer Ref Code enables RGMII-ID feature on BCM65500
-		 * RGMII interface).  Register 0x1C shadow 3 -> Clear bit 9, bits 8:0 are reserved,
-		 * write as 0.  Alternative is to disable this feature there: BCM65500 register
-		 * 0x3500 - set bit 1.
+		 * RGMII interface). Clock Alignment Control reg 0x03 -> Clear bit 9, bits 8:0 are
+		 * reserved, write as 0. Alternative is to disable this feature in the DSL ref code:
+		 * BCM65500 register 0x3500 - set bit 1.
 		 */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0x8c00);
-		PHY_DEBUG("%s: Disabling RGMII TX Delay\n");
+		write_bcm_shadow_reg(node, bus, phyaddr, BCM_CLK_ALIGN_CTRL_REG, 0x000);
+		PHY_DEBUG("%s: Phy %d disabling RGMII TX Delay\n", __func__, phyaddr);
 #endif
 #if 0
 		/* Disable RGMII RX Delay: Register 0x18 shadow 7 -> Clear bit 8 */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x18, 0x7007);
-		status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x18);
+		phy_write(node, bus, phyaddr, BCM_SHADOW_REG_18, 0x7007);
+		status = phy_read(node, bus, phyaddr, BCM_SHADOW_REG_18);
 		status |= (1 << 15);
-		status &= ~((1 << 10) | (1 << 8));	/* Bit 10 reserved - write as 0 */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x18, status);
-		PHY_DEBUG("%s: Disabling RGMII RX Delay\n");
+		status &= ~((1 << 10) | (1 << 8));	// Bit 10 reserved - write as 0
+		phy_write(node, bus, phyaddr, BCM_SHADOW_REG_18, status);
+		PHY_DEBUG("%s: Phy %d disabling RGMII RX Delay\n", __func__, phyaddr);
 #endif
-		/* Disable auto-negotiation, set FDX */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x0, 0x140);
+
 	}
 
-	return;
+	return 0;
 }
 
 /**
@@ -1163,43 +1201,51 @@ static void xmc_init_phy(struct nlm_hal_ext_phy *phy, int node)
 * @param [in] node Node number
 *
 * @return
-* 	- none
+* 	- 0 if the phy was successfully initialized
+*   - -1 if the phy was not successfully initialized
 *
 * @ingroup hal_nae
 *
 */
-static void bcm_init_phy(struct nlm_hal_ext_phy *phy, int node)
+static int bcm_init_phy(struct nlm_hal_ext_phy *phy, int node)
 {
-	int bus = phy->ext_mdio_bus;
-	int phyaddr = phy->phy_addr;
-	int int_inf = phy->inf;
+	unsigned int bus = phy->ext_mdio_bus;
+	unsigned int phyaddr = phy->phy_addr;
 	uint16_t status;
-	PHY_DEBUG("BCM_INIT_PHY\n");
 
-	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x04, 0x01); /* selector field */
-	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x00, 0); /* disable XLP AN */
-	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x00, 0x8000); /* soft reset */
+	PHY_DEBUG("%s: bus %d phyaddr %d interface %d\n", __func__, bus, phyaddr, phy->inf);
 
-#if 0
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, int_inf,  0x1c, 0x7800);
-	status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, int_inf, 0x1C);
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, int_inf,  0x1c, (status | (1<<15)| (0x1)));
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, int_inf,  0x1c, 0x7800);
-	status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, int_inf, 0x1C);
-#endif
+	/* Turn off Signal Detect Enable on 1000BASE-X side */
+	write_bcm_shadow_reg(node, bus, phyaddr, BCM_PRI_SERDES_CTRL_REG, 0x000);
+	write_bcm_shadow_reg(node, bus, phyaddr, BCM_1000BASEX_CTRL2_REG, 0x000);
 
-	/*switch to 1000Base-X registers mode*/
-	/*refer mode control register in broadcom datasheet*/
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr,  0x1c, 0x7c00);
-	status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1C);
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr,  0x1c, (status | (1<<15)| (0x1)));
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr,  0x0, 0x100 ); /*Disable AN*/
+	/* Setup PHY LED control */
+	/* Set bit 1: Enable Link LED */
+	write_bcm_shadow_reg(node, bus, phyaddr, BCM_SPARE_CTRL1_REG, 0x001);
+	/* LED3 (bits 7:4) = 0xE (off), LED1 (bits 3:0) = 0x5 (SLAVE - link) */
+	write_bcm_shadow_reg(node, bus, phyaddr, BCM_LED_SEL1_REG, 0x0E5);
+	/* LED2 (bits 7:4) = 0x3 (ACTIVITY), LED4 (bits 3:0) = 0xE (off) */
+	write_bcm_shadow_reg(node, bus, phyaddr, BCM_LED_SEL2_REG, 0x03E);
 
-	status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr,  0x0);
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr,  0x0, status | (1<<12) ); /*Enable AN on SGMMII side of PHY*/
-	status = nlm_hal_mdio_read(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf,  0x0);
-	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x00, status|(1<<12)); /* Enable XLP AN */
-	return;
+	/* Select copper registers (clear bit 0) */
+	status = read_bcm_shadow_reg(node, bus, phyaddr, BCM_MODE_CTRL_REG);
+	status &= 0x1FE;	// Bit 9 reserved, write as 0
+	status |= 0x008;	// Bit 3 reserved, write as 1
+	write_bcm_shadow_reg(node, bus, phyaddr, BCM_MODE_CTRL_REG, status);
+
+	/* Setup AN advertising */
+	status = ADVERTISE_ALL | ADVERTISE_CSMA;
+	phy_write(node, bus, phyaddr, MII_ADVERTISE, status);
+	status = ADVERTISE_1000FULL | ADVERTISE_1000HALF;
+	phy_write(node, bus, phyaddr, MII_CTRL1000, status);
+
+	/* Enable and restart AN in MII control register */
+	status = BMCR_ANENABLE | BMCR_ANRESTART;
+	phy_write(node, bus, phyaddr, MII_BMCR, status);
+	PHY_DEBUG("%s: Phy %d wrote 0x%04x to copper MII control register\n",
+			__func__, phyaddr, status);
+
+	return 0;
 }
 
 /**
@@ -1209,103 +1255,127 @@ static void bcm_init_phy(struct nlm_hal_ext_phy *phy, int node)
 * @param [in] node Node number
 *
 * @return
-* 	- none
+* 	- 0 if the phy was successfully initialized
+*   - -1 if the phy was not successfully initialized
 *
 * @ingroup hal_nae
 *
 */
-static void mvl_init_phy(struct nlm_hal_ext_phy *phy, int node)
+static int mvl_init_phy(struct nlm_hal_ext_phy *phy, int node)
 {
-	int bus = phy->ext_mdio_bus;
-	int phyaddr = phy->phy_addr;
-	int int_inf = phy->inf;
+	unsigned int bus = phy->ext_mdio_bus;
+	unsigned int phyaddr = phy->phy_addr;
 
-	/* device initialization */
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 22, 0x02);
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 16, 0x0288);
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 22, 0x8000);
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x00, 0x8000);
+	PHY_DEBUG("%s: bus %d phyaddr %d interface %d\n", __func__, bus, phyaddr, phy->inf);
 
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 22, 0x02); /* page 2 */
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 26, 0x8000); /* AN bypass enable */
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0, 0); /* Disable MAC side AN */
+	/* Device initialization required per Marvell datasheet pg. 25. Note MVL phy
+	 * permanently configured for preamble suppression thus an idle MDIO clock
+	 * cycle is required between back-to-back operations. Do not remove delays.
+	 */
+	/* Select page 2 */
+	phy_write(node, bus, phyaddr, MVL_PAGE_SEL_REG, 0x0002);
+	nae_ext_mdio_wait();
+	/* Set mode = Copper (bits 9:7 = 0x5), disable SGMII power down (bit 3) */
+	phy_write(node, bus, phyaddr, MVL_CTRL1_REG, 0x0288);
+	nae_ext_mdio_wait();
+	/* Enable AN Bypass (allow link if link partner doesn't support AN - bit 15) */
+	phy_write(node, bus, phyaddr, MVL_CTRL2_REG, 0x8000);
+	nae_ext_mdio_wait();
+	/* Select page 0, auto page select (reg 22 bit 15) */
+	phy_write(node, bus, phyaddr, MVL_PAGE_SEL_REG, 0x8000);
+	nae_ext_mdio_wait();
+	/* Enable Copper Energy Detect mode 2 (bits 9:8) */
+	phy_write(node, bus, phyaddr, MVL_CTRL1_REG, 0x6360);
+	nae_ext_mdio_wait();
+	/* Setup AN advertising */
+	phy_write(node, bus, phyaddr, MII_ADVERTISE, ADVERTISE_ALL | ADVERTISE_CSMA);
+	nae_ext_mdio_wait();
+	phy_write(node, bus, phyaddr, MII_CTRL1000, ADVERTISE_1000FULL | ADVERTISE_1000HALF);
+	nae_ext_mdio_wait();
+	/* Soft reset and enable AN */
+	phy_write(node, bus, phyaddr, MII_BMCR, BMCR_RESET | BMCR_ANENABLE);
 
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 22, 0x00); /* page 0 */
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0, 0xb000); /* Enable AN, Soft reset */
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0, 0x9140); /* Enable AN, Soft reset */
-
-	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x04, 0x01); /* selector field */
-	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x00, 0x4000); /* disable XLP AN */
-	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x00, 0x8000); /* soft reset */
+    return 0;
 }
 
 /**
-* @brief nlm_hal_ext_phy_an function enables auto-negotiation on an interface.
+* @brief nlm_hal_ext_phy_an function restarts auto-negotiation on an interface.
 *
 * @param [in] node Node number
-* @param [in] inf Interface on which to enable auto-negotiation
+* @param [in] inf Interface on which to restart auto-negotiation
 *
 * @return
-* 	- none
+* 	- 0 if auto-negotiation completed successfully
+*   - -1 if auto-negotiation failed at the PHY
+*   - -2 if auto-negotiation failed at the XLP
 *
 * @ingroup hal_nae
 *
 */
-void nlm_hal_ext_phy_an(int node, int inf)
+int nlm_hal_ext_phy_an(int node, int inf)
 {
-	struct nlm_hal_ext_phy *this_phy=NULL;
-	this_phy = get_phy_info(inf);
-	if(!this_phy)
-		return;
-	this_phy->start_phy_an(this_phy, node);
-	return;
-}
-
-/**
-* @brief xmc_start_an function enables auto-negotiation on XMC board external BROADCOM PHY.
-*
-* @param[in] phy	:nlm_hal_ext_phy struct pointing to the BROADCOM PHY
-* @param [in] node Node number
-*
-* @return
-* 	- none
-*
-* @ingroup hal_nae
-*
-*/
-static void xmc_start_an(struct nlm_hal_ext_phy *phy, int node)
-{
+#ifdef WAIT_FOR_AN_COMPLETE
+	int count = 0;
 	uint16_t status;
-	int count;
-	int int_inf = phy->inf;
+	unsigned int int_inf, bus;
+#endif
+	unsigned int phyaddr;
+	struct nlm_hal_ext_phy *this_phy=NULL;
 
-	if(phy->basex)
-		return;
+	this_phy = get_phy_info(inf);
+	if(!this_phy) return -1;
+	if(this_phy->phy_mode) return -1;	// 1000BASE-X mode - no AN
 
-	nlm_print("Starting auto-negotiation on port %d, external mdio bus %d, phy address %d\n", phy->inf, phy->ext_mdio_bus, phy->phy_addr);
+	phyaddr = this_phy->phy_addr;
+	this_phy->start_phy_an(this_phy, node);
 
-	status = nlm_hal_mdio_read(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf,  0x0);
-	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x00, status|(1<<9)); /* Restart XLP AN */
-	/*Wait for XLP<->SGMII-PHY AN to be OK*/
-	count=0;
+#ifdef WAIT_FOR_AN_COMPLETE
+	int_inf = this_phy->inf;
+	bus = this_phy->ext_mdio_bus;
+
+	/* Allow up to five seconds for phy AN to complete */
 	do {
 		nlm_mdelay(100);
-		count++;
-		status = nlm_hal_mdio_read(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x1);
-		if(status & (1<<5)){ /* check for autonegotiation to be completed */
-			PHY_DEBUG("Autonegotiation is OK with PHY-SGMII =0x%x \n", int_inf);
-			return;
+		status = phy_read(node, bus, phyaddr, MII_BMSR);
+		if(status & BMSR_ANEGCOMPLETE) {
+			PHY_DEBUG("Phy AN OK, count = %d\n", count);
+			break;
 		}
-		status = nlm_hal_mdio_read(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf,  0x0);
-		nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x00, status|(1<<9)); /* Restart XLP AN */
+		count++;
+	} while(count < 50);
+	if(count == 50) {
+		nlm_print("Port %d Phy AN failed\n", int_inf);
+		return -1;
+	}
+
+	/* Restart XLP AN */
+	status = nlm_hal_mdio_read(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, MII_BMCR);
+	status |= BMCR_ANRESTART;
+	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, MII_BMCR, status);
+
+	/* Wait for XLP<->SGMII-PHY AN to be OK - this should be almost instantaneous */
+	PHY_DEBUG("Restarting XLP AN for port %d\n", int_inf);
+	count = 0;
+	do {
+		nlm_mdelay(1);
+		status = nlm_hal_mdio_read(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, MII_BMSR);
+		if(status & BMSR_ANEGCOMPLETE) {
+			PHY_DEBUG("XLP AN OK, count = %d\n", count);
+			return 0;
+		}
+		count++;
 	} while(count < 50);
 
-	nlm_print("Autonegotiation is NOT OK for PHY-SGMII inf=0x%x int_inf=0x%x\n", phy->phy_addr, int_inf);
-	return;
+	PHY_DEBUG("Port %d XLP AN failed\n", int_inf);
+
+	return -2;
+#else
+	return 0;
+#endif
 }
 
 /**
-* @brief bcm_start_an function enables auto-negotiation on an external BROADCOM PHY.
+* @brief bcm_start_an function restarts auto-negotiation on external BROADCOM PHY
 *
 * @param [in] phy nlm_hal_ext_phy struct pointing to the BROADCOM PHY
 * @param [in] node Node number
@@ -1316,36 +1386,21 @@ static void xmc_start_an(struct nlm_hal_ext_phy *phy, int node)
 * @ingroup hal_nae
 *
 */
-static void bcm_start_an(struct nlm_hal_ext_phy *phy, int node)
+static void bcm_restart_an(struct nlm_hal_ext_phy *phy, int node)
 {
-	uint16_t status;
-	int count;
-	int int_inf = phy->inf;
+	uint16_t val;
+	unsigned int phyaddr = phy->phy_addr;
+	unsigned int bus = phy->ext_mdio_bus;
 
-	nlm_print("Starting auto-negotiation on port %d, external mdio bus %d, phy address %d\n", phy->inf, phy->ext_mdio_bus, phy->phy_addr);
-
-	status = nlm_hal_mdio_read(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf,  0x0);
-	nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x00, status|(1<<9)); /* Restart XLP AN */
-	/*Wait for XLP<->SGMII-PHY AN to be OK*/
-	count=0;
-	do {
-		nlm_mdelay(100);
-		count++;
-		status = nlm_hal_mdio_read(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x1);
-		if(status & (1<<5)){ /* check for autonegotiation to be completed */
-			PHY_DEBUG("Autonegotiation is OK with PHY-SGMII =0x%x \n", int_inf);
-			return;
-		}
-		status = nlm_hal_mdio_read(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf,  0x0);
-		nlm_hal_mdio_write(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 0x00, status|(1<<9)); /* Restart XLP AN */
-	} while(count < 50);
-
-	nlm_print("Autonegotiation is NOT OK for PHY-SGMII inf=0x%x int_inf=0x%x\n", phy->phy_addr, int_inf);
-	return;
+	val = phy_read(node, bus, phyaddr, MII_BMCR);
+	val |= BMCR_ANENABLE | BMCR_ANRESTART;
+	phy_write(node, bus, phyaddr, MII_BMCR, val);
+	PHY_DEBUG("%s: Phy %d wrote 0x%04x to control register\n", __func__,
+			phyaddr, val);
 }
 
 /**
-* @brief mvl_start_an function enables auto-negotiation on an external MARVELL PHY.
+* @brief mvl_restart_an function restarts auto-negotiation on an external MARVELL PHY.
 *
 * @param [in] phy nlm_hal_ext_phy struct pointing to the MARVELL PHY
 * @param [in] node Node number
@@ -1356,330 +1411,234 @@ static void bcm_start_an(struct nlm_hal_ext_phy *phy, int node)
 * @ingroup hal_nae
 *
 */
-static void mvl_start_an(struct nlm_hal_ext_phy *phy, int node)
+static void mvl_restart_an(struct nlm_hal_ext_phy *phy, int node)
 {
-	int i;
-	uint16_t val, status, extstatus;
-	int phyaddr = phy->phy_addr;
-	int bus = phy->ext_mdio_bus;
+	uint16_t val;
+	unsigned int phyaddr = phy->phy_addr;
+	unsigned int bus = phy->ext_mdio_bus;
 
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 22, 0);
-	val = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0);
-	val |= 0x1200;
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0, val);
-
-	nlm_print("Starting auto-negotiation on port %d, external mdio bus %d, phy address %d\n", phy->inf, bus, phyaddr);
-
-	i=0;
-	do {
-		status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 1);
-		extstatus = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 17);
-		if (((status & 0x0024) == 0x0024) && (extstatus & 0x0400)) {
-			PHY_DEBUG("bus:%d phy:%d auto negotiation ok: 0x%X 0x%X time(ms) %d\n", bus, phyaddr, status, extstatus, i);
-			break;
-		}
-		nlm_mdelay(1);
-		i++;
-	}while(i<5000);
-	if(i==5000) PHY_DEBUG("bus:%d phy:%d auto negotiation timeout: 0x%X 0x%X\n", bus, phyaddr, status, extstatus);
+	val = phy_read(node, bus, phyaddr, MII_BMCR);
+	val |= BMCR_ANENABLE | BMCR_ANRESTART;
+	nae_ext_mdio_wait();
+	phy_write(node, bus, phyaddr, MII_BMCR, val);
+	PHY_DEBUG("%s: Phy %d wrote 0x%04x to control register\n", __func__,
+			phyaddr, val);
 }
+
+/**
+* @brief nlm_hal_status_ext_phy function fetches link status info from an external phy
+*
+* @param [in] node Node number
+* @param [in] inf Interface number to query
+* @param [in] mii_info Pointer to struct nlm_hal_mii_info to populate
+* @param [out] link_stat Link status (up or down)
+* @param [out] media_detect Cable/media detected status
+* @param [out] speed Link speed
+* @param [out] duplex Full(1) or half(0) duplex
+*
+* @return
+* 	- 1 if link up, 0 if link down
+*
+* @ingroup hal_nae
+*
+*/
 
 int nlm_hal_status_ext_phy(int node, int inf, struct nlm_hal_mii_info* mii_info)
 {
 	struct nlm_hal_ext_phy *this_phy=NULL;
 	this_phy = get_phy_info(inf);
-	if(!this_phy)
-		return 0;
+	if(!this_phy) return 0;
+
 	return this_phy->phy_get_status(this_phy, mii_info, node);
-}
-
-/**
-* @brief xmc_get_phy_status function returns the status of an interface from the XMC external BROADCOM PHY.
-*
-* @param[in] phy		:nlm_hal_ext_phy struct pointing to the BROADCOM PHY
-* @param[out] speed		:Link speed
-* @param[out] duplex	:Link duplex status
-* @param [in] node Node number
-*
-* @return
-* 	- 1 - Link up, 0 - Link Down
-*
-* @ingroup hal_nae
-*
-*/
-static int xmc_get_phy_status(struct nlm_hal_ext_phy *phy, struct nlm_hal_mii_info* mii_info, int node)
-{
-	uint16_t status, aux_status;
-	int phyaddr = phy->phy_addr;
-	int bus = phy->ext_mdio_bus;
-	int int_inf = phy->inf;
-
-	mii_info->phyaddr=phyaddr;
-
-	if(phy->basex == 0) {
-		/*switch to Copper registers mode*/
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0x7c00);
-		status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c);
-		/* Bits 3 and 9 are reserved, write as 1 and 0 */
-		status |= (1 << 3) | (1 << 15);
-		status &= ~((1 << 9) | 1);
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, status);
-
-		/* check the status */
-		aux_status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x19);
-		switch ((aux_status>>8) & 0x7){
-			case 0x7:
-				mii_info->speed = SPEED_1000M;
-				mii_info->duplex = 1;
-			break;
-
-			case 0x6:
-				mii_info->speed = SPEED_1000M;
-				mii_info->duplex = 0;
-			break;
-
-			case 0x5:
-				mii_info->speed = SPEED_100M;
-				mii_info->duplex = 1;
-			break;
-
-			case 0x3:
-				mii_info->speed = SPEED_100M;
-				mii_info->duplex = 0;
-			break;
-
-			case 0x2:
-				mii_info->speed = SPEED_10M;
-				mii_info->duplex = 1;
-			break;
-
-			case 0x1:
-				mii_info->speed = SPEED_10M;
-				mii_info->duplex = 0;
-			break;
-
-			default:
-				nlm_print("Unknown operating speed, auxstatus = 0x%04x\n", aux_status);
-			break;
-		}
-
-		status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1);
-		status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1);
-		if(status & (1<<2)){
-			mii_info->link_stat = LINK_UP;
-			PHY_DEBUG("Phy %d link is up: 0x%x\n", phyaddr, status);
-		}else{
-			mii_info->link_stat = LINK_DOWN;
-			PHY_DEBUG("Phy %d Link is down: 0x%x\n", phyaddr, status);
-		}
-
-	} else {
-		mii_info->duplex = 1;
-		mii_info->speed = SPEED_1000M;
-
-		/* Switch to Fiber registers mode */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0x7c00);
-		status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c);
-		/* Bits 3 and 9 are reserved, write as 1 and 0 */
-		status |= 1 | (1 << 3) | (1 << 15);
-		status &= ~(1 << 9);
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, status);
-
-		/* Read status register 0x1 */
-		status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1);
-		status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1);
-		PHY_DEBUG("%s: Phy %d 1000BASE-X MII Status register value = 0x%04x\n", __func__, phyaddr, status);
-		if(status & (1<<2)){
-			mii_info->link_stat = LINK_UP;
-			PHY_DEBUG("Phy %d link is up: 0x%x\n", phyaddr, status);
-		}else{
-			mii_info->link_stat = LINK_DOWN;
-			PHY_DEBUG("Phy %d Link is down: 0x%x\n", phyaddr, status);
-		}
-
-#ifdef INCLUDE_PHY_DEBUG
-		/* Read aux status shadow register 0x1c */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0xf000);
-		aux_status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c);
-		nlm_print("%s: Phy %d 1000BASE-X Aux Status register value = 0x%04x\n", __func__, phyaddr, aux_status);
-
-		/* Read expansion register operating mode */
-		nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x17, 0xf42);
-		aux_status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x15);
-		nlm_print("%s: Phy %d Expansion register 0x42 value = 0x%04x\n", __func__, phyaddr, aux_status);
-#endif
-
-		/* Read XLP PCS status register to clear any previously latched bits */
-		status = nlm_hal_mdio_read(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 1);
-		status = nlm_hal_mdio_read(node, NLM_HAL_INT_MDIO, 0, BLOCK_7, LANE_CFG, int_inf, 1);
-		NAE_DEBUG("%s: XLP PCS MII Status Register val = 0x%04x\n", __func__, status);
-		if(status & 0x10)
-			nlm_print("XLP port %d PCS Remote Fault is set\n", int_inf);
-		if(status & 0x4) {
-			NAE_DEBUG("%s: XLP port %d PCS Link Status is up\n", __func__, int_inf);
-		} else {
-			nlm_print("XLP port %d PCS Link Status is down\n", int_inf);
-			mii_info->link_stat = LINK_DOWN;
-		}
-
-#ifdef INCLUDE_NAE_DEBUG
-		nlm_print("%s: XLP SerDes lane %d status = 0x%08X\n", __func__, int_inf % 4,
-				nlm_hal_read_mac_reg(node, int_inf >> 2, PHY, PHY_LANE_0_STATUS + (int_inf % 4)));
-		nlm_print("    Bit 11 = PMA controller ready, 9 = SGMII PCS sync, 6 = TX clock stable,\n");
-		nlm_print("         5 = far end absent, 4 = transmit detect, 0 = RX clock stable\n");
-
-		if(is_nlm_xlp2xx()) {
-			nlm_print("%s: XLP SerDes quad PMA status = 0x%08X\n", __func__,
-					nlm_hal_read_mac_reg(node, int_inf >> 2, PHY, PMA2P0_STATUS));
-			nlm_print("    Bits 27:24 = RX CDR lock, 23:20 = signal detect, 17 = synth status\n");
-			nlm_print("         16 = synth ready, 15:12 = RX status, 11:8 = RX ready\n");
-			nlm_print("         7:4 = TX status, 3:0 = TX ready\n");
-		}
-#endif
-	}
-
-	return (mii_info->link_stat == LINK_UP);
 }
 
 /**
 * @brief bcm_get_phy_status function returns the status of an interface from the external BROADCOM PHY.
 *
-* @param [in] phy nlm_hal_ext_phy struct pointing to the BROADCOM PHY
-* @param [out] speed Link speed
-* @param [out] duplex Link duplex status
+* @param [in] phy Pointer to struct nlm_hal_ext_phy for the BROADCOM PHY
+* @param [in] mii_info Pointer to nlm_hal_mii_info struct to hold Link info
 * @param [in] node Node number
+* @param [out] link_stat Link status (up or down)
+* @param [out] media_detect Cable/media detected status
+* @param [out] speed Link speed
+* @param [out] duplex Full(1) or half(0) duplex
 *
 * @return
-* 	- 1 - Link up, 0 - Link Down
+* 	- 1 if link up (or media detected and AN in process), 0 if link down
 *
 * @ingroup hal_nae
 *
 */
-static int bcm_get_phy_status(struct nlm_hal_ext_phy *phy, struct nlm_hal_mii_info* mii_info, int node)
+static int bcm_get_phy_status(struct nlm_hal_ext_phy *phy,
+		struct nlm_hal_mii_info* mii_info, int node)
 {
 	uint16_t status, aux_status;
-	int phyaddr = phy->phy_addr;
-	int bus = phy->ext_mdio_bus;
+	unsigned int phyaddr = phy->phy_addr;
+	unsigned int bus = phy->ext_mdio_bus;
+
 	mii_info->phyaddr=phyaddr;
 
-	bcm_start_an(phy, node);
+	/* Logic:
+	 * 1) Check MII link state, populate mii_info. If up, get speed/duplex info and return 1
+	 * 2) Check for media (energy detect), populate mii_info. If no media, return 0
+	 * 3) Check if AN state. If AN not completed, return 1
+	 * 4) Return 0
+	 */
 
-	/*switch to Copper registers mode*/
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, 0x7c00);
-	status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c);
-	/* Bits 3 and 9 are reserved, write as 1 and 0 */
-	status |= (1 << 3) | (1 << 15);
-	status &= ~((1 << 9) | 1);
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1c, status);
-	aux_status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x19);
-	switch ((aux_status>>8) & 0x7){
+	phy_read(node, bus, phyaddr, MII_BMSR);
+	status = phy_read(node, bus, phyaddr, MII_BMSR);
+	PHY_DEBUG("%s: Port %d phy %d MII status = 0x%x\n", __func__,
+			phy->inf, phyaddr, status);
+
+	/* If link is up, get speed and duplex from aux_status, populate mii_info */
+	if(status & BMSR_LSTATUS) {
+		mii_info->link_stat = 1;
+		mii_info->media_detect = 1;
+		aux_status = phy_read(node, bus, phyaddr, BCM_AUX_STATUS_REG);
+		PHY_DEBUG("  Link is up, MII Status = 0x%04x, aux status = 0x%04x\n",
+				status, aux_status);
+		switch ((aux_status >> 8) & 0x7) {
 		case 0x7:
 			mii_info->speed = SPEED_1000M;
 			mii_info->duplex = 1;
 		break;
-
 		case 0x6:
 			mii_info->speed = SPEED_1000M;
 			mii_info->duplex = 0;
 		break;
-
 		case 0x5:
 			mii_info->speed = SPEED_100M;
 			mii_info->duplex = 1;
 		break;
-
 		case 0x3:
 			mii_info->speed = SPEED_100M;
 			mii_info->duplex = 0;
 		break;
-
 		case 0x2:
 			mii_info->speed = SPEED_10M;
 			mii_info->duplex = 1;
 		break;
-
 		case 0x1:
 			mii_info->speed = SPEED_10M;
 			mii_info->duplex = 0;
 		break;
-
 		default:
-			nlm_print("Unknown operating speed\n");
-		break;
+			mii_info->speed = SPEED_UNKNOWN;
+			mii_info->duplex = 0;
+			nlm_print("Port %d unknown operating speed, aux status = 0x%04x\n",
+					phy->inf, aux_status);
+		}
+		PHY_DEBUG("  Link is up, MII Status = 0x%04x, aux status = 0x%04x\n",
+				status, aux_status);
+		return 1;
 	}
 
-#ifdef INCLUDE_PHY_DEBUG
-	if(mii_info->speed==SPEED_1000M)
-		nlm_print("Configured with Speed 1000M");
-	if(mii_info->speed==SPEED_100M)
-		nlm_print("Configured with Speed 100M");
-	if(mii_info->speed==SPEED_10M)
-		nlm_print("Configured with Speed 10M");
+	PHY_DEBUG("  Link is down, MII status = 0x%x\n", status);
+	mii_info->link_stat = 0;
+	mii_info->speed = SPEED_UNKNOWN;
+	mii_info->duplex = 0;
 
-	((mii_info->duplex == 1) ? nlm_print(" Full duplex\n"):nlm_print(" Half duplex\n"));
-#endif
-	status = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 0x1);
-	if(status & (1<<2)){
-		mii_info->link_stat = LINK_UP;
-		nlm_print("bus:%d phy:%d Link is up : %x\n", bus, phyaddr, status);
-	}else{
-		mii_info->link_stat = LINK_DOWN;
-		nlm_print("bus:%d phy:%d Link is down : %x\n", bus, phyaddr, status);
+	/* Energy detected on copper interface? Phy mode control shadow reg 0x1F bit 5 */
+	aux_status = read_bcm_shadow_reg(node, bus, phyaddr, BCM_MODE_CTRL_REG);
+	PHY_DEBUG("  Phy mode control = 0x%x\n", aux_status);
+	if (!(aux_status & 0x0020)) {
+		PHY_DEBUG("  No media detected\n");
+		mii_info->media_detect = 0;
+		return 0;
+	}
+	mii_info->media_detect = 1;
+
+	/* AN in process? Check status bit 5 - 1 means AN is complete. If AN in process and
+	 * media detected, assume AN will succeed and return 1.
+	 */
+	if(!(status & BMSR_ANEGCOMPLETE)) {
+		PHY_DEBUG("  AN in progress\n");
+		return 1;
 	}
 
-	return mii_info->link_stat;
+	return 0;
 }
 
 /**
 * @brief mvl_get_phy_status function returns the status of an interface from the external MARVELL PHY.
 *
 * @param [in] phy nlm_hal_ext_phy struct pointing to the MARVELL PHY
-* @param [out] speed Link speed
-* @param [out] duplex Link duplex status
+* @param [in] mii_info Pointer to nlm_hal_mii_info struct to hold Link info
 * @param [in] node Node number
+* @param [out] link_stat Link status (up or down)
+* @param [out] media_detect Cable/media detected status
+* @param [out] speed Link speed
+* @param [out] duplex Full(1) or half(0) duplex
 *
 * @return
-* 	- 1 - Link up, 0 - Link Down
+* 	- 1 if link up (or media detected and AN in process), 0 if link down
 *
 * @ingroup hal_nae
 *
 */
-static int mvl_get_phy_status(struct nlm_hal_ext_phy *phy, struct nlm_hal_mii_info* mii_info, int node)
+#define MVL_EXT_STATUS		17
+static int mvl_get_phy_status(struct nlm_hal_ext_phy *phy,
+		struct nlm_hal_mii_info* mii_info, int node)
 {
-	uint16_t extstatus;
-	int phyaddr = phy->phy_addr;
-	int bus = phy->ext_mdio_bus;
+	uint16_t status, extstatus;
+	unsigned int phyaddr = phy->phy_addr;
+	unsigned int bus = phy->ext_mdio_bus;
 
-	nlm_hal_mdio_write(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 22, 0);
-	extstatus = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, phyaddr, 17);
 	mii_info->phyaddr=phyaddr;
 
-	if (extstatus & 0x0400) {
-		mii_info->link_stat = LINK_UP;
-		mii_info->speed = (extstatus >> 14) & 0x3;	// Only set if link is up
+	/* Logic:
+	 * 1) Check MII link state, populate mii_info. If up, get speed/duplex info and return 1
+	 * 2) Check for media (energy detect), populate mii_info. If no media, return 0
+	 * 3) Check if AN state. If AN not completed, return 1
+	 * 4) Return 0
+	 */
+
+	/* Note the below two reads will be issued back-to-back without an idle
+	 * in-between. Should be OK though since both are the same operation. If
+	 * one read fails, we just get stale (latched) status bits instead of the
+	 * right now status.
+	 */
+	phy_read(node, bus, phyaddr, MII_BMSR);
+	status = phy_read(node, bus, phyaddr, MII_BMSR);
+	PHY_DEBUG("%s: Port %d phy %d MII Status = 0x%04x\n", __func__,
+			phy->inf, phyaddr, status);
+
+	/* If link is up, get speed and duplex from ext_status, populate mii_info */
+	if (status & BMSR_LSTATUS) {
+		mii_info->link_stat = 1;
+		mii_info->media_detect = 1;
+		extstatus = phy_read(node, bus, phyaddr, MVL_EXT_STATUS);
+		mii_info->speed =  (extstatus >> 14) & 0x3;
 		mii_info->duplex = (extstatus >> 13) & 0x1;
-#ifdef INCLUDE_PHY_DEBUG
-		nlm_print("bus:%d phy:%d Link is up: 0x%X speed ", bus, phyaddr, extstatus);
-		if(mii_info->speed == SPEED_1000M)
-			nlm_print("1000Mbps");
-		else if(mii_info->speed == SPEED_100M)
-			nlm_print("100Mbps");
-		else if(mii_info->speed == SPEED_10M)
-			nlm_print("10Mbps");
-		if(mii_info->duplex)
-			nlm_print(" full duplex\n");
-		else
-			nlm_print(" half duplex\n");
-#endif
+		PHY_DEBUG("  Link is up, MII Status = 0x%04x, ext status = 0x%04x\n",
+				status, extstatus);
 		return 1;
 	}
-	else {
-		mii_info->link_stat = LINK_DOWN;
-		mii_info->speed = SPEED_100M;	// Set a default if link is down
-		mii_info->duplex = 1;
-		PHY_DEBUG("bus:%d phy:%d Link is down: 0x%X\n",bus, phyaddr, extstatus);
+
+	PHY_DEBUG("  Link is down, MII Status = 0x%04x\n", status);
+	mii_info->link_stat = 0;
+	mii_info->speed = SPEED_UNKNOWN;
+	mii_info->duplex = 0;
+
+	/* Media attached? Check extstatus bit 4 - 1 means cable detached */
+	extstatus = phy_read(node, bus, phyaddr, MVL_EXT_STATUS);
+	PHY_DEBUG("  Extended status = 0x%x\n", extstatus);
+	if(extstatus & 0x0010) {
+		PHY_DEBUG("  No media detected\n");
+		mii_info->media_detect = 0;
 		return 0;
 	}
+	mii_info->media_detect = 1;
+
+	/* AN in process? Check status bit 5 - 1 means AN is complete. If AN in process and
+	 * media detected, assume AN will succeed and return 1.
+	 */
+	if(!(status & BMSR_ANEGCOMPLETE)) {
+		PHY_DEBUG("  AN in progress\n");
+		return 1;
+	}
+
+	return 0;
 }
 
 /**
@@ -1694,7 +1653,7 @@ static int mvl_get_phy_status(struct nlm_hal_ext_phy *phy, struct nlm_hal_mii_in
 * @ingroup hal_nae
 *
 */
-struct nlm_hal_ext_phy* get_phy_info(int inf)
+struct nlm_hal_ext_phy *get_phy_info(int inf)
 {
 	struct nlm_hal_ext_phy *phy_info = NULL;
 	/*search through scanned and registered phys*/
@@ -1714,36 +1673,39 @@ struct nlm_hal_ext_phy* get_phy_info(int inf)
 *
 * @param [in] node Node number
 * @param [in] inf Interface number
-* @param [out] hw_portid PHY address of the external PHY attached to inf
 *
 * @return
-* 	- none
+* 	- pointer to struct nlm_hal_ext_phy for this phy for success
+*   - NULL for failure
 *
 * @ingroup hal_nae
 *
 */
-void register_phy(int node, int inf, int* hw_portid)
+struct nlm_hal_ext_phy *register_phy(int node, uint8_t inf)
 {
 	nlm_nae_config_ptr nae_cfg = nlm_node_cfg.nae_cfg[node];
-	int i = 0;
-	int phy_addr;
-	for(i=0; nae_cfg->num_ports; i++)
-		if(nae_cfg->ports[i].hw_port_id == inf)
+	int i;
+	uint8_t phy_addr = 0xFF;
+	uint8_t phy_mode = 0;
+	for(i = 0; i < nae_cfg->num_ports; i++)
+		if(nae_cfg->ports[i].hw_port_id == inf) {
+			phy_addr = nae_cfg->ports[i].ext_phy_addr;
+			phy_mode = nae_cfg->ports[i].ext_phy_mode;
 			break;
+		}
 
-	phy_addr = nae_cfg->ports[i].ext_phy_addr;
-	*hw_portid = phy_addr;
-	/* make a inf and hw_port id pair*/
-	for(i=0; i<reg_num_phys; i++){
-		if((*hw_portid) == regs_ext_phys[i].phy_addr){
+	for(i = 0; i < reg_num_phys; i++){
+		if(phy_addr == regs_ext_phys[i].phy_addr) {
 			regs_ext_phys[i].inf = inf;
+			regs_ext_phys[i].phy_mode = phy_mode;
 			PHY_DEBUG("[%s] Interface %d phy address is %d\n",
-					__func__, inf, *hw_portid);
-			return;
+					__func__, inf, phy_addr);
+			return &(regs_ext_phys[i]);
 		}
 	}
-	*hw_portid = -1;
+
 	nlm_print("[%s] Could not find interface %d\n", __func__, inf);
+	return NULL;
 }
 
 /**
@@ -1778,7 +1740,7 @@ void sgmii_scan_phys(int node)
 	for(bus=0; bus < maxbus; bus++) {
 		PHY_DEBUG("Scanning MDIO external BUS %d...\n", bus);
 		for(inf=0; inf<31; inf++) {
-			phyid = nlm_hal_mdio_read(node, NLM_HAL_EXT_MDIO, bus, BLOCK_7, LANE_CFG, inf, 3);
+			phyid = phy_read(node, bus, inf, MII_PHYSID2);
 			if (phyid != 0xffff) {
 				PHY_DEBUG("  MDIO Device ID %d returned PhyID 0x%04x\n", inf, phyid);
 				for(j=0; j < sizeof(known_ext_phys)/ sizeof(struct nlm_hal_ext_phy); j++)
@@ -1799,7 +1761,7 @@ void sgmii_scan_phys(int node)
 	}
 
 	reg_num_phys =  reg_idx;
-	nlm_print("Total SGMII PHYs found = %d\n", reg_idx);
+	PHY_DEBUG("Total SGMII PHYs found = %d\n", reg_idx);
 }
 
 /* CDE SUPPORT
@@ -1818,18 +1780,14 @@ void sgmii_scan_phys(int node)
 */
 void nlm_hal_set_cde_freq(int node, int freq)
 {
-	const uint64_t mhz = 1000000;
+	const uint32_t mhz = 1000000;
+	soc_device_id_t device = is_nlm_xlp2xx() ? XLP2XX_CLKDEVICE_CMP : DFS_DEVICE_CMP;
+
 #ifdef FREQ_DEBUG
-	nlm_print("-- CDE Frequency set to %d\n", freq);
-#endif
-#ifndef NLM_HAL_XLP1
-	if(is_nlm_xlp2xx()) {
-		nlm_hal_xlp2xx_set_clkdev_frq(XLP2XX_CLKDEVICE_CMP, freq * mhz);
-		return;
-	}
-#endif
-#ifndef NLM_HAL_XLP2
-	nlm_hal_set_soc_freq(node, DFS_DEVICE_CMP, freq * mhz);
+	uint32_t set_freq = nlm_hal_set_soc_freq(node, device, freq * mhz);
+	nlm_print("-- CDE Frequency set to %d MHz\n", (set_freq + 500000) / mhz);
+#else
+	nlm_hal_set_soc_freq(node, device, freq * mhz);
 #endif
 }
 
@@ -1849,20 +1807,15 @@ void nlm_hal_set_cde_freq(int node, int freq)
 */
 void nlm_hal_set_dtre_freq(int node, int freq)
 {
-	const uint64_t mhz = 1000000;
+	const uint32_t mhz = 1000000;
+	soc_device_id_t device = is_nlm_xlp2xx() ? XLP2XX_CLKDEVICE_GDX : DFS_DEVICE_DTRE;
+
 #ifdef FREQ_DEBUG
-	nlm_print("-- DTRE Frequency set to %d\n", freq);
+	uint32_t set_freq = nlm_hal_set_soc_freq(node, device, freq * mhz);
+	nlm_print("-- DTRE Frequency set to %d MHz\n", (set_freq + 500000) / mhz);
+#else
+	nlm_hal_set_soc_freq(node, device, freq * mhz);
 #endif
-	if(is_nlm_xlp2xx()) {
-		nlm_print("ERROR: DTRE block unavailable for xlp2xx\n");
-	}
-	else {
-		uint64_t set_freq = nlm_hal_set_soc_freq(node, DFS_DEVICE_DTRE, freq * mhz);
-		NLM_HAL_DO_DIV(set_freq, mhz);
-#ifdef FREQ_DEBUG
-		nlm_print("DTRE Frequency set to %lluMHz\n", (unsigned long long)set_freq);
-#endif
-	}
 }
 
 /**
@@ -1915,26 +1868,22 @@ void nlm_hal_dtr_init(void *fdt)
 */
 void nlm_hal_set_sae_freq(int node, int freq)
 {
-	const uint64_t mhz = 1000000;
+	const uint32_t mhz = 1000000;
+	soc_device_id_t device = is_nlm_xlp2xx() ? XLP2XX_CLKDEVICE_SAE : DFS_DEVICE_SAE;
+
 #ifdef FREQ_DEBUG
-	nlm_print("-- SAE Frequency set to %d\n", freq);
-#endif
-#ifndef NLM_HAL_XLP1
-	if(is_nlm_xlp2xx()) {
-		nlm_hal_xlp2xx_set_clkdev_frq(XLP2XX_CLKDEVICE_SAE, freq * mhz);
-		return;
-	}
-#endif
-#ifndef NLM_HAL_XLP2
-	nlm_hal_set_soc_freq(node, DFS_DEVICE_SAE, freq * mhz);
+	uint32_t set_freq = nlm_hal_set_soc_freq(node, device, freq * mhz);
+	nlm_print("-- SAE Frequency set to %d MHz\n", (set_freq + 500000) / mhz);
+#else
+	nlm_hal_set_soc_freq(node, device, freq * mhz);
 #endif
 }
 
 /* Comment this out if using SDK 2.3 libraries/crypto and linux-userspace */
 #if 1
-enum chip_specific_features { 
+enum chip_specific_features {
 	INIT_DONE = 0x1,
-	ZUC = 0x2, 
+	ZUC = 0x2,
 	DES3_KEY_SWAP = 0x4
 };
 #endif
@@ -1949,26 +1898,37 @@ int nlm_hal_get_sae_chip_feature(void )
 	return chip_features;
 }
 
+/* RSA/ECC SUPPORT
+ */
+/**
+* @brief nlm_hal_set_rsa_freq function sets the frequency of the RSA/ECC block.
+*
+* @param [in] node Node number
+* @param [in] freq Frequency to set in MHz
+*
+* @return
+* 	- none
+*
+* @ingroup hal_sae
+*
+*/
 void nlm_hal_set_rsa_freq(int node, int freq)
 {
-	const uint64_t mhz = 1000000;
+	const uint32_t mhz = 1000000;
+	soc_device_id_t device = is_nlm_xlp2xx() ? XLP2XX_CLKDEVICE_RSA : DFS_DEVICE_RSA;
+
 #ifdef FREQ_DEBUG
-	nlm_print("--RSA Frequency set to %d\n", freq);
-#endif
-#ifndef NLM_HAL_XLP1
-	if(is_nlm_xlp2xx()) {
-		nlm_hal_xlp2xx_set_clkdev_frq(XLP2XX_CLKDEVICE_RSA, freq * mhz);
-		return;
-	}
-#endif
-#ifndef NLM_HAL_XLP2
-	nlm_hal_set_soc_freq(0, DFS_DEVICE_RSA, freq * mhz);
+	uint32_t set_freq = nlm_hal_set_soc_freq(node, device, freq * mhz);
+	nlm_print("--RSA Frequency set to %d MHz\n", (set_freq + 500000) / mhz);
+#else
+	nlm_hal_set_soc_freq(node, device, freq * mhz);
 #endif
 }
 
 void nlm_hal_sata_firmware_init(void)
 {
-	volatile uint32_t readdata, i;
+	uint32_t readdata;
+	int i = 0;
 
 	nlm_print("Started AHCI Firmware Initialization.\n");
 
@@ -1997,7 +1957,6 @@ void nlm_hal_sata_firmware_init(void)
 
 //	nlm_print ("Waiting for PHYs to come up.\n");
 
-	i=0;
 	readdata = rd_sata_glue_reg(XLP_HAL_SATA_STATUS);
 	while ( ((readdata & 0x00F0) != 0x00F0) && (i < 30))
 	{

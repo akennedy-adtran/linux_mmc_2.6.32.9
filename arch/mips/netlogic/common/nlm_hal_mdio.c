@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2013 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * This software is available to you under a choice of one of two
@@ -37,6 +37,7 @@
 #include <linux/netdevice.h>
 #endif
 
+#include <asm/mipsregs.h>
 #include "nlm_hal_fmn.h"
 #include "nlm_hal_nae.h"
 #include "nlm_hal_sys.h"
@@ -44,22 +45,26 @@
 #include "fdt_helper.h"
 #include "nlm_evp_cpld.h"
 
-void nae_ext_mdio_wait(int n)
+/* Wait at least one MDIO clock cycle. TODO should really know what the
+ * MDIO clock speed is. For now we are assuming a worst-case of 250 MHz
+ * NAE and a worst-case divider of 448 (14*32) = 558 KHz. Thus need at
+ * least freq >> 19 cycles.
+ */
+void nae_ext_mdio_wait(void)
 {
-	volatile int s=0, i,j;
-	unsigned long long freq = nlm_hal_cpu_freq();
-	freq >>= 17;
-	if ( is_nlm_xlp3xx_ax() || is_nlm_xlp8xx_ax() || is_nlm_xlp8xx_b0() )
-	   return;
-	for(j=0; j<n; j++)
-	for(i=0; i<freq; i++) s++;
-	return;
+	uint32_t initial = read_c0_count();
+	uint32_t target = initial + (uint32_t)(nlm_hal_cpu_freq() >> 19);
+
+	/* Expect counter to wrap? If so, wait for the wrap */
+	if(target < initial) while(read_c0_count() > initial) { }
+
+	while(read_c0_count() < target) { }
 }
 
 /*
  * MDIO CLK = NAE freq (not 2x freq) divided by both of the dividers below:
  *----------------------
- * EXT_G0_MDIO_CTRL[4:2]
+ * EXT_G0_MDIO_CTRL[4:2] (AddDiv)
  *----------------------
  *  0	 4
  *  1	 4
@@ -70,40 +75,31 @@ void nae_ext_mdio_wait(int n)
  *  6	20
  *  7	54
  *----------------------
- * EXT_G0_MDIO_CTRL[1:0] - old chips / mid-life chips / new chips (Firefly B0)
+ * EXT_G0_MDIO_CTRL[1:0] (Div) - Firefly / Eagle, Storm
  *----------------------
- * 0	 1		 64		  8
- * 1	 2		128		 32
- * 2	 4		256		128
- * 3	 8		512		512
+ * 0	  8		 64
+ * 1	 32		128
+ * 2	128		256
+ * 3	512		512
+ *
  */
-static uint32_t nae_get_EXT_G_MDIO_DIV(void)
+static inline uint32_t nae_get_EXT_G_MDIO_DIV(void)
 {
-	/* Older chips without a /64 post divider - EXT_G_MDIO_DIV = 0x1E */
-	if (is_nlm_xlp3xx_ax() || is_nlm_xlp8xx_ax() || is_nlm_xlp8xx_b0() )
-		return EXT_G_MDIO_DIV;
-
-#ifndef NLM_HAL_XLP1
-	/* Mid-life chips - EXT_G_MDIO_DIV_WITH_HW_DIV64_11 = 0x11 */
-	if (is_nlm_xlp3xx() || is_nlm_xlp8xx() || is_nlm_xlp2xx_ax() )
-		return EXT_G_MDIO_DIV_WITH_HW_DIV64_11;
-
-	/* Should leave only Firefly B0.  The first divider has changed from 64/128/256/512 to
-	 * 8/32/128/512 and default frequencies have doubled on some speed grades. Thus
-	 * test NAE clock and decide.  Target is 195KHz from 250MHz / 500 MHz NAE clock. */
-	if (nlm_hal_xlp2xx_get_clkdev_frq(XLP2XX_CLKDEVICE_NAE) <= 375000000)
-		return EXT_G_MDIO_DIV_2XX_SLOW;
+	if (is_nlm_xlp3xx() || is_nlm_xlp8xx())
+		/* Div = 6, AddDiv = 64 -> Total divider 384
+		 * @333 MHz NAE -> 867.2 KHz; @250 MHz NAE -> 651.0 KHz */
+		return ((0x2 << EXT_G_MDIO_ADD_DIV_POS) | (0x0 << EXT_G_MDIO_DIV_POS));
 	else
-		return EXT_G_MDIO_DIV_2XX_FAST;
-#else
-	return EXT_G_MDIO_DIV_WITH_HW_DIV64_11;
-#endif
+		/* Div = 32, AddDiv = 14 -> Total divider 448
+		 * @400 MHz NAE -> 892.9 KHz; @250 MHz NAE -> 558.0 KHz
+		 */
+		return ((0x5 << EXT_G_MDIO_ADD_DIV_POS) | (0x1 << EXT_G_MDIO_DIV_POS));
 }
 
 /* INT_MDIO_CTRL, block7, 0x799
  * EXT_XG_MDIO_CTRL, block7, 0x7A5,0x7A9
  * 29:28: MCDiv Master Clock Divider
- * 0 1
+ * 0 1 Erratum XLP1xx/2xx E37_NET / E38_NET: Do not use value 0
  * 1 2
  * 2 4
  * 3 8
@@ -116,7 +112,7 @@ static uint32_t nae_get_EXT_G_MDIO_DIV(void)
  *    62.5MHz/(2*(0x7F+1)) = 0.24MHz
  */
 
-static uint32_t nae_get_EXT_XG_MDIO_DIV(void)
+static inline uint32_t nae_get_EXT_XG_MDIO_DIV(void)
 {
 	return ((0x7F << EXT_XG_MDIO_CTRL_XDIV_POS) | (2 << EXT_XG_MDIO_CTRL_MCDIV_POS));
 }
@@ -124,7 +120,7 @@ static uint32_t nae_get_EXT_XG_MDIO_DIV(void)
 /* INT_MDIO_CTRL, block7, 0x799
  * EXT_XG_MDIO_CTRL, block7, 0x7A5,0x7A9
  * 29:28: MCDiv Master Clock Divider
- * 0 1
+ * 0 1 Erratum XLP1xx/2xx E37_NET / E38_NET: Do not use value 0
  * 1 2
  * 2 4
  * 3 8
@@ -136,7 +132,7 @@ static uint32_t nae_get_EXT_XG_MDIO_DIV(void)
  *    250MHz/4 = 62.5MHz
  *    62.5MHz/(2*(0x7F+1)) = 0.24MHz
  */
-static uint32_t nae_get_INT_MDIO_DIV(void)
+static inline uint32_t nae_get_INT_MDIO_DIV(void)
 {
 	return ((0x7F << INT_MDIO_CTRL_XDIV_POS) | (2 << INT_MDIO_CTRL_MCDIV_POS));
 }
@@ -395,8 +391,7 @@ static int nae_gmac_mdio_read(int node, int bus, int phyaddr, int regidx)
 			       | (regidx << EXT_G_MDIO_REGADDR_POS)
 			       | (1<<18) | clk_div);
 
-	nae_ext_mdio_wait(1);
-
+	nlm_mdelay(1);	// Must wait one MDIO clock cycle before checking busy bit
 	while(nlm_hal_read_mac_reg(node, block, intf_type,
 				    EXT_G0_MDIO_RD_STAT + bus * 4) & EXT_G_MDIO_STAT_MBSY);
 
@@ -467,8 +462,7 @@ static int nae_gmac_mdio_write(int node, int bus, int phyaddr, int regidx, uint1
 			       (regidx << EXT_G_MDIO_REGADDR_POS)	|
 			       (0<<18) | clk_div);
 
-	nae_ext_mdio_wait(1);
-
+	nlm_mdelay(1);	// Must wait one MDIO clock cycle before checking busy bit
 	while(nlm_hal_read_mac_reg(node, block, intf_type,
 				    EXT_G0_MDIO_RD_STAT + bus * 4) & EXT_G_MDIO_STAT_MBSY);
 

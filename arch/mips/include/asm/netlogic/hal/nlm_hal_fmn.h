@@ -223,7 +223,7 @@ static inline unsigned long long nlh_qid_to_virt_addr(int node, int reg, int sel
 */
 static inline int xlp_send(unsigned int dest)
 {
-        unsigned int success = 0;
+        unsigned int success;
 
         __asm__ volatile (".set push\n"
                           ".set noreorder\n"
@@ -415,7 +415,7 @@ static inline int xlp_message_send_2(uint32_t dst, uint32_t code,
 static inline int xlp_message_send_3(uint32_t dst, uint32_t code,
 		uint64_t data0, uint64_t data1, uint64_t data2)
 {
-	unsigned int dest = 0;
+	unsigned int dest;
 
 
 	xlp_load_tx_msg0(data0);
@@ -458,7 +458,7 @@ static inline int xlp_message_send_3(uint32_t dst, uint32_t code,
 static inline int xlp_message_send_4(uint32_t dst, uint32_t code,
 		uint64_t data0, uint64_t data1, uint64_t data2, uint64_t data3)
 {
-	unsigned int dest = 0;
+	unsigned int dest;
 
 	xlp_load_tx_msg0(data0);
 	xlp_load_tx_msg1(data1);
@@ -499,7 +499,7 @@ static inline int xlp_message_send_4(uint32_t dst, uint32_t code,
 static inline int xlp_message_send(uint32_t dst, uint32_t size, uint32_t code,
 		uint64_t *data)
 {
-	unsigned int dest = 0;
+	unsigned int dest;
 
 	switch (size) {
 	case 4:
@@ -906,7 +906,7 @@ static inline void xlp_message_send_block_fast(int size, unsigned int code,
 */
 static inline int xlp_receive(unsigned int vc)
 {
-	unsigned int success = 0;
+	unsigned int success;
 
 	__asm__ volatile (".set push\n"
 	                  ".set noreorder\n"
@@ -1051,7 +1051,7 @@ static inline int nlm_hal_pop_cfg_update (uint32_t vc_mask)
 
 static inline int nlm_hal_pop_send (uint32_t popq)
 {
-	int rc = 0;
+	int rc;
 
 	if (!xlp_send(popq) )
 	{

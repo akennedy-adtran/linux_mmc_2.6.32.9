@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2014 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * This software is available to you under a choice of one of two
@@ -45,16 +45,8 @@ extern unsigned long xlp_poe_base_pcie[];
 extern unsigned long xlp_poe_base_pcim[];
 extern unsigned long xlp_sys_base[];
 
-extern int nlm_chip_is_xlp3xx;
 extern unsigned long xlp_regex_base_pcie;
 extern unsigned long xlp_regex_base_pcim;
-
-#ifndef is_nlm_xlp8xx
-extern int is_nlm_xlp(unsigned int chipid, unsigned int rev, unsigned int ext);
-
-#define XLP_REVISION_ANY	0xFF
-#define is_nlm_xlp8xx()		(is_nlm_xlp(0x8000, XLP_REVISION_ANY, 0) || is_nlm_xlp(0x4000, XLP_REVISION_ANY, 0))
-#endif /* is_nlm_xlp8xx */
 
 #endif /* #ifndef __ASSEMBLY__ */
 
@@ -1272,9 +1264,7 @@ static __inline__ uint32_t nlm_hard_cpuid(void)
 
 static __inline__ uint32_t nlm_node_id(void)
 {
-	if (is_nlm_xlp8xx())
-		return (nlm_hard_cpuid() >> 5) & 0x3;
-	return 0;
+	return (nlm_hard_cpuid() >> 5) & 0x3;
 }
 
 static __inline__ uint32_t nlm_cpu_id(void)
