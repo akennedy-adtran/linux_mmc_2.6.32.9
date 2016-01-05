@@ -164,9 +164,9 @@ config NLM_FDT_PROC
 		/proc/netlogic/fdt-ucore.
 
 config NLM_XLP_EEPROM
-	bool "Enable driver for EEPROM on NetLogic eval boards"
+	tristate "Driver for EEPROM on NetLogic eval boards"
 	depends on NLM_XLP && I2C_NLM_XLP
 	default n
 	help
-		Simple I2C device driver for EEPROM used on XLP eval boards to hold
+		EEPROM device driver for EEPROM used on XLP eval boards to hold
 		MAC address for the network driver.
