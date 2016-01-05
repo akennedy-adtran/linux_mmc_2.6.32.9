@@ -455,7 +455,7 @@ static int __devinit sdhci_xlp_probe(struct pci_dev *pdev,
 	 */
 	pdev->resource[0].flags = IORESOURCE_MEM;
 	pdev->resource[0].start = physbase;
-	pdev->resource[0].end   = physbase + 0xFFF;
+	pdev->resource[0].end   = physbase + XLP_PCIE_REGION_SIZE - 1;
 
 	SDHCI_DEBUG("  Requesting PCI I/O memory region\n");
 	ret = pci_request_region(pdev, 0, sdhci_xlp_driver.name);
