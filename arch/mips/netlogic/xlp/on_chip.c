@@ -185,13 +185,13 @@ void xlp_msgring_int_handler(unsigned int irq, struct pt_regs *regs)
 		}
 	}
 
-	/* Ack interrupts - NAPI VC interrupt should be disabled at this time */
+	/* Ack interrupts - NAPI VC interrupt should be disabled at this time if the
+	 * NAPI VC was the cause of the interrupt.
+	 */
 	if (is_nlm_xlp2xx()) {
 		xlp_write_msg_int(xlp2xx_ack_mask);
-	} else {
-		uint32_t val = xlp_read_status1();
-		xlp_write_status1(val | xlp3xx_ack_mask);
-	}
+	} else
+		xlp_write_status1(msg_int | xlp3xx_ack_mask);
 
 //	nlm_cpu_stat_update_msgring_cycles(read_c0_count() - cycles);
 

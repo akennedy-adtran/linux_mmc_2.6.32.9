@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2014 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * Redistribution and use in source and binary forms, with or without
@@ -67,8 +67,6 @@
 #include <asm/netlogic/phnx_loader.h>
 #include "../boot/ops.h"
 #include <asm/netlogic/xlp8xx/cpu_control_macros.h>
-
-#include <asm/netlogic/xlp-hal/iomap.h>
 
 void parse_cmdline(void);
 /* Certain macros for this file
@@ -164,7 +162,6 @@ struct xlp_stack_pages xlp_stack_pages_temp
 		__attribute__((__section__(".data.init_task"),
 		__aligned__(THREAD_SIZE)));
 
-uint64_t nlm_io_base;
 struct nlm_ici_vc_param
 {
 	int own_credit;
@@ -501,7 +498,6 @@ int nlm_get_fdt_app_param(const char *param, void *data, int size)
 }
 EXPORT_SYMBOL(nlm_get_fdt_app_param);
 
-int nae_rx_vc = -1, nae_fb_vc = -1;
 int sae_rx_vc = -1, sae_rx_sync_vc = -1;
 int ipsec_async_vc = -1, ipsec_sync_vc = -1;
 static void __init parse_fdt_sae_vc_config(void)
@@ -513,12 +509,6 @@ static void __init parse_fdt_sae_vc_config(void)
 
 	node = finddevice("/doms/dom@0/cpu");
 	if(node) {
-		if (getprop(node, "nae-rx-vc", &nae_rx_vc, 4) > 0)
-			nae_rx_vc = fdt32_to_cpu(nae_rx_vc);
-
-		if (getprop(node, "nae-fb-vc", &nae_fb_vc, 4) > 0)
-			nae_fb_vc = fdt32_to_cpu(nae_fb_vc);
-
 		if (getprop(node, "sae-rx-vc", &sae_rx_vc, 4) > 0) 
 			sae_rx_vc = fdt32_to_cpu(sae_rx_vc);
 		
@@ -546,8 +536,6 @@ static void __init parse_fdt_sae_vc_config(void)
 
 	return;
 }
-EXPORT_SYMBOL(nae_rx_vc);
-EXPORT_SYMBOL(nae_fb_vc);
 EXPORT_SYMBOL(sae_rx_vc);
 EXPORT_SYMBOL(sae_rx_sync_vc);
 EXPORT_SYMBOL(ipsec_async_vc);
@@ -1248,7 +1236,6 @@ static int __init initrd_setup(char *str)
 	*(tmp-1) = '@';
 	initrd_start = simple_strtoul(tmp, &endptr, 16);
 
-	nlm_io_base = CKSEG1ADDR(XLP_DEFAULT_IO_BASE);
 #if defined(CONFIG_32BIT) && defined (CONFIG_MAPPED_KERNEL)
 	initrd_start = CKSEG2ADDR(initrd_start);
 #else

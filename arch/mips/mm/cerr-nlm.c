@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2012 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * Redistribution and use in source and binary forms, with or without
@@ -63,6 +63,16 @@ static __inline__ void cerr_cpu_halt(void)
 			".set pop       \n"
 		);
 	}
+}
+
+static __inline__ int get_num_controllers(void)
+{
+	if(is_nlm_xlp2xx())
+		return 1;
+	else if(is_nlm_xlp3xx())
+		return 2;
+	else
+		return 4;
 }
 
 #define UART_RHR 0
@@ -173,7 +183,7 @@ static int print_cerr_info(void)
 
 static void dump_cerr_info(void)
 {
-	int n, num_controllers, ret;
+	int n, num_controllers;
 	uint32_t dram_log1, dram_log2;
 	int node = hard_smp_processor_id() / NLM_MAX_CPU_PER_NODE;
 	uint64_t mmio = nlm_hal_get_dev_base(node, 0, NLH_BRIDGE, 0);
@@ -220,14 +230,7 @@ static void dump_cerr_info(void)
 	cerr_printk("     NBU: reg0 = 0x%08x, reg1 = 0x%08x, reg2 = 0x%08x\n",
 				nbu_reg0, nbu_reg1, nbu_reg2);
 
-	num_controllers = 4;	//8xx has 4 controller 
-	ret=is_nlm_xlp3xx_rev(XLP_REVISION_ANY);
-	if( ret ) num_controllers = 2;
-	else {
-		ret=is_nlm_xlp2xx();
-		if( ret ) num_controllers = 1;
-	}
-
+	num_controllers = get_num_controllers();
 	for(n=0; n<num_controllers; n++)
 	{
 		dram_log1 = nlm_hal_read_32bit_reg(mmio, n*0x80+0x11D);
@@ -454,15 +457,7 @@ static int check_DRAM_error(void)
 	int node = hard_smp_processor_id() / NLM_MAX_CPU_PER_NODE;
 	uint64_t mmio = nlm_hal_get_dev_base(node, 0, NLH_BRIDGE, 0);
 
-	int num_controllers = 4;	//8xx has 4 controller 
-	int ret=is_nlm_xlp(300, XLP_REVISION_ANY, CPU_EXTPID_XLP_3XX_ANY);
-	if( ret ) num_controllers = 2;
-	else
-	{
-		ret=is_nlm_xlp(200, XLP_REVISION_ANY, 0 );
-		if( ret ) num_controllers = 1;
-	}
-
+	int num_controllers = get_num_controllers();
 	for(n=0; n<num_controllers; n++)
 	{
 		log1 = nlm_hal_read_32bit_reg(mmio, n*0x80+0x11D);

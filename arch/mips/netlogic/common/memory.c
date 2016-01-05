@@ -450,3 +450,15 @@ int __uncached_access(struct file *file, unsigned long addr)
 	   cached page for memory space. */
 	return nlm_common_get_pgprot(addr);
 }
+
+inline int valid_phys_addr_range(unsigned long addr, size_t count)
+{
+	/* for now return valid */
+	return 1;
+}
+
+inline int valid_mmap_phys_addr_range(unsigned long pfn, size_t size) 
+{
+	/* for now return valid */
+	return 1;
+}

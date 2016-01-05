@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2014 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * Redistribution and use in source and binary forms, with or without
@@ -64,7 +64,7 @@ void dump_all_ites(void)
 	for_each_online_node(node) {
 		for (i = 0; i < XLP_ITE_ENTRIES; i++) {
 			cpumask_scnprintf(buf, 140, &xlp_ites[node][i]);
-			printk(KERN_DEBUG "[ite.c] node %d PIC: Supported CPUMASK (%d) -> %s\n", node, i, buf);
+			printk(KERN_DEBUG "PIC: Node %d supported CPUMASK (%d) -> %s\n", node, i, buf);
 			reg = XLP_PIC_INT_THREADEN23(i);
 			tmp = nlh_pic_r64r(node, reg);
 			ite3 = tmp >> 32;
@@ -73,8 +73,8 @@ void dump_all_ites(void)
 			tmp = nlh_pic_r64r(node, reg);
 			ite1 = tmp >> 32;
 			ite0 = tmp & 0xffffffffULL;
-			printk(KERN_DEBUG "[ite.c] node %d PIC: Programmed ITE (%d)    -> %08x,%08x,%08x,%08x\n",
-					node, i, ite3, ite2, ite1, ite0);
+			printk(KERN_DEBUG "               Programmed ITE (%d) -> %08x,%08x,%08x,%08x\n",
+					i, ite3, ite2, ite1, ite0);
 		}
 	}
 
@@ -164,7 +164,7 @@ int xlp_span_multiple_nodes(const struct cpumask *mask)
 	f = cpumask_first(mask);
 	l = find_last_bit(cpumask_bits(mask), NR_CPUS);
 	if ((f/NLM_MAX_CPU_PER_NODE) != (l/NLM_MAX_CPU_PER_NODE)) {
-		printk(KERN_DEBUG "Mask spans from cpu %#x to %#x. Spans across nodes are not supported\n", f, l);
+		printk(KERN_DEBUG "PIC: Mask spans from cpu %#x to %#x. Spans across nodes are not supported\n", f, l);
 		return -EINVAL;
 	}
 	return 0;
@@ -223,15 +223,15 @@ static int xlp_closest_match_cpumask(u8 node, const struct cpumask *m)
 		cpumask_and(&a, &xlp_ites[node][i], &phys_cpu_present_map);
 		if (cpumask_equal(&t, &a)) {
 			cpumask_scnprintf(buf, 40, m);
-//			printk(KERN_DEBUG "[ite.c] Matched ITE #%d for logical cpumask %s\n", i, buf);
+//			printk(KERN_DEBUG "PIC: Matched ITE #%d for logical cpumask %s\n", i, buf);
 			return i;
 		}
 	}
 	cpumask_scnprintf(buf, 40, m);
-	printk(KERN_WARNING "[ite.c] Could not find ITE match for logical cpumask %s\n", buf);
+	printk(KERN_WARNING "PIC: Could not find ITE match for logical cpumask %s\n", buf);
 	cpumask_scnprintf(buf, 40, &t);
-	printk(KERN_WARNING "[ite.c]                  Calculated physical cpumask %s\n", buf);
-	printk(KERN_WARNING "[ite.c] Using ITE #1 (default all online CPUs)\n");
+	printk(KERN_WARNING "                      Calculated physical cpumask %s\n", buf);
+	printk(KERN_WARNING "     Using ITE #1 (default all online CPUs)\n");
 	return 1; /* if no match, point to all local cpus */
 }
 
@@ -248,7 +248,7 @@ void xlp_set_cpumask_on_node(u8 node, const struct cpumask *m, int irq)
 
 	//dump_all_ites();
 	ite = xlp_closest_match_cpumask(node, m);
-	printk(KERN_DEBUG "[ite.c] Using PIC ITE %d for IRQ %d (IRT %d)\n", ite, irq, irt);
+	printk(KERN_DEBUG "PIC: Using ITE %d for IRQ %d (IRT %d)\n", ite, irq, irt);
 	/* xlp_pic_init() has set default values. Override them */
 	val = XLP_IRTENT_ENABLE | XLP_IRTENT_SCH_LCL |
 			XLP_IRTENT_RVEC(rvec) | XLP_IRTENT_DB(ite);
