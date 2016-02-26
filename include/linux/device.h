@@ -66,6 +66,7 @@ struct bus_type {
 	const struct dev_pm_ops *pm;
 
 	struct bus_type_private *p;
+	const struct attribute_group **dev_groups;	// 4_2_4
 };
 
 extern int __must_check bus_register(struct bus_type *bus);

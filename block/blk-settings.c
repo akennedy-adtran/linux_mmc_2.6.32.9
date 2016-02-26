@@ -187,8 +187,18 @@ void blk_queue_bounce_limit(struct request_queue *q, u64 dma_mask)
 	 * Assume anything <= 4GB can be handled by IOMMU.  Actually
 	 * some IOMMUs can handle everything, but I don't know of a
 	 * way to test this here.
+	 * XLP8xx/4xx/3xx/2xx/1xx (MIPS64R2/R3) with 64b kernel does not
+	 * use HIGHMEM so max_low_pfn will include memory above 2^32.
+	 * These chips do not include an IOMMU so some devices (e.g.
+	 * SDHCI) require a bounce buffer when physical memory addresses
+	 * exceed 2^32.
 	 */
+#ifdef CONFIG_CPU_XLP
+	if ((b_pfn <= (0xffffffffUL >> PAGE_SHIFT)) &&
+		(max_low_pfn > (0xffffffffUL >> PAGE_SHIFT)))
+#else
 	if (b_pfn < (min_t(u64, 0xffffffffUL, BLK_BOUNCE_HIGH) >> PAGE_SHIFT))
+#endif
 		dma = 1;
 	q->limits.bounce_pfn = max_low_pfn;
 #else

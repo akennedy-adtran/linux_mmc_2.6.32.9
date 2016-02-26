@@ -171,7 +171,7 @@ NORET_TYPE void do_exit(long error_code)
 NORET_TYPE void complete_and_exit(struct completion *, long)
 	ATTRIB_NORET;
 
-#if 1  //ADTRAN
+/* 4_2_4 */
 /* Internal, do not use. */
 int __must_check _kstrtoul(const char *s, unsigned int base, unsigned long *res);
 int __must_check _kstrtol(const char *s, unsigned int base, long *res);
@@ -237,7 +237,7 @@ static inline int __must_check kstrtol(const char *s, unsigned int base, long *r
 		return _kstrtol(s, base, res);
 }
 extern unsigned long simple_strtoul(const char *,char **,unsigned int);
-#endif
+
 extern long simple_strtol(const char *,char **,unsigned int);
 extern unsigned long long simple_strtoull(const char *,char **,unsigned int);
 extern long long simple_strtoll(const char *,char **,unsigned int);
@@ -450,6 +450,8 @@ static inline char *pack_hex_byte(char *buf, u8 byte)
         printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_cont(fmt, ...) \
 	printk(KERN_CONT fmt, ##__VA_ARGS__)
+
+#define pr_warn_ratelimited pr_warning		// 4_2_4
 
 /* pr_devel() should produce zero code unless DEBUG is defined */
 #ifdef DEBUG

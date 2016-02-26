@@ -44,7 +44,6 @@
 #include <asm/netlogic/xlp.h>
 
 #define XLP_SOC_PCI_DRIVER 	"XLP SoC Driver"
-#define DEV_IRT_INFO			0x3D
 
 #define XLP_MAX_DEVICE			8
 #define XLP_MAX_FUNC			8
@@ -112,7 +111,6 @@ static struct dev2drv dev2drv_table[] __initdata = {
 	{XLP_DEVID_UART,	"serial8250",	11,  0},
 	{XLP_DEVID_I2C,		"i2c-xlp",		8,   0},	// XLP8xx/XLP4xx/XLP3xx
 	{XLP2XX_DEVID_I2C,	"i2c-xlp",		8,   0},	// XLP2xx/XLP1xx - 4 busses
-	{XLP_DEVID_MMC,		"mmc-xlp",		8,   0},
 	{XLP_DEVID_SPI,		"spi-xlp",		8,   0},
 	{XLP_DEVID_NOR,		"nor-xlp",		8,   0},
 	{XLP_DEVID_NAND,	"nand-xlp",		9,   0}
@@ -129,8 +127,6 @@ static int __init get_dev2drv(uint32_t devid)
 	}
 	return -1;
 }
-
-struct platform_device *mmc_pplat_dev = NULL;
 
 /* TODO - Read fdt to get this info, add BCM65500 platform driver detection */
 static int __init xlp_find_pci_dev(void)
@@ -205,7 +201,7 @@ static int __init xlp_find_pci_dev(void)
 				}
 
 
-				irt = (nlm_hal_read_32bit_reg(mmio, DEV_IRT_INFO) & 0xFFFF);
+				irt = (nlm_hal_read_32bit_reg(mmio, (XLP_PCIE_DEV_IRT_INFO >> 2)) & 0xFFFF);
 				irq = xlp_irt_to_irq(0, irt);
 				pres[0].start = irq;
 				pres[0].end   = irq;
@@ -231,9 +227,6 @@ static int __init xlp_find_pci_dev(void)
 							mmio, mmio + 0xFFF);
 
 					platform_device_add_resources(pplatdev, pres, 2);
-				}
-				if (devid == XLP_DEVID_MMC){
-					mmc_pplat_dev = pplatdev;
 				}
 				pplatdev->dev.dma_mask = &xlp_dev_dmamask;
 				pplatdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);

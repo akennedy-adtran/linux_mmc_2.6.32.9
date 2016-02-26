@@ -10,7 +10,7 @@
 
 #include <linux/err.h>
 #include <linux/gpio.h>
-//#include <linux/gpio/consumer.h>  //ADTRAN
+#include <linux/gpio/consumer.h>
 #include <linux/interrupt.h>
 #include <linux/jiffies.h>
 #include <linux/mmc/host.h>
@@ -60,7 +60,6 @@ int mmc_gpio_alloc(struct mmc_host *host)
 
 int mmc_gpio_get_ro(struct mmc_host *host)
 {
-#if 0 // ADTRAN
 	struct mmc_gpio *ctx = host->slot.handler_priv;
 
 	if (!ctx || !ctx->ro_gpio)
@@ -71,15 +70,11 @@ int mmc_gpio_get_ro(struct mmc_host *host)
 			!!(host->caps2 & MMC_CAP2_RO_ACTIVE_HIGH);
 
 	return gpiod_get_value_cansleep(ctx->ro_gpio);
-#else
-	return -ENOSYS ;
-#endif
 }
 EXPORT_SYMBOL(mmc_gpio_get_ro);
 
 int mmc_gpio_get_cd(struct mmc_host *host)
 {
-#if 0 // ADTRAN
 	struct mmc_gpio *ctx = host->slot.handler_priv;
 
 	if (!ctx || !ctx->cd_gpio)
@@ -90,9 +85,6 @@ int mmc_gpio_get_cd(struct mmc_host *host)
 			!!(host->caps2 & MMC_CAP2_CD_ACTIVE_HIGH);
 
 	return gpiod_get_value_cansleep(ctx->cd_gpio);
-#else
-	return -ENOSYS ;
-#endif
 }
 EXPORT_SYMBOL(mmc_gpio_get_cd);
 
@@ -108,7 +100,6 @@ EXPORT_SYMBOL(mmc_gpio_get_cd);
  */
 int mmc_gpio_request_ro(struct mmc_host *host, unsigned int gpio)
 {
-#if 0 // ADTRAN
 	struct mmc_gpio *ctx = host->slot.handler_priv;
 	int ret;
 
@@ -124,15 +115,11 @@ int mmc_gpio_request_ro(struct mmc_host *host, unsigned int gpio)
 	ctx->ro_gpio = gpio_to_desc(gpio);
 
 	return 0;
-#else
-	return -ENOSYS ;
-#endif
 }
 EXPORT_SYMBOL(mmc_gpio_request_ro);
 
 void mmc_gpiod_request_cd_irq(struct mmc_host *host)
 {
-#if 0 // ADTRAN
 	struct mmc_gpio *ctx = host->slot.handler_priv;
 	int ret, irq;
 
@@ -164,9 +151,6 @@ void mmc_gpiod_request_cd_irq(struct mmc_host *host)
 
 	if (irq < 0)
 		host->caps |= MMC_CAP_NEEDS_POLL;
-#else
-	return -ENOSYS ;
-#endif
 }
 EXPORT_SYMBOL(mmc_gpiod_request_cd_irq);
 
@@ -201,7 +185,6 @@ EXPORT_SYMBOL(mmc_gpio_set_cd_isr);
 int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio,
 			unsigned int debounce)
 {
-#if 0 //ADTRAN
 	struct mmc_gpio *ctx = host->slot.handler_priv;
 	int ret;
 
@@ -225,9 +208,6 @@ int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio,
 	ctx->cd_gpio = gpio_to_desc(gpio);
 
 	return 0;
-#else
-	return -ENOSYS ;
-#endif
 }
 EXPORT_SYMBOL(mmc_gpio_request_cd);
 
@@ -251,7 +231,6 @@ int mmc_gpiod_request_cd(struct mmc_host *host, const char *con_id,
 			 unsigned int idx, bool override_active_level,
 			 unsigned int debounce, bool *gpio_invert)
 {
-#if 0 // ADTRAN
 	struct mmc_gpio *ctx = host->slot.handler_priv;
 	struct gpio_desc *desc;
 	int ret;
@@ -276,9 +255,6 @@ int mmc_gpiod_request_cd(struct mmc_host *host, const char *con_id,
 	ctx->cd_gpio = desc;
 
 	return 0;
-#else
-	return -ENOSYS ;
-#endif
 }
 EXPORT_SYMBOL(mmc_gpiod_request_cd);
 
@@ -301,7 +277,6 @@ int mmc_gpiod_request_ro(struct mmc_host *host, const char *con_id,
 			 unsigned int idx, bool override_active_level,
 			 unsigned int debounce, bool *gpio_invert)
 {
-#if 0 // ADTRAN
 	struct mmc_gpio *ctx = host->slot.handler_priv;
 	struct gpio_desc *desc;
 	int ret;
@@ -326,8 +301,5 @@ int mmc_gpiod_request_ro(struct mmc_host *host, const char *con_id,
 	ctx->ro_gpio = desc;
 
 	return 0;
-#else
-	return -ENOSYS ;
-#endif
 }
 EXPORT_SYMBOL(mmc_gpiod_request_ro);

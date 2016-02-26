@@ -12,9 +12,6 @@
  */
 #ifndef __SDHCI_HW_H
 #define __SDHCI_HW_H
-/* ADTRAN:  We had to have this for the BE/LE access. . . the I/O bus on the
- * XLP is LE, but we still do a byte swap -- WRONG!!! */
-#define CONFIG_MMC_SDHCI_IO_ACCESSORS
 
 #include <linux/scatterlist.h>
 #include <linux/compiler.h>
@@ -616,7 +613,6 @@ static inline void sdhci_writeb(struct sdhci_host *host, u8 val, int reg)
 
 static inline u32 sdhci_readl(struct sdhci_host *host, int reg)
 {
-#error OH NO!!!!
 	return readl(host->ioaddr + reg);
 }
 

@@ -13,11 +13,10 @@
 
 #include <linux/device.h>
 #include <linux/err.h>
-//#include <linux/export.h>  //ADTRAN
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
-//#include <linux/pm_domain.h>  //ADTRAN
+#include <linux/pm_domain.h>
 #include <linux/acpi.h>
 
 #include <linux/mmc/card.h>
@@ -138,11 +137,7 @@ static int sdio_bus_probe(struct device *dev)
 	if (!id)
 		return -ENODEV;
 
-#if 0 //ADTRAN
 	ret = dev_pm_domain_attach(dev, false);
-#else
-	ret = -ENOSYS ;
-#endif
 	if (ret == -EPROBE_DEFER)
 		return ret;
 
@@ -175,6 +170,7 @@ static int sdio_bus_probe(struct device *dev)
 disable_runtimepm:
 	if (func->card->host->caps & MMC_CAP_POWER_OFF_CARD)
 		pm_runtime_put_noidle(dev);
+	dev_pm_domain_detach(dev, false);
 	return ret;
 }
 
@@ -206,11 +202,11 @@ static int sdio_bus_remove(struct device *dev)
 	if (func->card->host->caps & MMC_CAP_POWER_OFF_CARD)
 		pm_runtime_put_sync(dev);
 
+	dev_pm_domain_detach(dev, false);
 
 	return ret;
 }
 
-#ifdef CONFIG_PM  //ADTRAN
 static const struct dev_pm_ops sdio_bus_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(pm_generic_suspend, pm_generic_resume)
 	SET_RUNTIME_PM_OPS(
@@ -219,20 +215,15 @@ static const struct dev_pm_ops sdio_bus_pm_ops = {
 		NULL
 	)
 };
-#endif
 
 static struct bus_type sdio_bus_type = {
 	.name		= "sdio",
-#ifdef CONFIG_PM_SLEEP  // ADTRAN
 	.dev_groups	= sdio_dev_groups,
-#endif
 	.match		= sdio_bus_match,
 	.uevent		= sdio_bus_uevent,
 	.probe		= sdio_bus_probe,
 	.remove		= sdio_bus_remove,
-#ifdef CONFIG_PM  // ADTRAN
 	.pm		= &sdio_bus_pm_ops,
-#endif
 };
 
 int sdio_register_bus(void)

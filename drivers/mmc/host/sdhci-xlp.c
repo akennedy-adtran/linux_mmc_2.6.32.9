@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2012 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * This software is available to you under a choice of one of two
@@ -32,490 +32,607 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+
+/* SDHCI PCI Driver for XLP SD Host Controller */
+
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/pci.h>
-#include <linux/pci_ids.h>
-#include <linux/platform_device.h>
-
-#include <asm/netlogic/common.h>
-#include <asm/netlogic/haldefs.h>
-#include <asm/netlogic/xlp-hal/iomap.h>
-#include <asm/netlogic/xlp-hal/xlp.h>
-#include <linux/andy.h>
-
+#include <linux/init.h>
+#include <linux/err.h>
+#include <linux/delay.h>
+#include <linux/mmc/host.h>
+#include <linux/interrupt.h>
+#include <asm/netlogic/xlp.h>
+#include <asm/io.h>
+#include <asm/gpio.h>
 #include "sdhci.h"
 
-#define XLP_SLOT_SIZE		0x100
-#define XLP_NUM_SD_SLOT		1
+#define XLP_SDHCI_DRIVER_NAME		"sdhci-xlp"
+#define XLP_SDHCI_DESCRIPTION		"Broadcom XLP SDHCI Driver"
+#define XLP_SDHCI_VERSION			"1.0"
 
-#define nlm_get_mmc_pcibase(node)	\
-	nlm_pcicfg_base(cpu_is_xlp9xx() ?  XLP9XX_IO_MMC_OFFSET(node) : \
-						XLP_IO_MMC_OFFSET(node))
-#define nlm_get_mmc_regbase(node)	\
-			(nlm_get_mmc_pcibase(node) + XLP_IO_PCI_HDRSZ)
+/* Debug options */
+//#define XLP_SDHCI_DEBUG				// Enable for debug messages
+//#define XLP_SDHCI_DEBUG_VERBOSE		// Above and then some
+//#define XLP_SDHCI_DEBUG_REGS			// Show all register read/writes (very verbose!)
 
-#define nlm_get_mmcsd_regbase(node, slot) \
-		(nlm_get_mmc_regbase(node) + slot * XLP_SLOT_SIZE)
+/* Module parameters */
+static int slot0_is_emmc;
+module_param(slot0_is_emmc, int, 0444);
+MODULE_PARM_DESC(slot0_is_emmc, "   Set to 1 if slot 0 is connected to an eMMC device");
 
-struct sdhci_xlp_chip {
-	struct pci_dev		*pdev;
-	struct sdhci_host	*host[XLP_NUM_SD_SLOT];
-};
+static int slot0_read_only;
+module_param(slot0_read_only, int, 0444);
+MODULE_PARM_DESC(slot0_read_only, " Set to 1 to force slot 0 write protect state to true");
 
-/* Setting XLP device and Vendor IDs */
-static const struct pci_device_id xlp_pci_ids[] __devinitdata = {
-	{
-		.vendor         = PCI_VENDOR_NETLOGIC,
-		.device         = PCI_DEVICE_ID_NLM_MMC,
-		.subvendor      = PCI_ANY_ID,
-		.subdevice      = PCI_ANY_ID,
-	},
-	{
-		.vendor         = PCI_VENDOR_ID_BROADCOM,
-		.device         = PCI_DEVICE_ID_XLP9XX_MMC,
-		.subvendor      = PCI_ANY_ID,
-		.subdevice      = PCI_ANY_ID,
-	},
-};
+static int slot1_enable;
+module_param(slot1_enable, int, 0444);
+MODULE_PARM_DESC(slot1_enable, "    Set to 1 to enable the second host controller slot");
 
-static unsigned int xlp_get_max_clock(struct sdhci_host *sd_host)
-{
-	/*
-	 * SDHCI_CAPABILITIES[15:8] register gives 0x00 instead of 0x85(133)
-	 * on xlp2xx B0 and xlp9xx chips. Forcibly returning 133MHz.
-	 */
-	return 133000000;
-}
+static int slot1_is_emmc;
+module_param(slot1_is_emmc, int, 0444);
+MODULE_PARM_DESC(slot1_is_emmc, "   Set to 1 if slot 1 is connected to an eMMC device");
 
-static inline void xlp_writel(struct sdhci_host *host, u32 val, int reg)
-{
-	__raw_writel(val, host->ioaddr + reg);
-}
+static int slot1_read_only;
+module_param(slot1_read_only, int, 0444);
+MODULE_PARM_DESC(slot1_read_only, " Set to 1 to force slot 1 write protect state to true");
 
-static inline void xlp_writew(struct sdhci_host *host, u16 val, int reg)
-{
-	__raw_writew(val, host->ioaddr + reg);
-}
+/* XLP-specific host controller wrapper registers.
+ * Note address is byte offset from start of PCI-e header!
+ */
+#define HC_SYSCTRL					(0xC0 << 2)
+	#define HC_RESET				(1 << 0)
+	#define HC_CLK_DISABLE			(1 << 1)
+	#define HC_ENABLE_SLOT_0		(1 << 2)
+	#define HC_ENABLE_SLOT_1		(1 << 3)
+	#define HC_ENABLE_L3_ALLOCATE	(1 << 4)
+	#define HC_WRITE_PROT_S0		(1 << 6)
+	#define HC_WRITE_PROT_S1		(1 << 7)
+#define HC_MMC_CAPCFG0_S0			(0xC1 << 2)	// Override for
+#define HC_MMC_CAPCFG1_S0			(0xC2 << 2)	// capability registers
+#define HC_MMC_INIT_PRESET_CFG_S0	(0xC3 << 2)	// Sets MMC_PRESET0 contents
+#define HC_MMC_DEF_PRESET_CFG_S0	(0xC4 << 2)	// Sets MMC_PRESET1 contents
+#define HC_MMC_CAPCFG0_S1			(0xC6 << 2)
+#define HC_MMC_CAPCFG1_S1			(0xC7 << 2)
+#define HC_MMC_INIT_PRESET_CFG_S1	(0xC8 << 2)
+#define HC_MMC_DEF_PRESET_CFG_S1	(0xC9 << 2)
 
-static inline void xlp_writeb(struct sdhci_host *host, u8 val, int reg)
-{
-	__raw_writeb(val, host->ioaddr + reg);
-}
+#define SDHCI_POWER_RESET			(1 << 4)
 
-static inline u32 xlp_readl(struct sdhci_host *host, int reg)
-{
-	return __raw_readl(host->ioaddr + reg);
-}
+#define XLP_SLOT_SIZE				0x100
+#define XLP_NUM_SD_SLOT				2
 
-static inline u16 xlp_readw(struct sdhci_host *host, int reg)
-{
-	return __raw_readw(host->ioaddr + reg);
-}
-
-static inline u8 xlp_readb(struct sdhci_host *host, int reg)
-{
-	return __raw_readb(host->ioaddr + reg);
-}
-
-#define HC_NORMAL_INT_STS_EN            0x0034
-#define HC_NORMAL_INT_SIGNAL_EN         0x0038
-#define HC_PC_HC                        0x0028
-#define HC_NORMAL_INT_STS               0x0030
-#define HC_ERROR_INT_STS                0x0032
-#define XLP_INT_RESET			0x37ff7fff
-
-static void xlpmmc_reset_controller(struct sdhci_host *host, u8 mask)
-{
-	/* FIXME:  get rid of the two volatiles above for the preferred xlp_write* */
-	volatile u32 *mmc_base32 = (u32 *)(host->ioaddr);
-	volatile u16 *mmc_base16 = (u16 *)(host->ioaddr);
-
-	/* Enable Interrupts */
-	xlp_writel(host, XLP_INT_RESET, SDHCI_INT_ENABLE);
-	//hc_wr32(host->ioaddr, HC_NORMAL_INT_STS_EN, 0x37ff7fff, slot);
-
-	/* Enable Interrupt Signals */
-	xlp_writel(host, XLP_INT_RESET, SDHCI_SIGNAL_ENABLE);
-	//hc_wr32(host->base, HC_NORMAL_INT_SIGNAL_EN, 0x37ff7fff, slot);
-
-	/* Send HW Reset to eMMC-4.4 Card */
-	mmc_base16[HC_PC_HC>>1] = 0x1e00;
-	//hc_wr16(host->base, HC_PC_HC, 0x1e00, slot);
-	mmc_base16[HC_PC_HC>>1] = 0x1f00;
-	//hc_wr16(host->base, HC_PC_HC, 0x1f00, slot);
-
-	/* Remove HW Reset to eMMC-4.4 Card */
-	mmc_base16[HC_PC_HC>>1] = 0x0f00;
-	//hc_wr16(host->base, HC_PC_HC, 0x0f00, slot);
-
-	/* Flush any pending interrupts */
-	mmc_base32[HC_ERROR_INT_STS>>2] = mmc_base32[HC_ERROR_INT_STS>>2];
-	//hc_wr32(base, HC_ERROR_INT_STS, hc_rd32(base, HC_ERROR_INT_STS, slot), slot);
-	mmc_base32[HC_NORMAL_INT_STS>>2] = mmc_base32[HC_NORMAL_INT_STS>>2];
-	//hc_wr32(base, HC_NORMAL_INT_STS, hc_rd32(base, HC_NORMAL_INT_STS, slot), slot);
-
-	return;
-}
-
-
-static struct sdhci_ops xlp_sdhci_ops = {
-	.read_l = xlp_readl,
-	.read_w = xlp_readw,
-	.read_b = xlp_readb,
-	.write_l = xlp_writel,
-	.write_w = xlp_writew,
-	.write_b = xlp_writeb,
-	.get_max_clock = xlp_get_max_clock,
-	.set_clock = sdhci_set_clock,
-	.get_timeout_clock = xlp_get_max_clock,
-	.set_bus_width = sdhci_set_bus_width,
-	.set_uhs_signaling = sdhci_set_uhs_signaling,
-	.set_bus_width = sdhci_set_bus_width,
-	.reset = xlpmmc_reset_controller,
-};
-
-/* VDD volt 2.70 ~ 3.60 */
-#define MMC_VDD_27_36	(MMC_VDD_27_28 | MMC_VDD_28_29 | MMC_VDD_29_30 | \
-			 MMC_VDD_30_31 | MMC_VDD_31_32 | MMC_VDD_32_33 | \
-			 MMC_VDD_33_34 | MMC_VDD_34_35 | MMC_VDD_35_36)
-/* Reference clock to MMC host controller - assume 133 MHz.  TODO
-   Add code to actually check the reference in case it was changed */
-#define XLP_REF_CLK133MHZ		133333333
-
-#define XLPMMC_DESCRIPTOR_SIZE	(64<<10)
-#define XLPMMC_DESCRIPTOR_COUNT	1
-#define GPIO_MMC_DETECT		29
-
-static uint32_t gpio_regread(int regidx) 
-{
-	uint64_t mmio = nlm_hal_get_dev_base(NODE_0, BUS_0, XLP_PCIE_GIO_DEV, XLP_GIO_GPIO_FUNC);
-	return nlm_hal_read_32bit_reg(mmio, regidx);
-}
-
-static void gpio_regwrite(int regidx, uint32_t val)
-{
-	uint64_t mmio = nlm_hal_get_dev_base(NODE_0, BUS_0, XLP_PCIE_GIO_DEV, XLP_GIO_GPIO_FUNC);
-	nlm_hal_write_32bit_reg(mmio, regidx, val);
-}
-
-/* Platform driver pointer from arch/mips/netlogic/xlp/platform.c */
-extern struct platform_device *mmc_pplat_dev;
-
-static int sdhci_xlp_probe_slot(struct pci_dev *pdev,
-					struct sdhci_xlp_chip *chip, int sltno)
-{
-	struct sdhci_xlp_chip *chip_sd;
-	struct sdhci_host *sd_host;
-	struct mmc_host *mmc;
-	int ret;
-
-printm();
-	sd_host = sdhci_alloc_host(&pdev->dev, sizeof(struct sdhci_xlp_chip));
-printm();
-	if (IS_ERR(sd_host)) {
-		dev_err(&pdev->dev, "sdhci_alloc_host() failed!\n");
-printb(-ENODEV);
-		return -ENODEV;
-	}
-
-printm();
-	chip_sd = sdhci_priv(sd_host);
-	chip->host[sltno] = sd_host;
-	chip_sd->pdev = chip->pdev;
-
-printm();
-	sd_host->hw_name = "xlp-mmc";
-	sd_host->ops = &xlp_sdhci_ops;
-	sd_host->irq = pdev->irq;
-
-printm();
-	/*
-	 * The capabilities register reports block size as 3 for 4096,
-	 * force it to 2048.
-	 * The cmd and data lines are not getting cleared by hardware on writing
-	 * 0x2 and 0x4 to MMC_SWRESET [2,1] register, if the card is not present
-	 * in the slot.
-	 * Avoid reset if the card is not present.
-	 */
-	sd_host->quirks = SDHCI_QUIRK_FORCE_BLK_SZ_2048 |
-				SDHCI_QUIRK_NO_CARD_NO_RESET;
-
-printm();
-	ret = pci_request_region(pdev, sltno, mmc_hostname(sd_host->mmc));
-printm();
-	if (ret) {
-printm();
-		dev_err(&pdev->dev, "can't request region\n");
-		goto err1;
-	}
-
-printm();
-	sd_host->ioaddr = devm_ioremap(&pdev->dev,
-					pci_resource_start(pdev, sltno),
-					pci_resource_len(pdev, sltno));
-printm();
-	if (!sd_host->ioaddr) {
-printm();
-		dev_err(&pdev->dev, "failed to remap registers\n");
-		ret = -ENOMEM;
-		goto err0;
-	}
-
-printm();
-
-	/* *********************************************************************** */
-	/* *********************************************************************** */
-	/* *********************************************************************** */
-	/* *********************************************************************** */
-	/* I don't know if anything in this block is needed. . . I do, however, know
-	 * that the further I got in the code, some of this stuff was required to
-	 * make things on the eMMC work */
-
-	/* These GPIO calls seemed to have no effect there or not. */
-printv(gpio_regread(XLP_GPIO_INTEN00));
-	gpio_regwrite(XLP_GPIO_INTEN00, gpio_regread(XLP_GPIO_INTEN00) | 
-			0x1<<(GPIO_MMC_DETECT+sltno));
-printv(gpio_regread(XLP_GPIO_INTEN00));
-printv(gpio_regread(XLP_8XX_GPIO_INT_POLAR0));
-	gpio_regwrite(XLP_8XX_GPIO_INT_POLAR0, gpio_regread(XLP_8XX_GPIO_INT_POLAR0) | 
-			0x1<<(GPIO_MMC_DETECT+sltno));
-printv(gpio_regread(XLP_8XX_GPIO_INT_POLAR0));
-printv(gpio_regread(XLP_8XX_GPIO_INT_TYPE0));
-	gpio_regwrite(XLP_8XX_GPIO_INT_TYPE0, gpio_regread(XLP_8XX_GPIO_INT_TYPE0) | 
-			0x1<<(GPIO_MMC_DETECT+sltno));
-printv(gpio_regread(XLP_8XX_GPIO_INT_TYPE0));
-	mmc = sd_host->mmc ;
-
-	/* Pretty sure that the following is needed -- through the xlpmmc_reset below */
-
-	/* Inform kernel of min and max clock divider values we support - assuming
-	 * 10-bit divider and all divider values supported.  Note in 10b mode, divider
-	 * value does not appear to be 2x the value in the register (PRM says it IS 2x) */
-	mmc->f_min = XLP_REF_CLK133MHZ / 1023;
-	mmc->f_max = XLP_REF_CLK133MHZ / 3;     // 44.33 MHz
-
-	mmc->max_blk_size = 512;
-	mmc->max_blk_count = 2048;
-
-	mmc->max_seg_size = XLPMMC_DESCRIPTOR_SIZE;
-	mmc->max_segs = XLPMMC_DESCRIPTOR_COUNT;
-
-	mmc->ocr_avail = MMC_VDD_27_36; /* volt 2.70 ~ 3.60 */
-	mmc->caps = MMC_CAP_NONREMOVABLE;
-
-	/* High speed mode at single data rate can be supported with 3.3V signaling */
-	sd_host->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SD_HIGHSPEED |
-			MMC_CAP_MMC_HIGHSPEED;
-
-	xlpmmc_reset_controller(sd_host, 0);
-	msleep(5);
-	/* *********************************************************************** */
-	/* *********************************************************************** */
-	/* *********************************************************************** */
-	/* *********************************************************************** */
-
-	/* Registering host */
-printm();
-	ret = sdhci_add_host(sd_host);
-/* Don't know what I've done, but here we never return from sdhci_add_host anymore. . . */
-#warning I just wanted you to see this note -- We don't return from sdhci_add_host after today. . . 
-printm();
-	if (ret) {
-printm();
-		dev_err(&pdev->dev, "sdhci_add_host() failed\n");
-		goto err0;
-	}
-
-#if 0 /* This was added to try to trick the MMC layer into thinking that the
-	 card was inserted.  It didn't seem to have an effect. */
-#define XLP_ENABLE_SIMULATION		(1<<7)	
-#define XLP_SIMULATE_CARD_INSERT	(1<<6)
-	xlp_writel(sd_host, XLP_ENABLE_SIMULATION, SDHCI_HOST_CONTROL);
-	msleep(1);
-	xlp_writel(sd_host, XLP_SIMULATE_CARD_INSERT, SDHCI_HOST_CONTROL);
+#ifdef XLP_SDHCI_DEBUG_VERBOSE
+#define SDHCI_DEBUG_VERBOSE			printk
+#define XLP_SDHCI_DEBUG
+#else
+#define SDHCI_DEBUG_VERBOSE(...)
 #endif
 
+#ifdef XLP_SDHCI_DEBUG
+#define SDHCI_DEBUG					printk
+#define KDBG						KERN_INFO
+#else
+#define SDHCI_DEBUG(...)
+#define KDBG						KERN_DEBUG
+#endif
 
-printv(gpio_regread(XLP_GPIO_INTEN00));
-printv(gpio_regread(XLP_8XX_GPIO_INT_POLAR0));
-printv(gpio_regread(XLP_8XX_GPIO_INT_TYPE0));
-printg();
-	return 0;
+#ifdef XLP_SDHCI_DEBUG_REGS
+#define SDHCI_DEBUG_REGS			printk
+#else
+#define SDHCI_DEBUG_REGS(...)
+#endif
 
-err0:
-printm();
-	pci_release_region(pdev, sltno);
-printm();
-err1:
-printm();
-	sdhci_free_host(sd_host);
-printb(ret);
-	return ret;
+/* Insure the capabilities registers reflect the correct capabilities.
+ * Note this doesn't match the PRM for good reason.
+ */
+#define XLP_SDHCI_CAPABILITIES											\
+		(  (1 << 22)	/* 3.3V signaling supported */					\
+		 | (1 << 21)	/* Suspend/Resume supported */					\
+		 | (1 << 20)	/* SDMA supported */							\
+		 | (1 << 19)	/* High-speed mode supported (but need quirk) */\
+		 | (1 << 18)	/* ADMA2 supported */							\
+		 | (2 << 15)	/* Max Block Length (2 = 2048 bytes) */			\
+		 | (1 << 6)		/* Time-out clock frequency units (1 = MHz) */	\
+		 | 0x30			/* Time-out clock frequency */					\
+		)
+
+/* Quirks for 4.2.4 MMC core:
+ * 1) The cmd and data lines are not getting cleared by hardware on writing
+ *    0x2 and 0x4 to MMC_SWRESET [2,1] register, if the card is not present
+ *    in the slot. Avoid reset if the card is not present. Note for an eMMC
+ *    device, the card detect signal never gets asserted so this quirk will
+ *    prevent reset from being applied. Thus do not apply the quirk if the
+ *    slot type is set for eMMC.
+ * 2) Experiment - Controller doesn't support high-speed bit in host control
+ *    register but does support high-speed modes.
+ */
+#define XLP_SDHCI_QUIRKS					\
+		(  SDHCI_QUIRK_NO_CARD_NO_RESET		\
+		 | SDHCI_QUIRK_NO_HISPD_BIT			\
+		)
+#define XLP_SDHCI_QUIRKS_EMMC	SDHCI_QUIRK_NO_HISPD_BIT
+#define XLP_SDHCI_QUIRKS2		0
+
+struct xlp_sdhci_chip {
+	struct sdhci_host	*host[XLP_NUM_SD_SLOT];
+	void __iomem		*ioaddr;
+	struct resource      iomem_resource;
+	struct pci_dev		*pdev;
+	uint16_t			 num_slots;
+};
+
+static char driver_name[] = XLP_SDHCI_DRIVER_NAME;
+
+static u64 xlp_sdhci_dmamask = ~(u32)0;
+
+/* Use our I/O accessors since the kernel accessors expect little endian.
+ * When reading XLP PCI-e config space registers the endianness is always
+ * the same as the CPU.
+ *
+ * For all of these we are assuming reg is given as a byte offset from the
+ * start of the device-specific register space (i.e. after the PCIe header
+ * offset - therefore the slot probe code needs to set host->ioaddr correctly.
+ */
+#define REG(x)		(unsigned int)(((unsigned long)(x) & 0x3FFUL) >> 2)
+static void xlp_writel(struct sdhci_host *host, u32 data, int reg) {
+	volatile u32 __iomem *mmio = (volatile u32 *)(host->ioaddr + reg);
+	SDHCI_DEBUG_REGS("  Write 4 bytes to 0x%p (reg 0x%02x) <- 0x%08x\n",
+			mmio, REG(mmio), data);
+	*mmio = data;
 }
 
-/* there are other places where I key off of if (andy) in the code so that
- * I can check to see values as they are being set ONLY during init phase. */
-int andy = 0;
-static int __devinit sdhci_xlp_probe(struct pci_dev *pdev,
-					const struct pci_device_id *id)
+static void xlp_writew(struct sdhci_host *host, u16 data, int reg) {
+	volatile u16 __iomem *mmio = (volatile u16 *)(host->ioaddr + reg);
+	SDHCI_DEBUG_REGS("  Write 2 bytes to 0x%p (reg 0x%02x) <- 0x    %04x\n",
+			mmio, REG(mmio), data);
+	*mmio = data;
+}
+
+static void xlp_writeb(struct sdhci_host *host, u8 data, int reg) {
+	volatile u8 __iomem *mmio = (volatile u8 *)(host->ioaddr + reg);
+	SDHCI_DEBUG_REGS("  Write 1 byte  to 0x%p (reg 0x%02x) <- 0x      %02x\n",
+			mmio, REG(mmio), data);
+	*mmio = data;
+}
+
+static u32 xlp_readl(struct sdhci_host *host, int reg) {
+	volatile u32 __iomem *mmio = (volatile u32 *)(host->ioaddr + reg);
+	u32 data;
+	SDHCI_DEBUG_REGS("  Read  4 bytes at 0x%p (reg 0x%02x)....",
+			mmio, REG(mmio));
+	data = *mmio;
+	SDHCI_DEBUG_REGS(KERN_CONT "0x%08x\n", data);
+	return data;
+}
+
+static u16 xlp_readw(struct sdhci_host *host, int reg) {
+	volatile u16 __iomem *mmio = (volatile u16 *)(host->ioaddr + reg);
+	u16 data;
+	SDHCI_DEBUG_REGS("  Read  2 bytes at 0x%p (reg 0x%02x)....",
+			mmio, REG(mmio));
+	data = *mmio;
+	SDHCI_DEBUG_REGS(KERN_CONT "0x    %04x\n", data);
+	return data;
+}
+
+static u8 xlp_readb(struct sdhci_host *host, int reg) {
+	volatile u8 __iomem *mmio = (volatile u8 *)(host->ioaddr + reg);
+	u8 data;
+	SDHCI_DEBUG_REGS("  Read  1 byte  at 0x%p (reg 0x%02x)....",
+			mmio, REG(mmio));
+	data = *mmio;
+	SDHCI_DEBUG_REGS(KERN_CONT "0x      %02x\n", data);
+	return data;
+}
+
+static int xlp_enable_dma(struct sdhci_host *host)
 {
-	struct sdhci_xlp_chip *chip;
-	struct resource res;
-	void __iomem *sys_addr;
-	int ret, slotno, node;
+	unsigned long *priv = (unsigned long *)sdhci_priv(host);
+	struct pci_dev *pdev = (struct pci_dev *)priv[0];
+	int rv;
+	static int dma_enabled = 0;
 
-printm();
-andy=1;
-	if (cpu_is_xlp9xx())
-		node = PCI_FUNC(pdev->bus->self->devfn);
-	else
-		node = PCI_SLOT(pdev->devfn) / 8;
+	if(dma_enabled) return 0;
 
-printm();
-	chip = kzalloc(sizeof(struct sdhci_xlp_chip), GFP_KERNEL);
-printm();
-	if (!chip) {
-printb(-ENOMEM);
-		return -ENOMEM;
+	rv = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
+	if(rv) {
+		printk(KERN_ERR "%s: Failed to set 32b DMA mask for %s\n",
+				driver_name, mmc_hostname(host->mmc));
+		host->flags &= ~(SDHCI_USE_SDMA | SDHCI_USE_ADMA);
+		return rv;
 	}
 
-printm();
-	ret = pci_enable_device(pdev);
-printm();
+	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+	pdev->dev.dma_mask = &xlp_sdhci_dmamask;
+	pci_set_master(pdev);
+	SDHCI_DEBUG("DMA Enabled for %s\n", mmc_hostname(host->mmc));
+	dma_enabled = 1;
+
+	return 0;
+}
+
+static void xlp_hw_reset(struct sdhci_host *host)
+{
+	u8 data = xlp_readb(host, SDHCI_POWER_CONTROL);
+
+	if(!(data & SDHCI_POWER_ON)) return;
+
+	SDHCI_DEBUG("Issuing hardware reset to %s\n", mmc_hostname(host->mmc));
+	xlp_writeb(host, data | SDHCI_POWER_RESET, SDHCI_POWER_CONTROL);
+	udelay(10);		// eMMC minimum 1us
+	xlp_writeb(host, data, SDHCI_POWER_CONTROL);
+
+	usleep_range(300, 1000);	// eMMC minimum 200us
+}
+
+/* Host clock control functions - see above quirk
+ * For this to get called, the SDClkBF field in the capabilities
+ * register must be 0 (the default), which tells the host to get
+ * the max clock via some other means.
+ */
+static unsigned int xlp_get_max_clock(struct sdhci_host *host)
+{
+	unsigned int max_clk;
+
+	/* Retrieve the SD/MMC controller SOC reference clock */
+	if(is_nlm_xlp2xx())
+		max_clk = nlm_hal_get_soc_freq(NODE_0, XLP2XX_CLKDEVICE_MMC);
+	else
+		max_clk = nlm_hal_get_soc_freq(NODE_0, DFS_DEVICE_MMC);
+
+	/* 4.2.4 controller assumes the clock is multiplied by the value + 1
+	 * specified in the capabilities register ClkMul field (we set this
+	 * to 1 since 0 means programmable clock is not supported). Thus the
+	 * core assumes the clock is multiplied by two. However this is not
+	 * the case with XLP so instead give the core 1/2 the actual clock.
+	 */
+	max_clk /= 2;
+	SDHCI_DEBUG("SDHCI Clock Control: Returning max clock = %d MHz\n",
+			max_clk / 1000 / 1000);
+	return max_clk;
+}
+
+#ifdef CONFIG_GPIOLIB
+/* Mark GPIOs consumed by the SDHCI as unavailable for other functions. This only
+ * matters of some other potential user politely asks if they can use the GPIO.
+ * otherwise they have no idea that they can't.
+ */
+static const u8 slot0_gpios[] =
+	{  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 29, 31 };
+static const u8 slot1_gpios[] = 
+	{ 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 30, 32 };
+
+static void __init reserve_gpios(void)
+{
+	int i;
+	u8 g;
+
+	for(i = 0; i < ARRAY_SIZE(slot0_gpios); i++) {
+		g = slot0_gpios[i];
+		if(gpio_request(g, driver_name))
+			printk(KERN_WARNING "%s: Unable to reserve GPIO %d\n", driver_name, g);
+	}
+
+	if(!slot1_enable) return;
+
+	for(i = 0; i < ARRAY_SIZE(slot1_gpios); i++) {
+		g = slot1_gpios[i];
+		if(gpio_request(g, driver_name))
+			printk(KERN_WARNING "%s: Unable to reserve GPIO %d\n", driver_name, g);
+	}
+}
+
+static void __exit release_gpios(void)
+{
+	int i;
+
+	for(i = 0; i < ARRAY_SIZE(slot0_gpios); i++) gpio_free(slot0_gpios[i]);
+
+	if(!slot1_enable) return;
+
+	for(i = 0; i < ARRAY_SIZE(slot1_gpios); i++) gpio_free(slot1_gpios[i]);
+}
+#endif
+
+static void __init xlp_setup_hc(struct pci_dev *pdev)
+{
+	u16 sysctrl;
+	u32 capcfg0, capcfg1;
+
+	capcfg0 = XLP_SDHCI_CAPABILITIES;
+	/* Cap 1: Bit 1 = SDR50 support, bit 13 = Programmable Clock Multiplier support */
+	capcfg1 = (1 << 0) | (1 << 13);
+
+	pci_write_config_dword(pdev, HC_MMC_CAPCFG0_S0, capcfg0 | (slot0_is_emmc << 27));
+	pci_write_config_dword(pdev, HC_MMC_CAPCFG1_S0, capcfg1);
+
+	/* Set-up capabilities registers for slot 1 (even if not used) */
+	pci_write_config_dword(pdev, HC_MMC_CAPCFG0_S1, capcfg0 | (slot1_is_emmc << 27));
+	pci_write_config_dword(pdev, HC_MMC_CAPCFG1_S1, capcfg1);
+
+	/* Enable host controller */
+	sysctrl = HC_ENABLE_SLOT_0 | HC_ENABLE_L3_ALLOCATE;
+	if(slot0_read_only) sysctrl |= HC_WRITE_PROT_S0;
+	if(slot1_enable)    sysctrl |= HC_ENABLE_SLOT_1;
+	if(slot1_read_only) sysctrl |= HC_WRITE_PROT_S1;
+	pci_write_config_dword(pdev, HC_SYSCTRL, sysctrl);
+	msleep(5);
+}
+
+/* Callbacks for the 4.2.4 MMC core. Have to populate the
+ * following call-backs even if not providing them in this
+ * driver (sdhci.c version is listed on the right):
+ *	reset				sdhci_reset
+ *	set_bus_width		sdhci_set_bus_width
+ *	set_clock			sdhci_set_clock
+ *	set_uhs_signaling	sdhci_set_uhs_signaling
+ *
+ * The remaining callbacks in the ops struct are optional.
+ */
+static struct sdhci_ops xlp_sdhci_ops = {
+	.reset             = sdhci_reset,
+	.set_clock         = sdhci_set_clock,
+	.set_bus_width     = sdhci_set_bus_width,
+	.set_uhs_signaling = sdhci_set_uhs_signaling,
+	.hw_reset          = xlp_hw_reset,
+	.enable_dma        = xlp_enable_dma,
+	.get_max_clock     = xlp_get_max_clock,
+	.write_l           = xlp_writel,
+	.write_w           = xlp_writew,
+	.write_b           = xlp_writeb,
+	.read_l            = xlp_readl,
+	.read_w            = xlp_readw,
+	.read_b            = xlp_readb
+};
+
+/* Per-slot host set-up */
+static int probe_slot(struct xlp_sdhci_chip *chip,
+				struct pci_dev *pdev, int sltno)
+{
+	struct sdhci_host *sd_host = NULL;
+	int ret;
+
+	SDHCI_DEBUG("%s for slot number %d\n", __func__, sltno);
+
+	/* We don't need sdhci_alloc_host to allocate space for our private
+	 * data (struct xlp_sdhci_chip) since that is done elsewhere. However
+	 * we DO want to save a pointer to the PCI device struct so we need to
+	 * allocate at least enough bytes for a pointer. Since the private
+	 * data area is cacheline aligned in the struct definition, might as
+	 * well have sdhci_alloc_host allocate an entire cache line.
+	 */
+	sd_host = sdhci_alloc_host(&pdev->dev, XLP_CACHELINE_SIZE);
+	if (IS_ERR(sd_host)) {
+		printk(KERN_ERR "%s: sdhci_alloc_host failed for slot %d\n",
+				driver_name, sltno);
+		return PTR_ERR(sd_host);
+	}
+	SDHCI_DEBUG_VERBOSE("  Allocated host struct at 0x%p\n", sd_host);
+
+	sd_host->private[0] = (unsigned long)pdev;
+	sd_host->ioaddr = chip->ioaddr + XLP_PCIE_HDR_OFFSET + (sltno * XLP_SLOT_SIZE);
+	sd_host->hw_name = driver_name;
+	sd_host->ops = &xlp_sdhci_ops;
+	sd_host->irq = pdev->irq;
+	sd_host->dma_mask = DMA_BIT_MASK(32);
+
+	/* Slight difference in quirks and capabilities if the slot is
+	 * configured for an eMMC device vs. removable. XLP supports
+	 * CMD14/CMD19 and hardware reset pin to SD/MMC card.
+	 */
+	if(((sltno == 0) && slot0_is_emmc) || ((sltno == 1) && slot1_is_emmc)) {
+		sd_host->mmc->caps |= MMC_CAP_NONREMOVABLE;
+		sd_host->quirks = XLP_SDHCI_QUIRKS_EMMC;
+	} else {
+		sd_host->quirks  = XLP_SDHCI_QUIRKS;
+	}
+	sd_host->quirks2 = XLP_SDHCI_QUIRKS2;
+	sd_host->mmc->caps |= MMC_CAP_HW_RESET | MMC_CAP_BUS_WIDTH_TEST;
+
+	SDHCI_DEBUG_VERBOSE("  Slot Virt Base = 0x%p\n", sd_host->ioaddr);
+	SDHCI_DEBUG("  Capabilities register 0 val = 0x%08X\n",
+			xlp_readl(sd_host, SDHCI_CAPABILITIES));
+	SDHCI_DEBUG("  Capabilities register 1 val = 0x%08X\n",
+			xlp_readl(sd_host, SDHCI_CAPABILITIES + 4));
+	SDHCI_DEBUG("  Present state register val  = 0x%08X\n",
+			xlp_readl(sd_host, SDHCI_PRESENT_STATE));
+
+	/* Registering host */
+	SDHCI_DEBUG("  Calling sdhci_add_host\n");
+	ret = sdhci_add_host(sd_host);
 	if (ret) {
-printm();
-		dev_err(&pdev->dev, "pci_enable_device() failed!\n");
-		kfree(chip);
-printb(ret);
+		sdhci_free_host(sd_host);
+		printk(KERN_ERR "%s: sdhci_add_host() failed for slot %d\n",
+				driver_name, sltno);
+		return ret;
+	}
+	chip->host[sltno] = sd_host;
+
+	return 0;
+}
+
+/* Probe routine called when the PCI driver is instantiated */
+static int __init sdhci_xlp_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+{
+	struct xlp_sdhci_chip *chip = NULL;
+	u32 irt;
+	unsigned int irq;
+	int ret, slotno;
+	void __iomem *base;
+	unsigned long long physbase;
+	unsigned short pcie_devn = PCI_SLOT(pdev->devfn);
+	unsigned short pcie_fn   = PCI_FUNC(pdev->devfn);
+
+	ret = pci_enable_device(pdev);
+	if(ret) {
+		printk(KERN_ERR "%s: pci_enable_device() failed!\n", driver_name);
 		return ret;
 	}
 
-printm();
-#if 0
-	pdev->irq = nlm_irq_to_xirq(node, PIC_MMC_IRQ);
-#else
-{
-#define DEV_IRT_INFO		0x3d
-#define BUS_0			0
-#define XLP_MMC_PCIE_DEV	7
-#define XLP_MMC_PCIE_FN		3
-	uint64_t iobase = nlm_hal_get_dev_base(NODE_0, BUS_0,
-				XLP_MMC_PCIE_DEV, XLP_MMC_PCIE_FN);
-	uint16_t irt = nlm_hal_read_32bit_reg(iobase, DEV_IRT_INFO) & 0xff;
+	printk(KDBG "%s: PCI-e Bus 0 Device %d Function %d Vendor 0x%04X ID 0x%04X\n",
+			driver_name, pcie_devn, pcie_fn, pdev->vendor, pdev->device);
+	printk(KDBG "  Number of slots: %d\n", slot1_enable ? 2 : 1);
+	if(slot0_is_emmc)	printk(KDBG "  Slot 0 type set to non-removable / eMMC\n");
+	if(slot0_read_only)	printk(KDBG "  Slot 0 write protected\n");
+	if(slot1_enable || slot1_read_only)
+						printk(KDBG "  Slot 1 write protected\n");
 
-	pdev->irq = xlp_irt_to_irq(NODE_0, irt);
-printv(pdev->irq);
-prints("pdev->irq = %i", pdev->irq);
-}
-#endif
-printm();
-	chip->pdev = pdev;
-	pci_set_drvdata(pdev, chip);
-printm();
-
-	/*
-	 * Enable slots.
-	 * Get system control base, node set to zero.
-	 * TODO: node need to be taken care on multinode case.
-	 */
-	memcpy(&pdev->resource[0], &mmc_pplat_dev->resource[1],
-		sizeof(struct resource));
-printm();
-#if 0
-	res.start = CPHYSADDR(nlm_get_mmcsd_regbase(node, 2));
-#else
-	res.start = mmc_pplat_dev->resource[1].start;
-#endif
-printm();
-	sys_addr = devm_ioremap(&pdev->dev, res.start, 0x28);
-printm();
-	if (!sys_addr) {
-printm();
+	chip = devm_kzalloc(&pdev->dev, sizeof(struct xlp_sdhci_chip), GFP_KERNEL);
+	if(chip == NULL) {
+		printk(KERN_ERR "%s: can't allocate memory\n", driver_name);
 		ret = -ENOMEM;
-		goto err;
+		goto perr;
 	}
-printm();
-#if XLP_NUM_SD_SLOT == 1
-	__raw_writel(0x14, sys_addr);
-#else
-	__raw_writel(0x1c, sys_addr);
-#endif
-	msleep(5);
+	SDHCI_DEBUG_VERBOSE("  Allocated chip struct at 0x%p\n", chip);
+	chip->num_slots = slot1_enable ? 2 : 1;
 
-printm();
-	/*
-	 * The XLP MMC/SD controller has two slots. The registers for the
-	 * slots are at fixed location in the PCIe ECFG space, and not
-	 * in any PCI BARs.
-	 */
-	for (slotno = 0; slotno < XLP_NUM_SD_SLOT; slotno++) {
-printm();
-		pdev->resource[slotno].flags = IORESOURCE_MEM;
-#if 0
-		pdev->resource[slotno].start =
-			CPHYSADDR(nlm_get_mmcsd_regbase(node, slotno));
-		pdev->resource[slotno].end = pdev->resource[slotno].start +
-						XLP_SLOT_SIZE - 1;
-#else
-		pdev->resource[slotno].start = res.start + XLP_SLOT_SIZE * slotno + XLP_SLOT_SIZE;
-		pdev->resource[slotno].end = res.start + XLP_SLOT_SIZE * slotno + XLP_SLOT_SIZE * 2 - 1;
-#endif
-
-printm();
-		ret = sdhci_xlp_probe_slot(pdev, chip, slotno);
-printm();
-		if (ret)
-			dev_err(&pdev->dev, "failed to probe slot%d\n", slotno);
-printm();
+	/* Get I/O memory region for this device by bus, device, function */
+	physbase = nlm_hal_get_dev_base(NODE_0, BUS_0, pcie_devn, pcie_fn);
+	SDHCI_DEBUG("  PCI-E config phys base = 0x%llx\n", physbase);
+	base = ioremap_nocache(physbase, PAGE_SIZE);
+	if (!base) {
+		dev_err(&pdev->dev, "cannot remap I/O\n");
+		ret = -ENOMEM;
+		goto perr1;
 	}
+	SDHCI_DEBUG("    Virtual base = 0x%p\n", base);
+	chip->ioaddr = base;
 
-printm();
-andy=0;
-printg();
+	/* Get PIC IRT entry from PCI-e header, convert to IRQ */
+	pci_read_config_dword(pdev, XLP_PCIE_DEV_IRT_INFO, &irt);
+	irt &= 0xFFFF;
+	irq = xlp_irt_to_irq(NODE_0, irt);
+	SDHCI_DEBUG("  IRT = %u ==> IRQ %u\n", irt, irq);
+	pdev->irq = irq;
+
+	/* Save the I/O memory region so we can free it later */
+	chip->iomem_resource.flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+	chip->iomem_resource.start = physbase;
+	chip->iomem_resource.end   = physbase + 0xFFF;
+	chip->iomem_resource.name  = driver_name;
+	SDHCI_DEBUG("  Requesting PCI I/O memory region\n");
+	ret = request_resource(&iomem_resource, &chip->iomem_resource);
+	if (ret)
+		printk(KERN_WARNING "%s: Failed to reserve PCI-e config region\n", driver_name);
+
+	pci_set_drvdata(pdev, chip);
+
+	/* Enable host controller slot(s) and set write protect */
+	xlp_setup_hc(pdev);
+	for (slotno = 0; slotno < chip->num_slots; slotno++) {
+		ret = probe_slot(chip, pdev, slotno);
+		if(ret) break;
+	}
+	if(ret) goto perr2;
+
+#ifdef CONFIG_GPIOLIB
+	reserve_gpios();
+#endif
+
 	return 0;
 
-err:
-printm();
+perr2:
+	/* Failed to enable one or both slots - clean-up the driver */
+	/* Disable both slots and place the host controller in reset */
+	pci_write_config_dword(pdev, HC_SYSCTRL, HC_RESET | HC_CLK_DISABLE);
+	pci_set_drvdata(pdev, NULL);
+	SDHCI_DEBUG("  Calling release_resource\n");
+	release_resource(&chip->iomem_resource);
+	SDHCI_DEBUG("  Calling iounmap for virtual address 0x%p\n", base);
+	iounmap(base);
+perr1:
+	SDHCI_DEBUG_VERBOSE("  Calling devm_kfree for chip struct at 0x%p\n", chip);
+	devm_kfree(&pdev->dev, chip);
+perr:
+	SDHCI_DEBUG("  Calling pci_disable_device\n");
 	pci_disable_device(pdev);
-printm();
-	kfree(chip);
-andy=0;
-printb(ret);
+
 	return ret;
 }
 
-static void __devexit sdhci_xlp_remove(struct pci_dev *pdev)
+static void __exit sdhci_xlp_remove(struct pci_dev *pdev)
 {
-	struct sdhci_xlp_chip *chip;
+	struct xlp_sdhci_chip *chip;
+	struct sdhci_host *host;
 	int slotno, dead;
 	u32 scratch;
 
-	chip = pci_get_drvdata(pdev);
-	if (chip) {
-		for (slotno = 0; slotno < XLP_NUM_SD_SLOT; slotno++) {
-			scratch = readl(chip->host[slotno]->ioaddr +
-					SDHCI_INT_STATUS);
-			if (scratch == (u32)-1)
-				dead = 1;
+	SDHCI_DEBUG("%s enter\n", __func__);
 
-			sdhci_remove_host(chip->host[slotno], dead);
-			pci_release_region(pdev, slotno);
-			sdhci_free_host(chip->host[slotno]);
+	chip = pci_get_drvdata(pdev);
+	SDHCI_DEBUG_VERBOSE("  chip struct at 0x%p\n", chip);
+	if (chip) {
+		for (slotno = 0; slotno < chip->num_slots; slotno++) {
+			host = chip->host[slotno];
+			SDHCI_DEBUG("  Removing slot %d host \n", slotno);
+			SDHCI_DEBUG_VERBOSE("    Host struct at 0x%p\n", host);
+			if (host == NULL) continue;
+
+			SDHCI_DEBUG("    Checking if host has died...");
+			scratch = xlp_readl(host, SDHCI_INT_STATUS);
+			dead = (scratch == (u32)-1) ? 1 : 0;
+			SDHCI_DEBUG("%s\n", dead ? "yes" : "no");
+			SDHCI_DEBUG("    Calling sdhci_remove_host\n");
+			sdhci_remove_host(host, dead);
+			SDHCI_DEBUG("    Calling sdhci_free_host\n");
+			sdhci_free_host(host);
 		}
+
+		/* Disable both slots and place the host controller in reset */
+		pci_write_config_dword(pdev, HC_SYSCTRL, HC_RESET | HC_CLK_DISABLE);
+
+		/* Clean-up */
+		SDHCI_DEBUG("  Calling release_resource\n");
+		release_resource(&chip->iomem_resource);
+		SDHCI_DEBUG_VERBOSE("  Calling devm_kfree for chip struct at 0x%p\n", chip);
+		devm_kfree(&pdev->dev, chip);
 		pci_set_drvdata(pdev, NULL);
 	}
+
+#ifdef CONFIG_GPIOLIB
+	release_gpios();
+#endif
+
+	SDHCI_DEBUG("  Calling pci_disable_device\n");
 	pci_disable_device(pdev);
 }
 
-static struct pci_driver sdhci_xlp_driver = {
-	.name		= "sdhci-xlp",
-	.id_table	= xlp_pci_ids,
-	.probe		= sdhci_xlp_probe,
-	.remove		= sdhci_xlp_remove,
+/* PCI-e enumeration stuff */
+static const struct pci_device_id xlp_sdhci_pci_ids[] __initconst = {
+	{
+		.vendor         = PCI_NETL_VENDOR,
+		.device         = XLP_DEVID_MMC,
+		.subvendor      = PCI_ANY_ID,
+		.subdevice      = PCI_ANY_ID,
+	},
+	{ /* End - all zeros */ }
 };
 
-module_pci_driver(sdhci_xlp_driver);
+static struct pci_driver sdhci_xlp_driver = {
+	.name		= driver_name,
+	.id_table	= xlp_sdhci_pci_ids,
+	.probe		= sdhci_xlp_probe,
+	.remove		= __exit_p(sdhci_xlp_remove)
+};
 
-MODULE_AUTHOR("Kamlakant Patel <kamlakant.patel@broadcom.com>");
-MODULE_DESCRIPTION("SDHCI Driver for Netlogic XLP");
+static int __init sdhci_xlp_init(void)
+{
+	printk(XLP_SDHCI_DESCRIPTION "\n");
+
+	return pci_register_driver(&sdhci_xlp_driver);
+}
+module_init(sdhci_xlp_init);
+
+static void __exit sdhci_xlp_exit(void)
+{
+	pci_unregister_driver(&sdhci_xlp_driver);
+}
+module_exit(sdhci_xlp_exit);
+
 MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Lewis Carroll <lcarroll@broadcom.com>");
+MODULE_DESCRIPTION(XLP_SDHCI_DESCRIPTION);
+MODULE_VERSION(XLP_SDHCI_VERSION);
+

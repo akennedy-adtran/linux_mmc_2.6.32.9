@@ -4,6 +4,7 @@
 
 config MMC_CLKGATE
 	bool "MMC host clock gating"
+	depends on !CPU_XLP
 	help
 	  This will attempt to aggressively gate the clock to the MMC card.
 	  This is done to save power due to gating off the logic and bus
@@ -11,3 +12,7 @@ config MMC_CLKGATE
 	  support handling this in order for it to be of any use.
 
 	  If unsure, say N.
+
+config MMC_USE_SLOT_GPIO
+	bool
+	default y if !CPU_XLP

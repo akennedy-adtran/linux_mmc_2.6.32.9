@@ -11,7 +11,6 @@
  */
 
 #include <linux/err.h>
-//#include <asm/sizes.h>  ADTRAN
 #include <linux/sizes.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
@@ -235,7 +234,11 @@ static int mmc_read_ssr(struct mmc_card *card)
 		return 0;
 	}
 
+#if defined(CONFIG_64BIT) && defined(CONFIG_CPU_XLP)
+	ssr = kmalloc(64, GFP_KERNEL | GFP_DMA);
+#else
 	ssr = kmalloc(64, GFP_KERNEL);
+#endif
 	if (!ssr)
 		return -ENOMEM;
 
@@ -294,7 +297,11 @@ static int mmc_read_switch(struct mmc_card *card)
 
 	err = -EIO;
 
+#if defined(CONFIG_64BIT) && defined(CONFIG_CPU_XLP)
+	status = kmalloc(64, GFP_KERNEL | GFP_DMA);
+#else
 	status = kmalloc(64, GFP_KERNEL);
+#endif
 	if (!status) {
 		pr_err("%s: could not allocate a buffer for "
 			"switch capabilities.\n",
@@ -360,7 +367,11 @@ int mmc_sd_switch_hs(struct mmc_card *card)
 
 	err = -EIO;
 
+#if defined(CONFIG_64BIT) && defined(CONFIG_CPU_XLP)
+	status = kmalloc(64, GFP_KERNEL | GFP_DMA);
+#else
 	status = kmalloc(64, GFP_KERNEL);
+#endif
 	if (!status) {
 		pr_err("%s: could not allocate a buffer for "
 			"switch capabilities.\n", mmc_hostname(card->host));
@@ -1122,6 +1133,7 @@ static int mmc_sd_resume(struct mmc_host *host)
 	if (!(host->caps & MMC_CAP_RUNTIME_RESUME)) {
 		err = _mmc_sd_resume(host);
 		pm_runtime_set_active(&host->card->dev);
+		pm_runtime_mark_last_busy(&host->card->dev);
 	}
 	pm_runtime_enable(&host->card->dev);
 

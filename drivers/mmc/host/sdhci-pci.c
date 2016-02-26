@@ -1486,11 +1486,8 @@ static int sdhci_pci_runtime_resume(struct device *dev)
 static const struct dev_pm_ops sdhci_pci_pm_ops = {
 	.suspend = sdhci_pci_suspend,
 	.resume = sdhci_pci_resume,
-
-#ifdef CONFIG_PM
 	SET_RUNTIME_PM_OPS(sdhci_pci_runtime_suspend,
 			sdhci_pci_runtime_resume, NULL)
-#endif /* CONFIG_PM */
 };
 
 /*****************************************************************************\
@@ -1676,21 +1673,17 @@ static void sdhci_pci_remove_slot(struct sdhci_pci_slot *slot)
 
 static void sdhci_pci_runtime_pm_allow(struct device *dev)
 {
-#ifdef CONFIG_PM  // ADTRAN
 	pm_runtime_put_noidle(dev);
 	pm_runtime_allow(dev);
 	pm_runtime_set_autosuspend_delay(dev, 50);
 	pm_runtime_use_autosuspend(dev);
 	pm_suspend_ignore_children(dev, 1);
-#endif /* CONFIG_PM */
 }
 
 static void sdhci_pci_runtime_pm_forbid(struct device *dev)
 {
-#ifdef CONFIG_PM  // ADTRAN
 	pm_runtime_forbid(dev);
 	pm_runtime_get_noresume(dev);
-#endif /* CONFIG_PM */
 }
 
 static int sdhci_pci_probe(struct pci_dev *pdev,

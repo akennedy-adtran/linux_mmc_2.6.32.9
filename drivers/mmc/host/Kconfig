@@ -346,12 +346,11 @@ config MMC_SDHCI_ST
 
 config MMC_SDHCI_XLP
 	tristate "SDHCI support on Broadcom XLP SoC"
+	depends on CPU_XLP
+	select MMC_SDHCI_IO_ACCESSORS
 	help
-	  This is the XLP Secure Digital Host Controller Interface for the
-	  XLP SoCs.
-
-	  If you have a controller with this interface, say Y or M here.
-	  If unsure, say N.
+	  Secure Digital Host Controller Interface
+	  for the Broadcom XLP SoCs.
 
 config MMC_OMAP
 	tristate "TI OMAP Multimedia Card Interface support"
@@ -394,22 +393,6 @@ config MMC_AU1X
 	  If you have a Alchemy platform with a MMC slot, say Y or M here.
 
 	  If unsure, say N.
-
-config MMC_XLP
-	tristate "XLP MMC/SD/SDIO Host Controller"
-	depends on NLM_XLP
-	help
-	  This selects the XLP sdio/mmc/sd card interface.
-	  If you have a XLP platform with a MMC slot, say Y or M here.
-
-config MMC_XLP_ENABLE_SLOT_1
-	bool "Enable slot 1"
-	default y
-	depends on NLM_XLP && MMC_XLP
-	help
-	  Enable both SD/MMC slots.  If not selected, only slot 0 will
-	  be enabled and the GPIOs used for slot 1 will be available for
-	  use as GPIOs.
 
 config MMC_ATMELMCI
 	tristate "Atmel SD/MMC Driver (Multimedia Card Interface)"

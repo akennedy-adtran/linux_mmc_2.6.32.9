@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2014 Broadcom Corporation
+ * Copyright (c) 2003-2015 Broadcom Corporation
  * All Rights Reserved
  *
  * Redistribution and use in source and binary forms, with or without
@@ -70,6 +70,10 @@
 #define XLP_DEVID_REGEX			0x1019
 #define XLP2XX_DEVID_I2C        0x101C
 #define XLP2XX_DEVID_XHCI       0x101D
+
+#define XLP_PCIE_HDR_OFFSET		0x100
+#define XLP_PCIE_REGION_SIZE	0x1000
+#define XLP_PCIE_DEV_IRT_INFO	(0x3D << 2)
 
 struct smp_boot_info_percpu {
   volatile unsigned long ready;

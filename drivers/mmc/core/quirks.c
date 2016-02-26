@@ -11,8 +11,7 @@
 
 #include <linux/types.h>
 #include <linux/kernel.h>
-//#include <linux/export.h>  //ADTRAN
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/sdio_ids.h>
 
